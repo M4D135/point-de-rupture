@@ -20,7 +20,10 @@ namespace PdrOutils
 	{
 		/** Critere de l'etape A3 : vingt minutes de jeu, soit 24 000 iterations, en six secondes. */
 		constexpr double BudgetMicrosecondes = 250.0;
-		/** Dix fois le plus gros fichier que l'outil sait ecrire. Au-dela de 2 Gio, le moteur tronquerait la taille a 32 bits. */
+		/**
+		 * Plus de huit fois le plus gros fichier que l'outil sait ecrire : environ 125 Mo a dix millions d'iterations,
+		 * d'apres le modele. Au-dela de 2 Gio, le moteur tronquerait la taille a 32 bits.
+		 */
 		constexpr int64 TailleRelectureMax = 1ll << 30;
 
 		/** Vrai si aucun condense n'est attendu, ou si c'est bien celui-la. */

@@ -252,6 +252,38 @@ def etat_des_binaires():
     return examines, en_avance, jamais
 
 
+def bibliotheques_en_retard():
+    """Bibliotheques du projet plus anciennes que l'un de leurs objets, ou introuvables.
+
+    Apres une compilation dont l'edition de liens a echoue, les objets sont neufs mais la bibliotheque est l'ancienne :
+    le moteur chargerait l'ancien code, alors que chaque objet est plus recent que ses sources. La liste des modules et
+    de leurs bibliotheques est celle que lit le moteur au demarrage (UnrealEditor.modules).
+    Rend (bibliotheques examinees, ecarts).
+    """
+    dossier = PROJET / 'Binaries' / {'darwin': 'Mac', 'win32': 'Win64'}.get(sys.platform, 'Linux')
+    manifeste = dossier / 'UnrealEditor.modules'
+    if not manifeste.is_file():
+        return 0, ['%s introuvable' % manifeste.relative_to(PROJET)]
+    try:
+        modules = json.loads(manifeste.read_text(encoding='utf-8'))['Modules']
+    except (ValueError, KeyError, TypeError):
+        return 0, ['%s illisible' % manifeste.relative_to(PROJET)]
+    examinees, ecarts = 0, []
+    for module, nom in sorted(modules.items()):
+        bibliotheque = dossier / nom
+        if not bibliotheque.is_file():
+            ecarts.append('%s introuvable' % nom)
+            continue
+        examinees += 1
+        date = bibliotheque.stat().st_mtime_ns
+        objets = [objet for motif in ('*.o', '*.obj')
+                  for objet in (PROJET / 'Intermediate' / 'Build').glob('*/*/UnrealEditor/Development/%s/%s' % (module, motif))]
+        recents = sorted(objet.name for objet in objets if objet.stat().st_mtime_ns > date)
+        if recents:
+            ecarts.append('%s plus ancienne que %s' % (nom, ', '.join(recents)))
+    return examinees, ecarts
+
+
 def regles_retouchees():
     """Fichiers de regles de compilation plus recents que le dernier passage de l'outil de compilation."""
     plans = sorted((PROJET / 'Intermediate' / 'Build').glob('*/*/PointDeRuptureEditor/Development/Makefile.bin'))
@@ -592,18 +624,21 @@ def principal():
             return 1
         examines, en_avance, jamais = etat_des_binaires()
     retouchees = regles_retouchees()
+    liees, en_retard = bibliotheques_en_retard()
     relatif = lambda chemins: ', '.join(sorted(os.path.relpath(chemin, PROJET) for chemin in chemins))
-    if en_avance or jamais or retouchees:
+    if en_avance or jamais or retouchees or en_retard:
         if en_avance:
             print('BINAIRES  ECART : sources plus recents que leur objet, les tests porteraient sur l\'ancien code : %s' % relatif(en_avance))
         if jamais:
             print('BINAIRES  ECART : sources jamais compiles : %s' % relatif(jamais))
         if retouchees:
             print('BINAIRES  ECART : regles de compilation retouchees depuis la derniere compilation : %s' % ', '.join(retouchees))
+        if en_retard:
+            print('BINAIRES  ECART : bibliotheques que le moteur chargerait sans les derniers objets (edition de liens manquee) : %s' % '; '.join(en_retard))
         bon = False
     elif examines:
-        print('BINAIRES  a jour : %d objets, aucun plus ancien que ses sources%s' % (
-            examines, ' (un source supprime depuis la derniere compilation ne se voit pas sans compiler)' if options.sans_compiler else ''))
+        print('BINAIRES  a jour : %d objets, aucun plus ancien que ses sources ; %d bibliotheques, aucune plus ancienne que ses objets%s' % (
+            examines, liees, ' (un source supprime depuis la derniere compilation ne se voit pas sans compiler)' if options.sans_compiler else ''))
     else:
         print('BINAIRES  fraicheur non controlee : aucun fichier de dependances sous Intermediate/Build')
 
