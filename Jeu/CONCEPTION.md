@@ -1,4 +1,4 @@
-# Point de rupture — conception de la version 0.2
+# Point de rupture — conception des versions 0.2 et 0.3
 
 Décisions de David du 12 novembre 2026, dans l'ordre :
 - « oublie totalement le système classique, full procedural rts » ;
@@ -240,6 +240,13 @@ Chaque camp tenu par l'IA réfléchit une fois par seconde, à tour de rôle.
 **Diplomatie** : voir 1.2.
 
 **Difficulté.** Facile : revenus ×0,8 et décisions lentes. Normal. Difficile : revenus ×1,2, replis et ciblage plus fins.
+
+**Version 0.3.**
+- Achèvement : rapport de forces de 1,2 en mode « jusqu'au dernier », 2,5 dans les autres modes, jamais en démo.
+- Un groupe sans objectif marche sur le front, à 320 m au plus.
+- Les cocktails sont lancés sur un avant-poste attaqué, au plus toutes les 30 s.
+- Le canon à eau part éteindre les feux.
+- La Convergence casse toutes les 10 s.
 
 ### 1.10 Commandes
 
