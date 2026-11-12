@@ -1,6 +1,6 @@
 # POINT DE RUPTURE — contre-expertise et cahier des charges révisé
 
-Version 5 du 11 novembre 2026 : corrigée après deux relectures adverses, puis alignée sur vos décisions du même jour (tout se fait dans Unreal Engine ; modèles tirés des contenus gratuits d'Unreal ou générés par Claude ; ni achat ni sous-traitance). Rien du jeu n'est implémenté et aucun équilibre n'est démontré ; seul existe le squelette du projet Unreal, deux modules C++ vides qui se compilent. Tous les nombres sont des hypothèses de prototype ; ★ marque ceux à essayer en premier.
+Version 5 du 11 novembre 2026 : corrigée après deux relectures adverses, puis alignée sur vos décisions du même jour (tout se fait dans Unreal Engine ; modèles tirés des contenus gratuits d'Unreal ou générés par Claude ; ni achat ni sous-traitance). Avancement mis à jour le 12 novembre 2026 (section 9). Rien du jeu n'est implémenté et aucun équilibre n'est démontré ; seul existe le socle technique de l'étape A1 : un noyau de simulation déterministe qui ne connaît encore aucune règle du jeu, ses relectures et ses tests. Tous les nombres de conception sont des hypothèses de prototype ; ★ marque ceux à essayer en premier.
 
 **Comment ce document a été établi.** Quatre contre-expertises indépendantes du document d'origine (règles, factions, technique, expérience du joueur), trois conceptions libres commandées avant de l'avoir lu, et deux enquêtes sur les documentations officielles, chacune relue par un second lecteur chargé de la réfuter. J'ai arbitré, rédigé, puis fait attaquer ce texte deux fois : trois relecteurs sur la première version (36 constats), deux sur la version corrigée (20 constats, dont un bloquant). Tous sont intégrés ; la présente version n'a pas été relue une troisième fois. Tous les rapports sont dans `annexes/`. Les faits techniques de la section 8 renvoient à la liste de sources en fin de document. Les précédents de jeux cités sans renvoi le sont de mémoire.
 
@@ -548,7 +548,18 @@ Trois règles de travail en découlent :
 
 **Compilation C++.** Avec la 5.8.0, l'outil de compilation d'Unreal refusait Xcode 27.2 : ce moteur n'admettait Xcode que jusqu'à la version 26.9, d'après son fichier `Engine/Config/Apple/Apple_SDK.json`. Le correctif 5.8.4 porte cette limite à 27.9, et l'outil déclare maintenant la plateforme Mac valide. L'annonce du correctif ne le mentionnait pas [U1]. Le projet a été créé et compilé le même jour : deux modules C++ vides, `PointDeRupture` et `PdrSim`, compilés et liés avec Xcode 27.2 en 74 secondes, sans erreur ni avertissement. Lancé sans interface, l'éditeur les charge tous les deux, le module de jeu appelant celui de simulation, et exécute un script Python ; ce premier chargement a pris 3 min 47 s.
 
-**Écoute réseau de l'outil de compilation.** Par défaut, l'outil de compilation d'Unreal ouvre le port 1345 sur toutes les interfaces réseau pendant chaque compilation, pour accepter des machines d'appoint. C'est désactivé pour ce projet depuis le 11 novembre 2026 (`Saved/UnrealBuildTool/BuildConfiguration.xml`, réglage `bDisableRemote`), et vérifié : plus aucune écoute pendant une compilation. Ce fichier vit dans `Saved`, dossier qu'on vide parfois et qu'on ne versionne pas : le script de vérification (section 9) signale sa disparition, et compile de toute façon sans écoute. Vos autres projets Unreal gardent le comportement par défaut.
+**Écoutes réseau d'Unreal.** Sans réglage, Unreal ouvre des ports sur toutes les interfaces réseau du Mac, à la compilation comme à l'exécution. Le projet n'a besoin d'aucun. Relevé des 11 et 12 novembre 2026, par la liste des ports en écoute pendant chaque commande :
+
+| Qui écoute | Port | Quand | Ce qui est fait pour ce projet |
+|---|---|---|---|
+| L'outil de compilation, pour accepter des machines d'appoint | 1345 | Pendant chaque compilation | Coupé par `Saved/UnrealBuildTool/BuildConfiguration.xml` (réglage `bDisableRemote`). Le dossier `Saved` n'est pas versionné, ce fichier l'est par exception |
+| Le serveur de traces `UnrealTraceServer`, programme de fond lancé à chaque démarrage du moteur | 1981 et 1989 | Du démarrage du moteur à l'arrêt du serveur, qui lui survit. Lancé le 11 novembre à 23 h 20 par une vérification, il écoutait encore le lendemain à 7 h 24 | Les commandes du projet passent `-notraceserver` : il n'est plus lancé |
+| Le moteur lui-même, pour la commande à distance de ses traces | 1985 | Tant que le moteur tourne | Les commandes sans affichage passent `-notracethreading`. Avec l'interface de l'éditeur, ce port ne se ferme pas sur un moteur installé : c'est une option de compilation du moteur |
+| Le serveur de stockage local `zenserver` | 8558 | Tant que le moteur tourne, et quelques secondes après | Limité à la machine elle-même par `Config/DefaultEngine.ini` (`RemoteNetworkService=None` ; valeur par défaut du moteur : `GeneratedStaticKey`) |
+
+Vérifié le 12 novembre 2026 : pendant une compilation puis une exécution sans affichage, aucun processus d'Unreal n'écoute ailleurs que sur la machine elle-même. Le script de vérification (section 9) refait ce relevé à chaque passage et échoue si une écoute apparaît. Je l'ai éprouvé en retirant `-notracethreading` : il signale le port 1985.
+
+Deux limites. L'éditeur lancé avec son interface n'est pas couvert : il n'a pas encore été ouvert sur ce projet, ses écoutes sont à relever avant de s'en servir (vue de mise au point de A1), et il faudra le lancer avec `-notraceserver`. Vos autres projets Unreal gardent le comportement par défaut ; le dossier `~/UnrealEngine/UnrealTrace` porte des journaux du serveur de traces datés d'octobre, antérieurs à ce projet.
 
 ### 8.2 Ce que disent les sources, et ce qu'on en fait
 
@@ -566,7 +577,7 @@ Pages lues le 11 novembre 2026, puis relues par un second lecteur chargé de ré
 | Python dans l'éditeur : fonctionnalité marquée expérimentale, disponible dans l'éditeur seulement, pas comme langage de jeu à ce jour ; un script peut se lancer sans interface | L'employer pour générer le niveau depuis la carte en données et pour fabriquer les modèles (8.9), jamais pour le jeu | [U15] |
 | Les plugins MassGameplay, MassAI et MassCrowd portent la mention Experimental en 5.8, AnimToTexture aussi. L'Animation Budget Allocator, sans mention de statut, bride le rythme d'animation des maillages squelettiques | Ne bâtir ni la foule ni l'IA sur Mass. Pour 150 à 260 personnages cosmétiques : maillages squelettiques classiques, niveaux de détail, Animation Budget Allocator | [U5] [U16] |
 | L'évitement RVO est limité à la classe Character. Le réseau est client-serveur à serveur autoritaire. La physique asynchrone « améliore » le déterminisme sans le garantir, et le pas fixe asynchrone est marqué expérimental | La simulation n'utilise ni la navigation, ni le réseau, ni la physique du moteur ; la navigation d'Unreal ne sert qu'au placement cosmétique des membres. Votre mise en garde sur le pas fixe est fondée | [U6] [U7] [U8] |
-| Le rendu nul (`-nullrhi`) est documenté ; le cadre d'automatisation est dit peu adapté au test unitaire pur | Tests de règles par l'éditeur en ligne de commande, sans affichage : c'est ce que fait l'exécuteur depuis le 11 novembre 2026 (section 9). Pour le test unitaire pur, Epic renvoie à ses « Low-Level Tests », dont je n'ai pas pu lire la page ; ils ne sont pas essayés, le démarrage du moteur à chaque lancement (une quinzaine de secondes) restant supportable | [U11] |
+| Le rendu nul (`-nullrhi`) est documenté ; le cadre d'automatisation est dit peu adapté au test unitaire pur | Tests de règles par l'éditeur en ligne de commande, sans affichage : c'est ce que fait l'exécuteur depuis le 11 novembre 2026 (section 9). Pour le test unitaire pur, Epic renvoie à ses « Low-Level Tests », dont je n'ai pas pu lire la page ; ils ne sont pas essayés, le démarrage du moteur à chaque lancement restant supportable : la commande de vérification complète prend 11 secondes, démarrage compris (8.3) | [U11] |
 | Redevance de 5 % au-delà d'un million de dollars de revenu brut sur la vie du produit | Sans effet avant un succès commercial | [U10] |
 
 **Techniques et précédents**
@@ -579,7 +590,7 @@ Pages lues le 11 novembre 2026, puis relues par un second lecteur chargé de ré
 ### 8.3 Ce qui reste hypothèse
 
 - **Exécutable Windows depuis un Mac.** Aucune page actuelle ne dit que c'est possible ; compter sur une machine Windows.
-- **Vitesse d'itération.** Mesurée le 11 novembre 2026 sur le Mac de référence, sans interface. Première compilation des deux modules vides : 74 s ; premier chargement du projet : 3 min 47 s. Depuis : recompilation après retouche d'un fichier du noyau, 4 s ; d'un en-tête du noyau, 9 s ; du fichier de tests, 11 s. Lancement de l'exécuteur et passage des tests : 14 à 25 s, dont moins de 0,2 s pour les tests eux-mêmes, le reste étant le démarrage du moteur. Le chargement de l'éditeur complet, avec son interface, n'est pas mesuré.
+- **Vitesse d'itération.** Mesurée sur le Mac de référence, sans interface. Le 11 novembre 2026 : première compilation des deux modules vides, 74 s ; premier chargement du projet, 3 min 47 s. Le 12 novembre 2026, cinq relevés par mesure, minimum puis médiane : recompilation après retouche d'un fichier du noyau, 2,3 s et 2,5 s ; d'un en-tête du noyau, 5,1 s et 5,5 s ; du fichier de tests, 5,8 s et 5,9 s ; commande de vérification complète (démarrage du moteur, 420 vérifications, mesures de charge, cent parties jouées puis rejouées), 10,9 s et 11,0 s, dont 0,22 s pour les vérifications. Le chargement de l'éditeur complet, avec son interface, n'est pas mesuré. Un piège relevé au passage : l'outil de compilation d'Unreal ne recompile pas un fichier source retouché moins d'une seconde après la production de son objet. Le script de vérification le détecte, rafraîchit la date du fichier et recompile.
 - **Fabrication de modèles par script.** Geometry Script s'appelle depuis Python [U20], mais je n'ai pas vérifié qu'un maillage ainsi produit s'enregistre comme actif par script. À essayer en A1.
 - **Virgule fixe et entiers.** Aucune source lue ne porte sur ce point ; c'est une pratique que je tiens pour établie, pas un fait vérifié. Que le même module donne les mêmes résultats sur un autre système que le Mac ne sera vérifié qu'à l'essai réseau de B2.
 - **Reciblage d'animations.** Unreal fournit IK Rig et IK Retargeter [U19] ; ce qu'ils donnent sur des animations gratuites n'est pas mesuré. L'essai 3D de B2 le dira.
@@ -645,7 +656,7 @@ V1 : deux tempéraments par faction (pression, développement), trois niveaux ; 
 - **Interface.** Compter 20 à 30 % de l'effort de programmation.
 - **Son.** Pas de voix intelligibles en V1 : sifflets, slogans indistincts, radio brouillée. Cela sert le thème et supprime le doublage.
 - **Tutoriel.** Écrit en dernier, en scénarios scriptés sur l'interface d'ordres, pour une faction ; une fiche par mécanique pour les deux autres.
-- **Budgets utiles.** Vitesse de l'exécuteur sans affichage ; durée du cycle modification-essai (cible : moins de 10 s pour une valeur de données, moins de 60 s pour une règle ; mesuré en A1 pour une règle : 18 à 36 s, recompilation et tests compris ; rien n'est mesuré pour une valeur de données, faute de fichiers de données à ce stade) ; accusé de réception d'un ordre, son et marqueur, en 100 ms au plus, en solo comme en réseau ; premier mouvement visible en 100 ms au plus en solo, auxquels s'ajoute en réseau le délai d'ordre du lockstep (hypothèse : 2 à 5 itérations, soit 100 à 250 ms, à mesurer en B2).
+- **Budgets utiles.** Vitesse de l'exécuteur sans affichage ; durée du cycle modification-essai (cible : moins de 10 s pour une valeur de données, moins de 60 s pour une règle ; mesuré en A1 pour une règle : 13 à 17 s, somme d'une recompilation et de la commande de vérification complète, lancées en ligne de commande et non dans l'éditeur ouvert (8.3) ; rien n'est mesuré pour une valeur de données, faute de fichiers de données à ce stade) ; accusé de réception d'un ordre, son et marqueur, en 100 ms au plus, en solo comme en réseau ; premier mouvement visible en 100 ms au plus en solo, auxquels s'ajoute en réseau le délai d'ordre du lockstep (hypothèse : 2 à 5 itérations, soit 100 à 250 ms, à mesurer en B2).
 
 ### 8.9 Personnages et modèles : contenus gratuits d'Unreal et modèles générés
 
@@ -680,7 +691,36 @@ Vos décisions du 11 novembre 2026 : tout dans Unreal, ni achat ni sous-traitanc
 
 Une étape n'est finie que si ses critères sont mesurés sur des parties réellement jouées. Aucune fonctionnalité n'est « terminée » hors d'une partie. Les mesures de vitesse se font sur votre MacBook Air M5 à 24 Go, machine de référence.
 
-**Avancement au 11 novembre 2026.** Le projet Unreal existe (`PointDeRupture.uproject`, à la racine de ce dossier). Ses deux modules C++ vides se compilent et se chargent sans interface. Tout le reste de l'étape A1 est à faire.
+**Avancement au 12 novembre 2026.** Le noyau de l'étape A1 et son outillage sont écrits, testés et mesurés. La vue de mise au point et le premier accessoire généré ne sont pas commencés. Aucune règle du jeu n'existe : le noyau ne sait que créer des escouades, les déplacer en ligne droite et les retirer.
+
+Ce qui existe :
+
+- `PdrSim`, le noyau : état, boucle à pas fixe de 20 itérations par seconde, commandes appliquées dans un ordre canonique, aléa à graine, empreinte de l'état relevée toutes les 100 itérations, sauvegarde relue sous validation stricte, enregistrement et relecture des parties. Entiers seulement, longueurs en millimètres.
+- `PdrOutils`, l'exécuteur sans affichage : 420 vérifications, mesures, génération et relecture de parties.
+- `Outils/verifier.py` : en une commande, contrôle des sources (ASCII seulement ; ni flottant ni horloge dans le noyau), compilation, tests, cent relectures comparées à un condensé attendu, fraîcheur des binaires, écoutes réseau (8.1).
+- Le dépôt Git du projet, poussé le 12 novembre 2026 sur GitHub en dépôt privé (`M4D135/point-de-rupture`). Git LFS n'est pas en place, faute de fichier binaire à ce jour ; il est à installer avant le premier actif Unreal [U13].
+
+Critères de A1, mesurés le 12 novembre 2026 sur le Mac de référence ; pour les durées, cinq relevés, minimum puis médiane :
+
+| Critère | Mesure |
+|---|---|
+| La plateforme Mac est déclarée valide et un projet C++ vide se compile | Tenu depuis le 11 novembre 2026 (8.1) |
+| Cent relectures distinctes d'au moins 10 000 itérations donnent la même suite d'empreintes d'une exécution à l'autre | Tenu. Cent parties de 10 000 itérations, 337 010 commandes au total, cent états finaux distincts, cent relectures conformes. Le condensé de toutes leurs empreintes, `9565f56e1f910d8d`, est le même à chacune des plus de quinze exécutions du jour, y compris avec le projet compilé sans optimisation. Un modèle Python écrit à part l'avait calculé avant le C++, et il reproduit les cent fichiers de parties au caractère près |
+| Boucle vide : 24 000 itérations en moins d'une seconde | Tenu : 0,06 ms |
+| Suite de tests complète en moins de 60 s | Tenu : 0,22 s pour les 420 vérifications ; 10,9 s et 11,0 s pour la commande complète, démarrage du moteur compris |
+| Durée du cycle modification-essai dans l'éditeur Unreal relevée | **Non tenu** : l'éditeur n'a pas été ouvert avec son interface. En ligne de commande, le cycle est de 13 à 17 s (8.3) |
+
+Hors critères, pour situer la marge avant A3, qui demande 20 minutes de partie simulées en 6 s, soit 250 microsecondes par itération : 24 000 itérations avec 48, 200 et 4 096 escouades en marche prennent 24 ms, 99 ms et 2,04 s ; avec 4 096 escouades, 8 ordres par itération et l'enregistrement actif, une itération prend 55 microsecondes, soit 22 % de ce budget. Ces chiffres ne valent que pour le déplacement en ligne droite de A1 : ni navigation, ni combat, ni visibilité.
+
+Limites connues :
+
+- Deux motifs de refus d'une commande, « tardive » et « file pleine », dépendent de l'histoire locale de la machine. En réseau, ils feraient diverger deux machines : c'est à la couche réseau de B2 de les rendre impossibles.
+- Une partie rechargée depuis une sauvegarde ne peut pas produire sa relecture : la sauvegarde reprend la simulation, pas le journal des commandes. À trancher en B1, avec la sauvegarde et la reprise.
+- Le déplacement de A1 tronque chaque pas au millimètre sur chaque axe. La vitesse réelle dépend donc de la direction : elle reste sous la vitesse nominale de moins de 1,5 mm par itération, ce qui pèse jusqu'à 29 % aux vitesses de 1 et 2 mm par itération et moins de 1 % à 150. La navigation de A2 le remplace.
+- Le modèle Python et le C++ ont le même auteur : leur accord contrôle l'écriture du code, pas le bien-fondé des règles.
+- Le déterminisme n'est mesuré que sur ce Mac, avec un seul compilateur, à deux niveaux d'optimisation. L'essai entre deux systèmes reste celui de B2.
+
+Reste à faire en A1 : la vue de mise au point du dessus ; le premier accessoire généré par script et enregistré comme actif ; le cycle modification-essai relevé dans l'éditeur, avec ses écoutes réseau (8.1) ; le schéma de données et son validateur.
 
 | Étape | Livrables | Critères d'acceptation |
 |---|---|---|

@@ -47,6 +47,10 @@ OPTIONS_MOTEUR = ['-nullrhi', '-unattended', '-nosplash', '-nopause', '-stdout',
 DELAI_COMPILATION = 3600
 DELAI_EXECUTION = 1800
 
+# Processus dont les ecoutes reseau sont relevees pendant la verification : ceux d'Unreal, et dotnet,
+# sous lequel tourne l'outil de compilation.
+PROCESSUS_SURVEILLES = re.compile(r'unreal|zenserver|uba|dotnet|shadercompile|crashreportclient', re.I)
+
 
 def moteur():
     return pathlib.Path(os.environ.get('PDR_UNREAL', '/Users/Shared/Epic Games/UE_5.8'))
@@ -88,31 +92,94 @@ def ecoute_coupee():
     return re.search(r'<bDisableRemote>\s*true\s*</bDisableRemote>', reglage.read_text(encoding='utf-8')) is not None
 
 
-def serveurs_de_traces():
-    """Numeros des processus UnrealTraceServer en cours. Chacun ecoute sur les ports 1981 et 1989 de toutes les interfaces."""
+def dependances_de(fichier):
+    """Chemins qu'enumere un fichier de dependances au format de make (cible et espaces proteges exclus)."""
+    texte = fichier.read_text(encoding='utf-8', errors='replace').replace('\\\n', ' ')
+    mots = [mot.replace('\\ ', ' ') for mot in re.findall(r'(?:\\ |\S)+', texte)]
+    return [pathlib.Path(os.path.realpath(mot)) for mot in mots if not mot.endswith(':')]
+
+
+def sources_non_compilees():
+    """Sources du projet plus recentes que l'objet compile a partir d'elles. Rend (objets examines, sources en avance).
+
+    L'outil de compilation d'Unreal ne recompile pas un fichier retouche moins d'une seconde apres la production
+    de son objet (tolerance d'Epic pour les copies reseau, Actions/ActionGraph.cs) : une retouche faite juste apres
+    une compilation passerait inapercue, et les tests porteraient sur l'ancien code.
+    """
+    racine = PROJET / 'Source'
+    examines, en_avance = 0, set()
+    for fichier in sorted((PROJET / 'Intermediate' / 'Build').glob('*/*/UnrealEditor/Development/*/*.d')):
+        objet = fichier.with_suffix('.o')
+        chemins = dependances_de(fichier)
+        # Un objet survit a la suppression de son source : il ne compte plus.
+        if not objet.is_file() or not any(chemin.name == objet.stem and chemin.is_file() for chemin in chemins):
+            continue
+        examines += 1
+        date = objet.stat().st_mtime_ns
+        for chemin in chemins:
+            if racine in chemin.parents and chemin.is_file() and chemin.stat().st_mtime_ns > date:
+                en_avance.add(chemin)
+    return examines, en_avance
+
+
+def ecoutes_reseau():
+    """Ecoutes ouvertes par les processus d'Unreal ailleurs que sur la boucle locale.
+
+    Rend un ensemble de textes 'processus protocole adresse' (ports TCP en ecoute, prises UDP liees),
+    ou None si le releve est impossible sur cette machine (Windows, lsof absent).
+    """
     if sys.platform.startswith('win'):
-        return set()
-    return set(subprocess.run(['pgrep', '-x', 'UnrealTraceServer'], capture_output=True, text=True).stdout.split())
+        return None
+    try:
+        resultat = subprocess.run(['lsof', '+c', '0', '-nP', '-iTCP', '-sTCP:LISTEN', '-iUDP', '-FcPn'],
+                                  capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    ecoutes = set()
+    processus = protocole = ''
+    for ligne in resultat.stdout.split('\n'):
+        if ligne.startswith('c'):
+            processus = ligne[1:]
+        elif ligne.startswith('P'):
+            protocole = ligne[1:]
+        elif ligne.startswith('n') and PROCESSUS_SURVEILLES.search(processus):
+            adresse = ligne[1:]
+            hote = adresse.rsplit(':', 1)[0]
+            if adresse != '*:*' and not (hote.startswith('127.') or hote in ('[::1]', 'localhost')):
+                ecoutes.add('%s %s %s' % (processus, protocole, adresse))
+    return ecoutes
 
 
-def lancer(commande, delai):
+def lancer(commande, delai, releve=None):
     """Lance une commande. Rend (code de sortie, sortie, duree) ; le code vaut None si le delai est depasse.
 
     La sortie passe par un fichier et non par un tube : un processus de fond lance par la commande herite de sa
     sortie, et garderait le tube ouvert apres elle. La lecture attendrait alors sa fin, sans limite.
+    Si un ensemble est donne dans releve, les ecoutes reseau des processus d'Unreal y sont ajoutees chaque seconde.
     """
     with tempfile.TemporaryFile() as sortie:
         debut = time.monotonic()
-        try:
-            code = subprocess.run(commande, stdin=subprocess.DEVNULL, stdout=sortie, stderr=subprocess.STDOUT, timeout=delai).returncode
-        except subprocess.TimeoutExpired:
-            code = None
+        processus = subprocess.Popen(commande, stdin=subprocess.DEVNULL, stdout=sortie, stderr=subprocess.STDOUT)
+        code = None
+        while True:
+            try:
+                code = processus.wait(timeout=1.0)
+                break
+            except subprocess.TimeoutExpired:
+                if time.monotonic() - debut > delai:
+                    processus.kill()
+                    processus.wait()
+                    break
+                if releve is not None:
+                    releve.update(ecoutes_reseau() or ())
         duree = time.monotonic() - debut
+        if releve is not None:
+            releve.update(ecoutes_reseau() or ())
         sortie.seek(0)
         return code, sortie.read().decode('utf-8', errors='replace'), duree
 
 
-def compiler():
+def compiler(releve=None):
     if sys.platform == 'darwin':
         commande = [str(moteur() / 'Engine/Build/BatchFiles/Mac/Build.sh'), 'PointDeRuptureEditor', 'Mac']
     elif sys.platform.startswith('win'):
@@ -121,7 +188,7 @@ def compiler():
         commande = [str(moteur() / 'Engine/Build/BatchFiles/Linux/Build.sh'), 'PointDeRuptureEditor', 'Linux']
     # -UBADisableRemote : aucune ecoute reseau pendant cette compilation, meme si le reglage du projet a disparu.
     commande += ['Development', '-project=%s' % FICHIER_PROJET, '-waitmutex', '-UBADisableRemote']
-    code, sortie, duree = lancer(commande, DELAI_COMPILATION)
+    code, sortie, duree = lancer(commande, DELAI_COMPILATION, releve)
     avertissements = [l for l in sortie.split('\n') if re.search(r'\b(warning|error)\b', l)]
     ecoutes = [l for l in sortie.split('\n') if 'Listening on' in l]
     if code is None:
@@ -129,8 +196,8 @@ def compiler():
     return code == 0 and not avertissements and not ecoutes, duree, avertissements + ecoutes
 
 
-def executer(arguments):
-    """Lance l'executeur sans affichage. Rend (code de sortie, lignes PDR_ en dictionnaires, duree de la commande)."""
+def executer(arguments, releve=None):
+    """Lance l'executeur sans affichage. Rend (code de sortie, lignes PDR_ en dictionnaires, echecs, duree de la commande)."""
     if sys.platform == 'darwin':
         binaire = moteur() / 'Engine/Binaries/Mac/UnrealEditor-Cmd'
     elif sys.platform.startswith('win'):
@@ -138,7 +205,7 @@ def executer(arguments):
     else:
         binaire = moteur() / 'Engine/Binaries/Linux/UnrealEditor-Cmd'
     commande = [str(binaire), str(FICHIER_PROJET), '-run=PdrSim'] + arguments + OPTIONS_MOTEUR
-    code, sortie, duree = lancer(commande, DELAI_EXECUTION)
+    code, sortie, duree = lancer(commande, DELAI_EXECUTION, releve)
     lignes = {}
     echecs = []
     if code is None:
@@ -180,13 +247,14 @@ def principal():
                             else 'ECART : Saved/UnrealBuildTool/BuildConfiguration.xml ne coupe plus l\'ecoute du port 1345 (bDisableRemote)'))
     bon = bon and coupee
 
-    traces_avant = serveurs_de_traces()
-    if traces_avant:
-        print('          note : un serveur de traces d\'Unreal tournait deja (processus %s), ports 1981 et 1989 ouverts sur le reseau'
-              % ', '.join(sorted(traces_avant)))
+    # Ecoutes reseau : celles qui existaient avant ne viennent pas de cette verification, les autres sont des ecarts.
+    ecoutes_avant = ecoutes_reseau()
+    releve = None if ecoutes_avant is None else set()
+    if ecoutes_avant:
+        print('          note : ecoutes d\'Unreal deja ouvertes avant la verification : %s' % ', '.join(sorted(ecoutes_avant)))
 
     if not options.sans_compiler:
-        reussie, duree, remarques = compiler()
+        reussie, duree, remarques = compiler(releve)
         print('COMPILER  %s en %.1f s' % ('reussie, sans avertissement ni ecoute reseau' if reussie else 'ECHEC', duree))
         for remarque in remarques[:20]:
             print('          %s' % remarque.strip())
@@ -194,12 +262,35 @@ def principal():
         if not reussie:
             return 1
 
+    # Les binaires doivent venir des sources presentes : voir sources_non_compilees.
+    examines, en_avance = sources_non_compilees()
+    if en_avance and not options.sans_compiler:
+        for source in en_avance:
+            os.utime(source)
+        reussie, duree, remarques = compiler(releve)
+        print('COMPILER  %d fichier(s) retouche(s) trop tot apres la compilation precedente, dates rafraichies : recompilation %s en %.1f s'
+              % (len(en_avance), 'reussie' if reussie else 'en ECHEC', duree))
+        for remarque in remarques[:20]:
+            print('          %s' % remarque.strip())
+        bon = bon and reussie
+        if not reussie:
+            return 1
+        examines, en_avance = sources_non_compilees()
+    if en_avance:
+        print('BINAIRES  ECART : sources plus recentes que leur objet, les tests porteraient sur l\'ancien code : %s'
+              % ', '.join(sorted(str(source.relative_to(PROJET)) for source in en_avance)))
+        bon = False
+    elif examines:
+        print('BINAIRES  a jour : %d objets, aucun plus ancien que ses sources' % examines)
+    else:
+        print('BINAIRES  fraicheur non controlee : aucun fichier de dependances sous Intermediate/Build')
+
     dossier = tempfile.mkdtemp(prefix='pdr-parties-') if options.modele else None
     try:
         arguments = ['-tests', '-boucle=24000', '-relectures=%d' % PARTIES, '-iterations=%d' % ITERATIONS, '-attendu=%s' % CONDENSE_ATTENDU]
         if dossier:
             arguments.append('-dossier=%s' % dossier)
-        code, lignes, echecs, duree = executer(arguments)
+        code, lignes, echecs, duree = executer(arguments, releve)
         tests = lignes.get('PDR_TESTS', {})
         boucle = lignes.get('PDR_BOUCLE', {})
         relectures = lignes.get('PDR_RELECTURES', {})
@@ -258,11 +349,14 @@ def principal():
         for nom, valeurs in releves.items():
             print('MESURE    %s : %s' % (nom, resume(valeurs)))
 
-    traces_lancees = serveurs_de_traces() - traces_avant
-    if traces_lancees:
-        print('RESEAU    ECART : un serveur de traces d\'Unreal a ete lance pendant la verification (processus %s), ports 1981 et 1989 ouverts'
-              % ', '.join(sorted(traces_lancees)))
-        bon = False
+    if releve is None:
+        print('RESEAU    ecoutes des processus d\'Unreal non relevees sur ce systeme')
+    else:
+        releve.update(ecoutes_reseau() or ())
+        apparues = sorted(releve - ecoutes_avant)
+        print('RESEAU    %s' % ('aucune ecoute hors de cette machine pendant la verification' if not apparues
+                                else 'ECART : ecoutes ouvertes pendant la verification : ' + ', '.join(apparues)))
+        bon = bon and not apparues
 
     print('RESULTAT  %s' % ('REUSSI' if bon else 'ECHEC'))
     return 0 if bon else 1
