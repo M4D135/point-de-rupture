@@ -178,6 +178,14 @@
     // par seconde, ne frappe plus et en sort à « lenteur » × sa vitesse. Un nuage presse à plein « plein » unités ; s'il
     // en tient davantage, la pression se partage entre elles : une foule plus dense n'y perd pas davantage.
     GAZ: Object.freeze({ max: 64, rayon: 7, duree: 14, pression: 3, lenteur: 0.5, montee: 2, marge: 2, plein: 20 }),
+    // Les immeubles : un foyer à moins de « chauffe » m d'une façade la chauffe ; après « prise » s à pleine
+    // intensité, l'immeuble prend. Un cocktail à moins de « cocktail » m l'allume une fois sur trois. L'intensité
+    // monte en « montee » s ; à pleine intensité, consume en « consume » s. Au-dessus de « propage », chauffe les
+    // voisins (à « voisinage » m) qui prennent après « voisinPrise » s. Calcine, fume « fumee » s. Max « max » en
+    // feu. Unité à moins de « recul » m s'écarte. Refroidit de « refroidit » /s si non chauffé. Lance (débit 1)
+    // ôte « eteint » /s. « lances » : jets d'eau rendus au dessin, au plus. (David 12/11/2026)
+    IMMEUBLES: Object.freeze({ chauffe: 3, prise: 15, cocktail: 2.5, montee: 40, consume: 240, propage: 0.6,
+      voisinPrise: 25, voisinage: 3, fumee: 60, max: 48, recul: 4, refroidit: 0.5, eteint: 0.01, lances: 96 }),
     // Projectiles : durée de vol = vol + distance / vitesse (secondes, mètres ; vitesse 0 : durée fixe). Voir dureeVol.
     PROJECTILES: Object.freeze({ pierre: Object.freeze({ vol: 0.6, vitesse: 0 }), molotov: Object.freeze({ vol: 0.5, vitesse: 20 }),
       lacrymo: Object.freeze({ vol: 0.6, vitesse: 22 }) }),
