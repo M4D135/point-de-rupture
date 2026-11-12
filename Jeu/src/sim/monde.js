@@ -290,6 +290,7 @@
     const sites = ville.sites;
     // 0.3, PLAN D9 : les immeubles qui brûlent
     const IMM = PDR.immeubles.creer(sites.immeubles || []), evIm = [];
+    const sortieImm = new Float32Array(1024 * P.IMMEUBLE_TAILLE);
     let versionImm = 0, immEnvoyes = 0;
     const mm = v => Math.round(v * 1000);
     const disqueCases8 = (x, z, rayon) => {
@@ -2378,6 +2379,7 @@
       // Ce qui vole : cocktails et grenades, puis les pierres de la file, de la plus ancienne à la plus récente.
       for (let k = 0; k < nVols; k++) st.push(vIt[k], vX[k], vZ[k], vCamp[k], vSorte[k], vTireur[k]);
       for (let k = sTete; k !== sQueue; k = (k + 1) & (NPIERRES - 1)) st.push(sIt[k], sCible[k], sGen[k], sTireur[k], sCamp[k], sPres[k]);
+      st.push(IMM.n > 0 ? PDR.immeubles.empreinte(IMM) | 0 : 0);
       return ecrire(new Uint8Array(Int32Array.from(st).buffer), o);
     }
     /** L'empreinte de l'état présent, calculée d'un coup (essais, relecture). */
@@ -2444,10 +2446,10 @@
         victoire: { mode: VIC.mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
           reste: limiteTemps ? Math.max(0, (limiteTemps - it) / IT_S) : -1, plafond: plafondIt / IT_S, demo: DEMO },
         structures: null, versionStructures: versionStructures + structuresDetail,
-        cassables: null, gisements: null, voile: null, feux: null, nuages: null, minicarte: null, combats: null,
+        cassables: null, gisements: null, voile: null, feux: null, nuages: null, immeubles: null, minicarte: null, combats: null,
         evenements: ev.slice(0, nev * 6), vainqueur, raison: P.RAISONS_FIN[raison],
         mesure: { msIteration: 0, msIA: 0, msNav: mesure.msNav, vivantes: vivantes[0] + vivantes[1] + vivantes[2], champs: nav.champs.length,
-          feux: nFeux, nuages: nNuages, aTerre, gisants: nGisants },
+          feux: nFeux, nuages: nNuages, immeubles: IMM.enFeu, aTerre, gisants: nGisants },
       };
       // La liste part à chaque changement majeur (pose, fin, destruction, file, occupation), et toutes les
       // 5 itérations au plus quand seuls les pv ou l'avancement des files bougent.
@@ -2476,6 +2478,12 @@
           o += P.FEU_TAILLE;
         }
         msg.feux = a;
+      }
+      // Envoi des immeubles en feu ou modifiés
+      if (IMM.n > 0 && (versionImm !== immEnvoyes || (IMM.enFeu > 0 && it % 5 === 0))) {
+        immEnvoyes = versionImm;
+        const n = PDR.immeubles.exporter(IMM, sortieImm);
+        msg.immeubles = sortieImm.slice(0, n * P.IMMEUBLE_TAILLE);
       }
       if (versionGaz !== gazEnvoye || (nNuages > 0 && it % 5 === 0)) {
         gazEnvoye = versionGaz;
