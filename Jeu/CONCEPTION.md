@@ -15,6 +15,18 @@ Décisions de David du 12 novembre 2026, dans l'ordre :
   new york », enfin « juste marseille, on verra, les autres seront pour les maj suivantes » : la 0.2 joue sur le vrai
   plan de Marseille ; la ville imaginaire en damier reste au choix ; Paris et New York viendront ensuite.
 
+Décisions de David pour la 0.3, le 12 novembre 2026, mot pour mot (`PLAN.md` § 1, demandes 2 à 4) :
+- « par contre le jeu faut des coctails molotov, faut foutre le feu quand on casse, faut plus de viloence et une
+  musique mois rigolote, et améliore les animations des persos et le détail de la map, c pas mal mais peux mieux faire
+  le marseille » ;
+- « il faut faire comme wow soit temps, soit jusqu'au dernier mais pas que au nombre de points, au choix un peu des 3
+  etc, à voir et par defaut moins de manifesants » ;
+- « demo pas assez longue ».
+
+Claude en a tiré, le même jour, les décisions D1 à D4 de `PLAN.md` § 2 : le ton plus dur (ci-dessous), la victoire au
+choix (§ 1.7), moins de manifestants par défaut (§ 1.4), la démo longue (§ 1.11). Le feu, les cocktails, le gaz, les
+charges et les chutes sont au § 1.5 et au § 1.6.
+
 **Plan réel.** Marseille est tirée d'OpenStreetMap (tuiles OpenFreeMap, licence ODbL) : rues, 5 274 bâtiments avec
 leur hauteur quand elle est connue, eau, places, repères, et 1 008 points de mobilier. Le générateur en fait le décor,
 de façon déterministe. Les bâtiments ont une hauteur plausible par quartier quand OSM ne la donne pas (Panier bas aux
@@ -36,10 +48,13 @@ marqués « PDR » (origine, voile, éclairage, lots, foule, MSAA) ; les anciens
 pourquoi, quel coût) et garde `rendu.test.mjs` vert. Le son et la musique sont des portages en français de ceux de
 METAL (`src/moteur/PROVENANCE-SON.md`).
 
-**Ton**, repris de `CONTRE-EXPERTISE.md` §4.6 : une bagarre burlesque stylisée.
+**Ton** (D1, 12/11/2026). Le feu, les cocktails Molotov, une violence plus dure et une ambiance plus sombre sont voulus :
+la « bagarre burlesque stylisée » de la 0.2 (`CONTRE-EXPERTISE.md` §4.6) cède là où elle les contredit.
 - Personne ne meurt ni ne saigne. Une unité à bout de cohésion est « hors jeu » et quitte la partie.
-- Aucune arme à feu, aucune lame, aucun feu sur un personnage. Une barricade peut brûler.
-- Aucun drapeau, emblème, slogan, sigle, uniforme ou personnalité réels, aucune cause énoncée. Les camps se distinguent par leur couleur et par un motif : rond, carré, chevron.
+- Aucune arme à feu, aucune lame, aucun sang. Personne n'est montré en feu : le feu brûle le sol, les objets, les
+  véhicules, les barricades et les avant-postes ; une unité prise dedans est pressée, fuit ou tombe hors jeu, et dans ce
+  cas disparaît aussitôt au lieu de rester couchée dans les flammes.
+- Aucun drapeau, emblème, slogan, sigle, uniforme ou personnalité réels, aucune cause énoncée. Les camps se distinguent par leur couleur et par un motif : rond, carré, chevron. Les vrais noms de lieux de Marseille restent.
 
 ## 1. La partie
 
@@ -62,11 +77,16 @@ METAL (`src/moteur/PROVENANCE-SON.md`).
 | Lever les avant-postes ennemis | non | non | oui, « elle lève tout » |
 | Frapper | le Bastion et la Préfecture | la Convergence ; la Préfecture seulement pendant 45 s après que la Préfecture l'a frappé (« colère ») | tout le monde |
 | Se battre, attaquer, se replier, regrouper, récolter | oui | oui | oui |
+| Mettre le feu (0.3) : ce qu'elle casse brûle, et les Furets lancent des cocktails Molotov | oui | non | non |
+| Lancer des pierres et des bouteilles (0.3) | oui, le Cortège | oui, les Piquets | non |
+| Charger et jeter au sol (0.3) | non | oui, les Béliers, à la poutre | oui, la Patrouille, à la matraque |
+| Gaz lacrymogène, salve, canon à eau qui éteint les feux (0.3) | non | non | oui |
 
 **Alliances.** Une seule à la fois, entre deux des trois camps.
 - Des alliés ne se frappent pas, partagent leur vue et gagnent ensemble.
 - Une alliance se choisit à la préparation. En partie, on peut en proposer une ou la rompre, puis attendre 60 s avant toute nouvelle alliance.
-- Une IA accepte une alliance quand le troisième camp est le plus fort. Deux IA s'allient contre un camp qui dépasse 45 % de la force totale.
+- Une IA accepte une alliance quand le troisième camp est le plus fort. Deux IA s'allient contre un camp qui dépasse 45 % de la force totale ; elles rompent quand l'allié dépasse à son tour 55 %, ou quand le camp visé tombe sous 20 %.
+- Les alliés ne se gazent pas : la Préfecture et son allié portent le masque.
 
 ### 1.3 Unités
 
@@ -74,6 +94,10 @@ Il y a 13 types d'unités, définis dans `src/sim/regles.js` avec leurs chiffres
 - **Convergence** : Équipe, Cortège, Furets, Fanfare. Le nombre, la vitesse, la casse et les barricades.
 - **Bastion** : Équipe, Piquets, Pavois, Béliers. Tenir, encaisser, lever.
 - **Préfecture** : Équipe, Patrouille, Compagnie, Motards, Canon à eau. Peu nombreux, chers, outils de zone, un véhicule.
+
+Depuis la 0.3 (chiffres au § 1.5) : le Cortège et les Piquets lancent des pierres ; les Furets, des cocktails Molotov ;
+les Béliers et la Patrouille chargent ; la Compagnie lance des grenades lacrymogènes en plus de sa salve ; le Canon à
+eau éteint les feux.
 
 ### 1.4 Économie
 
@@ -84,7 +108,8 @@ Il y a 13 types d'unités, définis dans `src/sim/regles.js` avec leurs chiffres
   - la casse rapporte des Matériaux à la Convergence ;
   - lever une barricade rend 50 % de son coût au Bastion ou à la Préfecture ;
   - la Préfecture reçoit une dotation de 120 Moyens par minute tant que son QG n'est pas occupé ;
-  - chaque lieu tenu rapporte 40 Moyens par minute.
+  - chaque lieu tenu rapporte 40 Moyens par minute ;
+  - en démo, tous les revenus sont doublés (§ 1.11).
 
 **Production.**
 - Elle se fait par lots : un ordre donne un lot d'unités.
@@ -93,7 +118,9 @@ Il y a 13 types d'unités, définis dans `src/sim/regles.js` avec leurs chiffres
 
 **Effectifs.**
 - Le réglage E (20 000, 50 000, **100 000** par défaut, 150 000 ou 200 000) fixe le nombre d'unités présentes au départ.
-- Parts : Convergence 50 %, Bastion 27 %, Préfecture 23 %, dont 4 % d'Équipes dans chaque camp.
+- Parts (D3, réglage « Manifestants » de la préparation, `options.manifestants`) : Convergence, Bastion, Préfecture à
+  34 / 35 / 31 % pour « Peu », **40 / 32 / 28 % pour « Moyen »**, le défaut, et 50 / 27 / 23 % pour « Beaucoup », les
+  parts de la 0.2 ; dont 4 % d'Équipes dans chaque camp. Le total reste celui du réglage E.
 - Plafond de chaque camp : 125 % de sa part.
 - La ville grandit avec E : 9 îlots par côté jusqu'à 30 000 unités, 13 jusqu'à 120 000, 15 au-delà.
 
@@ -101,14 +128,43 @@ Il y a 13 types d'unités, définis dans `src/sim/regles.js` avec leurs chiffres
 
 - **Cohésion et pression.** La cohésion tient lieu de points de vie. Au contact, une unité inflige une pression par seconde, donnée par la table des types.
 - **Angle.** Une pression reçue de flanc ou de dos, hors de l'arc frontal de 120°, est multipliée par 1,5. Une unité protégée ne reçoit que la moitié de la pression de face.
-- **À zéro de cohésion**, l'unité est hors jeu.
+- **À zéro de cohésion**, l'unité est hors jeu : elle reste couchée 6 s (1,5 s au-delà de 4 096 gisants), puis son
+  emplacement se libère. Dans un foyer, elle disparaît aussitôt (D1).
 - **Repli automatique.** Sous 25 % de cohésion, une unité se replie vers la zone de soutien la plus proche, sauf en posture « Tenir ». Elle court 30 % plus vite et ne frappe pas.
 - **Zones de soutien** : le QG et les avant-postes rendent 5 points de cohésion par seconde.
-- **Capacités.**
-  - Salve, de la Compagnie : zone de 6 m de rayon jusqu'à 14 m, annoncée 1,5 s avant ; 10 points à dix unités au plus, les plus proches, recharge 30 s. Réglage du 12/11 : à 35 points sans plafond toutes les 20 s, elle faisait 86 % des points de la Préfecture.
-  - Jet, du Canon à eau : cône de 18 m, avec recul.
+- **Rythme** (0.3) : toutes les pressions des tables — contact, salve, jet, pierres, charges, souffle du cocktail — sont
+  multipliées par `RYTHME` (`regles.js`). Il vaut 1 et reste à régler au banc d'équilibre : sous 1, les combats
+  durent, on voit les charges et les chutes, la production a le temps de compter (en 0.2, 70 % des unités étaient hors
+  jeu à 10 minutes). Le feu et le gaz, qui chassent plus qu'ils ne blessent, gardent leurs chiffres.
+- **À terre** (0.3) : une unité jetée au sol ne fait rien pendant 3 s, puis ne retombe pas pendant 6 s. Un véhicule ne
+  tombe jamais ; une unité protégée (Pavois, Compagnie), seulement sous la poutre des Béliers.
+- **Capacités.** Chiffres avant le rythme.
+  - Salve, de la Compagnie : zone de 6 m de rayon jusqu'à 14 m, annoncée 1,5 s avant ; 10 points à dix unités au plus, les plus proches, dont quatre jetées au sol, recharge 30 s. Réglage du 12/11 : à 35 points sans plafond toutes les 20 s, elle faisait 86 % des points de la Préfecture.
+  - Jet, du Canon à eau : cône de 18 m et de 40°, pendant 3 s, par impulsions de 0,2 s ; 12 points par seconde aux
+    huit unités les plus proches au plus à chaque impulsion (la foule plus dense n'y perd pas davantage), recul de 2 m
+    par seconde, jetées au sol à moins de 9 m ; chaque impulsion retire 3 s aux foyers du cône (§ 1.6).
   - Interpeller, de la Patrouille : pression doublée sur une unité sous 30 % de cohésion.
   - Soigner, de la Fanfare : +3 de cohésion par seconde aux unités de son camp à moins de 8 m.
+  - Pierres (0.3), du Cortège et des Piquets : de 3,5 à 14 m, avant le contact ; 3 points, recharge 5 s, 0,6 s de vol.
+  - Cocktail Molotov (0.3), des Furets : de 6 à 22 m, en cloche (0,5 s de vol plus 1 s par 20 m) ; 4 Matériaux.
+    Le souffle, sur 3 m : 12 points à huit unités au plus, dont trois jetées au sol. Il allume un foyer de 4 m pour 18 s,
+    enflamme les barricades et avant-postes touchés et jusqu'à deux objets. Recharge 25 s.
+  - Charge (0.3), des Béliers et de la Patrouille : de 4 à 12 m, élan à 1,8 fois la vitesse (Patrouille : 1,7) pendant
+    2 s au plus ; à l'impact 10 points (8), recul de 2 m (1,5), la cible tombe ; recharge 14 s (16). La poutre des
+    Béliers jette au sol même une unité protégée.
+  - Grenade lacrymogène (0.3), de la Compagnie : de 8 à 26 m, en cloche (0,6 s plus 1 s par 22 m), recharge 35 s.
+- **Lancers d'eux-mêmes** (0.3). Les Furets et la Compagnie lancent cocktails et grenades sans ordre, sur la foule
+  hostile la plus dense à portée (la case de 8 m la plus peuplée, sans foyer ni nuage, où les leurs ne sont pas plus de
+  la moitié des hostiles), à une cadence bornée par camp : 0,25 lancer par seconde par tranche de 20 000 unités
+  (1,25 à 100 000), six d'avance au plus ; pas de cocktail lancé seul au-delà de 96 foyers ou sous 60 Matériaux par
+  tranche de 20 000 unités, pas de grenade au-delà de 48 nuages. Sur ordre (touche de la capacité, puis un point du
+  sol), il n'y a que la recharge.
+- **Le feu** (0.3). Un foyer est un disque qui presse de 8 points par seconde quiconque s'y trouve, tous camps
+  confondus ; ces points ne comptent au bilan que contre un camp hostile. On le fuit à 1,3 fois sa vitesse, on le
+  contourne à 2,5 m. 128 foyers au plus ; leurs sources au § 1.6.
+- **Le gaz** (0.3). Le nuage d'une grenade grossit en 2 s jusqu'à 7 m de rayon et dure 14 s. Qui s'y trouve suffoque :
+  3 points par seconde, il ne frappe plus et en sort à la moitié de sa vitesse ; au-delà de 20 unités dans le nuage, ces
+  points se partagent entre elles. La Préfecture et ses alliés portent le masque ; un véhicule passe. 64 nuages au plus.
 
 ### 1.6 Structures
 
@@ -120,20 +176,43 @@ Il y a 13 types d'unités, définis dans `src/sim/regles.js` avec leurs chiffres
 - Coût : 150 Moyens et 100 Matériaux. Ce sont les Équipes qui les bâtissent.
 - Un avant-poste sert de dépôt, de petit producteur et de zone de soutien.
 - La Convergence peut le casser, la Préfecture le lever.
+- Il s'occupe (0.3) comme un QG, mais en 30 s cumulées d'ennemis sur son parvis sans défenseur ; le compte redescend
+  quand les ennemis partent, et son camp le reprend par 10 s de présence sans ennemi. Occupé, il ne produit plus, ne
+  soutient plus, ne sert plus de dépôt et ne compte plus comme base (§ 1.7).
+- Un cocktail l'enflamme (0.3) : un foyer de 6 m pendant 25 s, pendant lequel il ne produit plus ; il perd 1,6 % de
+  ses points de structure par seconde.
 
 **Barricades** : la Convergence seulement.
 - Segment de 4 à 20 m en travers d'une rue, à 6 Matériaux par mètre et 40 points de structure par mètre.
 - Toute unité de la Convergence peut la bâtir.
 - Elle bloque les déplacements de tous.
 - Le Bastion et la Préfecture la lèvent ; la Convergence peut retirer les siennes.
-- Certaines brûlent. Le feu est un décor : il ne touche jamais une unité.
+- Elle brûle (0.3) quand un cocktail tombe à moins d'un mètre d'elle, fût-il de la Convergence : un foyer de 3,2 m tous
+  les 7 m, trois au plus, pendant 30 s ; elle perd 2 % de ses points de structure par seconde. Le feu presse les unités
+  (§ 1.5) : il n'est plus un simple décor.
+
+**Le feu des objets** (0.3, « faut foutre le feu quand on casse »). Tout objet cassé s'embrase 1,5 s plus tard, puis
+reste calciné. Durée et rayon selon sa sorte : voiture 38 s et 4,5 m, poubelle 12 s et 2 m (les six sortes de la 0.2 :
+d'après leurs points de structure, de 12 à 40 s et de 2 à 4,5 m) ; deux-roues 20 s et 2,6 m, conteneur à ordures 34 s
+et 3 m, terrasse 16 s et 3,2 m, kiosque 36 s et 3,8 m. Un foyer se propage une fois : après 6 s, une chance sur deux
+d'embraser l'objet intact le plus proche à moins de 7 m, sur deux générations au plus. Le Canon à eau éteint (§ 1.5) ;
+l'objet reste calciné.
 
 ### 1.7 Victoire
 
-- Chaque lieu tenu rapporte 1 point par seconde. On en prend un en y restant 15 s sans ennemi ; une présence ennemie gèle la prise.
-- On gagne à 3 000 points ; les scores de deux alliés s'additionnent. On gagne aussi quand tous les camps hostiles sont éliminés.
-- Un camp est éliminé quand son QG est occupé, qu'il n'a plus d'avant-poste et qu'il lui reste moins de 2 % de ses effectifs de départ.
-- À 40 minutes, le meilleur score l'emporte.
+Au choix avant la partie depuis la 0.3 (D2, « soit temps, soit jusqu'au dernier mais pas que au nombre de points ») :
+- **Jusqu'au dernier**, le défaut : le dernier camp, ou la dernière alliance, debout.
+- **Au temps** : 10, 15, **20** (défaut), 30 ou 40 minutes ; le meilleur score l'emporte.
+- **Aux points** : 1 500, **3 000** (défaut) ou 5 000 points.
+- **Mixte**, la règle de la 0.2 : 3 000 points, 40 minutes ou le dernier debout, le premier des trois.
+
+- Chaque lieu tenu rapporte 1 point par seconde. On en prend un en y restant 15 s sans ennemi ; une présence ennemie gèle la prise. Les scores de deux alliés s'additionnent.
+- **Élimination, dans tous les modes.** Un camp sans base — QG occupé et aucun avant-poste achevé et libre — est en
+  déroute : il est éliminé s'il n'a pas retrouvé de base au bout de 30 s, et aussitôt s'il lui reste moins de 2 % de
+  ses effectifs de départ. Ses unités se dispersent, ses avant-postes tombent, ses lieux redeviennent neutres, son
+  alliance se défait.
+- Limite de sécurité des modes sans limite de temps : 90 minutes. « Jusqu'au dernier » : le côté qui a le plus
+  d'unités l'emporte ; « Aux points » : le meilleur score.
 
 ### 1.8 Brouillard
 
@@ -190,6 +269,10 @@ Chaque camp tenu par l'IA réfléchit une fois par seconde, à tour de rôle.
 ### 1.11 Démo
 
 - Une partie à trois IA, avec les effectifs choisis (100 000 par défaut), sans brouillard.
+- Une démo longue (0.3, D4, « demo pas assez longue » ; en 0.2 elle s'arrêtait à 10 min 40 sur 3 000 points) : ni fin
+  aux points ni fin au temps, le réglage de victoire est ignoré (`{ mode: 'dernier', points: 0, duree: 0 }`) ; les QG
+  ne s'occupent pas, les IA ne vont jamais « achever », les revenus sont doublés : chaque camp garde sa base et ses
+  renforts, et la partie va jusqu'à sa limite de sécurité, 60 minutes simulées.
 - Un réalisateur choisit toutes les 8 à 12 s le point le plus vivant : combat, barricade, prise de lieu, grande marche. Il y vole en douceur et tourne lentement autour. De temps en temps, il prend de la hauteur pour montrer toute la ville.
 - À l'écran : un bandeau « DÉMO », « Cliquez ou appuyez sur une touche » et le compteur d'images. La musique est celle du titre.
 
