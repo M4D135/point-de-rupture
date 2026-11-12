@@ -2,7 +2,8 @@
 // comme un script classique dans un contexte nu (vm : ni window, ni document, ni atob, ni Buffer, comme dans le
 // travailleur), se décode, rend des valeurs finies au décimètre dans son étendue, des polygones fermés, orientés, non
 // dégénérés, et toujours les mêmes données ; les comptes par sorte sont ceux qu'annonce le module, et les carrés de jeu
-// suivent ceux du damier (src/ville.js) à 10 % près. Une donnée altérée est refusée au chargement.
+// suivent ceux du damier (src/ville.js) à 10 % près. Le mobilier (points sans nom) et le lointain (repères, bâtiments,
+// boîtes, eau, espaces, voies hors du carré) sont contrôlés de même. Une donnée altérée est refusée au chargement.
 //   node Jeu/verifications/plans.test.mjs
 //   PLANS=dossier node Jeu/verifications/plans.test.mjs      vérifie les plans d'un autre dossier (avant de les livrer)
 import vm from 'node:vm';
@@ -35,6 +36,10 @@ const SORTES = Object.fromEntries(Object.entries({
   reperes: ['place', 'quartier', 'ville', 'eau', 'site', 'mairie', 'police', 'justice', 'culte', 'musee', 'monument',
     'curiosite', 'fontaine', 'marche', 'theatre', 'bibliotheque', 'embarcadere', 'port', 'gare', 'tram', 'metro', 'parc',
     'jardin', 'jeux', 'point-de-vue', 'stade'],
+  mobilier: ['terrasse', 'potelet', 'corbeille', 'conteneur', 'velos', 'velos-partage', 'motos', 'arret-bus', 'abri',
+    'boite-lettres', 'fontaine-a-boire', 'toilettes', 'kiosque', 'oeuvre', 'panneau'],
+  espacesLoin: ['parc', 'jardin', 'pelouse', 'bois', 'cimetiere', 'terrain', 'roche', 'sable', 'plage'],
+  voiesLoin: ['autoroute', 'voie-express', 'primaire', 'secondaire', 'tertiaire'],
 }).map(([k, v]) => [k, new Set(v)]));
 // m² : en dessous, l'outil retire un polygone (AIRE_MIN et AIRE_MIN_TROU d'extraire.py).
 const AIRE_MIN = { batiments: 1.5, eau: 1.0, espaces: 2.0 }, AIRE_MIN_TROU = 0.5;
@@ -68,6 +73,19 @@ function contenu(plan) {
   }
   for (const d of plan.reperes) {
     texte(d.nom); texte(d.sorte); texte(d.classe); texte(d.sousClasse); nombre(d.rang); nombre(d.x); nombre(d.z);
+  }
+  for (const d of plan.mobilier) { texte(d.sorte); nombre(d.x); nombre(d.z); }
+  const L = plan.lointain;
+  nombre(L ? 1 : 0);
+  if (L) {
+    texte(JSON.stringify(L.zone)); texte(JSON.stringify(L.tuilesAbsentes)); texte(JSON.stringify(L.reperes)); texte(JSON.stringify(L.sommets));
+    for (const b of L.batiments) {
+      nombre(b.hauteur); nombre(b.base); nombre(+b.connue); nombre(+b.contour); texte(JSON.stringify(b.couleur)); nombre(b.repere);
+      points(b.points); nombre(b.trous.length); b.trous.forEach(points);
+    }
+    points(L.boites);
+    for (const e of [...L.eau, ...L.espaces]) { texte(e.sorte); points(e.points); nombre(e.trous.length); e.trous.forEach(points); }
+    for (const v of L.voies) { texte(v.classe); points(v.points); }
   }
   return h.digest('hex');
 }
@@ -271,6 +289,83 @@ for (const fichier of fichiers) {
     }
   });
 
+  verifier(`${cle} : mobilier : points sans nom d'une sorte connue, au décimètre dans l'étendue, sans doublon`, () => {
+    assert.ok(Array.isArray(plan.mobilier));
+    const vus = new Set();
+    for (const d of plan.mobilier) {
+      assert.deepEqual(Object.keys(d), ['sorte', 'x', 'z'], 'ni nom ni enseigne');
+      assert.ok(SORTES.mobilier.has(d.sorte), d.sorte);
+      const [x, z] = dm([d.x, d.z], demi, 'mobilier ' + d.sorte), c = d.sorte + ':' + x + ':' + z;
+      assert.ok(!vus.has(c), 'mobilier en double : ' + c);
+      vus.add(c);
+    }
+  });
+
+  verifier(`${cle} : lointain : zone autour du carré, repères et bâtiments hors du carré, boîtes, eau, espaces, voies`, () => {
+    const L = plan.lointain;
+    if (L === null) { console.log('    pas de lointain'); return; }
+    assert.ok(Object.isFrozen(L) && Object.isFrozen(L.zone));
+    const Z = L.zone;
+    assert.ok([Z.x0, Z.z0, Z.x1, Z.z1].every(Number.isInteger));
+    assert.ok(Z.x0 <= -demi && Z.z0 <= -demi && Z.x1 >= demi && Z.z1 >= demi, 'la zone contient le carré du plan');
+    assert.ok(Array.isArray(L.tuilesAbsentes) && L.tuilesAbsentes.every(s => /^\d+\/\d+\/\d+$/.test(s)));
+    const dansZone = (x, z, m = 0.06) => x >= Z.x0 - m && x <= Z.x1 + m && z >= Z.z0 - m && z <= Z.z1 + m;
+    const dansCarre = (x, z, m = 0) => Math.abs(x) <= demi - m && Math.abs(z) <= demi - m;
+    const anneau = (p, exterieur, ou) => {
+      assert.ok(estF32(p) && p.length >= 6 && p.length % 2 === 0, ou + ' : au moins 3 points');
+      const q = new Array(p.length);
+      for (let k = 0; k < p.length; k += 2) {
+        assert.ok(Number.isFinite(p[k]) && Number.isFinite(p[k + 1]) && dansZone(p[k], p[k + 1]), `${ou} : (${p[k]}, ${p[k + 1]}) hors de la zone`);
+        q[k] = Math.round(p[k] * 10); q[k + 1] = Math.round(p[k + 1] * 10);
+        assert.ok(Math.abs(p[k] * 10 - q[k]) < 2e-3 && Math.abs(p[k + 1] * 10 - q[k + 1]) < 2e-3, ou + ' : pas au décimètre');
+      }
+      const a = aire2(q) / 200;
+      assert.ok(exterieur ? a > 0 : a < 0, `${ou} : aire ${a} m²`);
+    };
+    assert.ok(L.reperes.length > 0, 'au moins un repère');
+    for (const d of L.reperes) {
+      assert.ok(d.nom && /^[a-z-]+$/.test(d.modele) && d.rayon > 0);
+      assert.ok(dansZone(d.x, d.z) && !dansCarre(d.x, d.z), 'repère lointain ' + d.nom + ' dans le carré du plan');
+    }
+    for (const s of L.sommets) assert.ok(s.nom && dansZone(s.x, s.z) && s.altitude > 0 && s.altitude < 9000);
+    const parModele = {};
+    for (const b of L.batiments) {
+      assert.ok(Number.isInteger(b.repere) && b.repere >= 0 && b.repere < L.reperes.length);
+      assert.ok(b.base >= 0 && b.hauteur > b.base && b.hauteur < 1000);
+      if (!b.connue) assert.ok(b.hauteur === 5 && b.base === 0);
+      assert.ok(b.couleur === null || (b.couleur.length === 3 && b.couleur.every(c => c >= 0 && c <= 1)));
+      anneau(b.points, true, 'bâtiment lointain');
+      for (const t of b.trous) anneau(t, false, 'bâtiment lointain (trou)');
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let k = 0; k < b.points.length; k += 2) { x0 = Math.min(x0, b.points[k]); x1 = Math.max(x1, b.points[k]); z0 = Math.min(z0, b.points[k + 1]); z1 = Math.max(z1, b.points[k + 1]); }
+      assert.ok(x0 > demi - 0.11 || x1 < -demi + 0.11 || z0 > demi - 0.11 || z1 < -demi + 0.11, 'bâtiment lointain qui touche le carré du plan');
+      const m = L.reperes[b.repere].modele;
+      parModele[m] = (parModele[m] || 0) + 1;
+    }
+    for (const d of L.reperes) assert.ok(parModele[d.modele] > 0, 'repère sans bâtiment : ' + d.nom);
+    assert.ok(estF32(L.boites) && L.boites.length % 6 === 0);
+    let dedans = 0;
+    for (let k = 0; k < L.boites.length; k += 6) {
+      const [x, z, a, b, angle, h] = L.boites.subarray(k, k + 6);
+      assert.ok(dansZone(x, z, 60) && a >= b && b > 0 && a <= 400 && angle >= 0 && angle < Math.PI, `boîte ${k / 6}`);
+      assert.ok(Number.isInteger(h) && h >= 0 && h <= 255, 'hauteur de boîte ' + h);
+      if (dansCarre(x, z, 30)) dedans++;
+    }
+    assert.equal(dedans, 0, dedans + ' boîtes du lointain dans le carré du plan');
+    for (const e of L.eau) { assert.ok(SORTES.eau.has(e.sorte) && e.nom === ''); anneau(e.points, true, 'eau lointaine'); for (const t of e.trous) anneau(t, false, 'eau lointaine (trou)'); }
+    for (const e of L.espaces) { assert.ok(SORTES.espacesLoin.has(e.sorte), e.sorte); anneau(e.points, true, 'espace lointain'); for (const t of e.trous) anneau(t, false, 'espace lointain (trou)'); }
+    for (const v of L.voies) {
+      assert.ok(SORTES.voiesLoin.has(v.classe), v.classe);
+      assert.ok(estF32(v.points) && v.points.length >= 4);
+      let dans = 0;
+      for (let k = 0; k < v.points.length; k += 2) { assert.ok(dansZone(v.points[k], v.points[k + 1])); if (dansCarre(v.points[k], v.points[k + 1], 3)) dans++; }
+      assert.equal(dans, 0, 'voie lointaine dans le carré du plan');
+    }
+    console.log(`    zone ${Z.x0}..${Z.x1} × ${Z.z0}..${Z.z1} m` + (L.tuilesAbsentes.length ? ` (tuiles absentes : ${L.tuilesAbsentes.join(', ')})` : '')
+      + ` ; repères ${L.reperes.map(d => d.modele).join(', ')} ; ${L.batiments.length} bâtiments, ${L.boites.length / 6} boîtes, `
+      + `${L.eau.length} eaux, ${L.espaces.length} espaces, ${L.voies.length} voies, ${L.sommets.length} sommet(s)`);
+  });
+
   verifier(`${cle} : comptes par genre et par sorte, ceux qu'annoncent le module et son en-tête`, () => {
     const par = (liste, champ) => {
       const o = {};
@@ -280,17 +375,21 @@ for (const fichier of fichiers) {
     const pts = liste => liste.reduce((s, o) => s + o.points.length / 2 + (o.trous || []).reduce((t, h) => t + h.length / 2, 0), 0);
     const recompte = {
       rues: plan.rues.length, batiments: plan.batiments.length, eau: plan.eau.length, espaces: plan.espaces.length,
-      reperes: plan.reperes.length,
+      reperes: plan.reperes.length, mobilier: plan.mobilier.length,
       points: { rues: pts(plan.rues), batiments: pts(plan.batiments), eau: pts(plan.eau), espaces: pts(plan.espaces) },
       ruesParClasse: par(plan.rues, 'classe'), eauParSorte: par(plan.eau, 'sorte'),
       espacesParSorte: par(plan.espaces, 'sorte'), reperesParSorte: par(plan.reperes, 'sorte'),
+      mobilierParSorte: par(plan.mobilier, 'sorte'),
       batimentsHauteurConnue: plan.batiments.filter(b => b.connue).length,
       batimentsContour: plan.batiments.filter(b => b.contour).length,
       ruesNommees: plan.rues.filter(r => r.nom).length,
     };
+    const L = plan.lointain;
+    if (L) recompte.lointain = { batiments: L.batiments.length, boites: L.boites.length / 6, eau: L.eau.length, espaces: L.espaces.length,
+      voies: L.voies.length, reperes: L.reperes.length, sommets: L.sommets.length };
     assert.equal(canon(recompte), canon(plan.comptes));
     const entete = code.slice(0, code.indexOf('*/'));
-    for (const g of ['rues', 'batiments', 'eau', 'espaces', 'reperes']) {
+    for (const g of ['rues', 'batiments', 'eau', 'espaces', 'reperes', 'mobilier']) {
       assert.match(entete, new RegExp(`\\n {5}${g}: +\\[.*\\] +× ${recompte[g]}\\n`), g);
     }
     const liste = o => Object.entries(o).map(([k, v]) => k + ' ' + v).join(', ');
@@ -299,6 +398,7 @@ for (const fichier of fichiers) {
       + `${recompte.batimentsHauteurConnue}, contours ${recompte.batimentsContour}`);
     console.log(`    eau ${recompte.eau} (${liste(recompte.eauParSorte)}) ; espaces ${recompte.espaces} (${liste(recompte.espacesParSorte)})`);
     console.log(`    repères ${recompte.reperes} (${liste(recompte.reperesParSorte)})`);
+    console.log(`    mobilier ${recompte.mobilier} (${liste(recompte.mobilierParSorte)})`);
   });
 
   verifier(`${cle} : toujours les mêmes données (deux chargements, même contenu)`, () => {
@@ -317,9 +417,16 @@ for (const fichier of fichiers) {
 
   verifier(`${cle} : une donnée altérée est refusée au chargement`, () => {
     let essais = 0;
-    for (const g of ['rues', 'batiments', 'eau', 'espaces', 'reperes']) {
-      const m = new RegExp(`"${g}":\\{"n":\\d+,"points":\\d+,"octets":"([^"]*)"`).exec(code);
+    // Les flux du plan, puis ceux du lointain (après « "lointain":{ » dans le module).
+    const loin = code.indexOf('"lointain":{');
+    const flux = ['rues', 'batiments', 'eau', 'espaces', 'reperes', 'mobilier'].map(g => [g, 0]);
+    if (plan.lointain) for (const g of ['batiments', 'boites', 'eau', 'espaces', 'voies']) flux.push([g, loin]);
+    for (const [g, depuis] of flux) {
+      const re = new RegExp(`"${g}":\\{"n":\\d+,"points":\\d+,"octets":"([^"]*)"`, 'g');
+      re.lastIndex = depuis;
+      const m = re.exec(code);
       assert.ok(m, 'flux ' + g + ' introuvable');
+      if (!m[1].length) continue;
       const debut = m.index + m[0].length - m[1].length - 1;
       for (const f of [0.1, 0.5, 0.9]) {
         const i = debut + Math.floor(f * m[1].length);
@@ -328,7 +435,7 @@ for (const fichier of fichiers) {
         essais++;
       }
     }
-    assert.equal(essais, 15);
+    assert.ok(essais >= 15, essais + ' altérations essayées');
   });
 }
 
