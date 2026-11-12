@@ -572,9 +572,15 @@
   // Palettes de Marseille : enduits crème, ocre, rose pâle, sable ; pierre de taille ; tuiles canal ; zinc.
   const ENDUITS = [[0.91, 0.85, 0.71], [0.88, 0.72, 0.48], [0.91, 0.76, 0.66], [0.85, 0.77, 0.60], [0.93, 0.83, 0.60],
     [0.90, 0.88, 0.82], [0.89, 0.66, 0.53], [0.86, 0.80, 0.66], [0.80, 0.62, 0.45], [0.92, 0.80, 0.70]];
+  const ENDUITS_PANIER = [[0.90, 0.70, 0.45], [0.88, 0.62, 0.48], [0.93, 0.80, 0.58], [0.85, 0.55, 0.40], [0.92, 0.84, 0.70],
+    [0.80, 0.66, 0.52], [0.90, 0.74, 0.62], [0.78, 0.70, 0.56]];
   const PIERRE = [[0.87, 0.83, 0.73], [0.84, 0.80, 0.70], [0.89, 0.86, 0.78]];
-  const TUILES = [[0.72, 0.37, 0.23], [0.77, 0.43, 0.27], [0.66, 0.34, 0.22], [0.80, 0.49, 0.31], [0.70, 0.46, 0.34]];
-  const ZINC = [0.46, 0.49, 0.53];
+  const PIERRE_ROSE = [0.91, 0.78, 0.68], PIERRE_BLONDE = [0.90, 0.83, 0.68], PIERRE_FORT = [0.85, 0.74, 0.62];
+  // Tuiles canal : du rouge neuf à l'ocre et au brun des vieux toits.
+  const TUILES = [[0.72, 0.37, 0.23], [0.77, 0.43, 0.27], [0.66, 0.34, 0.22], [0.80, 0.49, 0.31], [0.70, 0.46, 0.34],
+    [0.82, 0.56, 0.36], [0.60, 0.36, 0.26], [0.78, 0.52, 0.40], [0.74, 0.40, 0.28], [0.68, 0.42, 0.27]];
+  const ZINC = [0.46, 0.49, 0.53], ARDOISE = [0.30, 0.32, 0.36], VERRE = [0.34, 0.45, 0.52];
+  const TERRASSES = [[0.55, 0.54, 0.52], [0.72, 0.70, 0.66], [0.62, 0.60, 0.56], [0.70, 0.50, 0.40], [0.48, 0.48, 0.48]];
   const VOITURES = [[0.75, 0.75, 0.76], [0.12, 0.13, 0.15], [0.55, 0.08, 0.08], [0.16, 0.25, 0.45], [0.85, 0.85, 0.83],
     [0.35, 0.37, 0.38], [0.62, 0.55, 0.40], [0.20, 0.35, 0.25]];
   const AUVENTS = [[0.80, 0.22, 0.18], [0.18, 0.42, 0.66], [0.92, 0.70, 0.20], [0.24, 0.55, 0.30], [0.86, 0.86, 0.82], [0.55, 0.30, 0.55]];
@@ -622,6 +628,18 @@
         { nom: 'Marché aux Fleurs du Cours Saint-Louis', x: 380, z: 25, des: 13 },
         { nom: 'Marché des Capucins', x: 537, z: -28, des: 15 },
         { nom: 'Marché de la Place de Lorette', x: -338, z: -412, des: 15 },
+      ],
+      // Repères bâtis : le point d'un repère du plan (ou, faute de repère nommé, un point de son emprise) désigne le
+      // bâtiment ; le modèle l'habille. rayon : les bâtiments voisins suivent le même style (parties d'un ensemble).
+      monuments: [
+        { repere: 'Hôtel de ville', sorte: 'mairie', modele: 'hotel-de-ville', rayon: 30 },
+        { repere: 'Église Saint-Ferréol', modele: 'eglise', clocher: 0.9 },
+        // Le palais de la Bourse n'a pas de repère nommé dans les tuiles : un point de son emprise (127..197 × -33..45).
+        { point: [160, 2], nom: 'Palais de la Bourse', modele: 'palais', face: [150, 60] },
+        { repere: 'Opéra de Marseille', modele: 'palais', face: [195, 285], scene: true },
+        { repere: 'Chapelle de la Vieille Charité', modele: 'charite', rayon: 64 },
+        { repere: 'Clocher des Accoules', modele: 'clocher' },
+        { repere: 'Halle Puget', modele: 'halle' },
       ],
       // Terrains de chantier : des dents creuses ouvertes sur la rue (le chantier dégage le bâti dans son rayon).
       chantiers: [
@@ -706,54 +724,125 @@
     const panier = P.reperes.find(q => q.nom === 'Le Panier') || { x: -437, z: -351 };
     const repOmbriere = P.reperes.find(q => /^Ombrière/.test(q.nom));
 
+    // Gabarit des îlots : un bruit lent (trame de 64 m), pour que les voisins montent à peu près au même étage.
+    const gabarit = (x, z) => {
+      const i = Math.floor(x / 64), j = Math.floor(z / 64), fx = x / 64 - i, fz = z / 64 - j;
+      const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+      const c00 = hacher(i, j * 7 + 3), c10 = hacher(i + 1, j * 7 + 3), c01 = hacher(i, j * 7 + 10), c11 = hacher(i + 1, j * 7 + 10);
+      return c00 + (c10 - c00) * sx + (c01 - c00) * sz + (c00 - c10 - c01 + c11) * sx * sz;
+    };
+    // Repères bâtis : l'hôte de chaque repère est le plus grand bâtiment qui contient son point.
+    const monuments = [];
+    for (const m of AM.monuments || []) {
+      const q = m.point ? { x: m.point[0], z: m.point[1] } : P.reperes.find(d => d.nom === m.repere && (!m.sorte || d.sorte === m.sorte));
+      if (q && enDecor(q.x, q.z)) monuments.push({ ...m, x: q.x, z: q.z, hote: -1, aire: 0 });
+    }
+    for (const d of P.reperes) {
+      if (d.sorte !== 'culte' || !/^(Église|Notre-Dame|Basilique|Chapelle)/.test(d.nom) || !enDecor(d.x, d.z)) continue;
+      if (!monuments.some(m => m.repere === d.nom)) monuments.push({ repere: d.nom, modele: 'eglise', x: d.x, z: d.z, hote: -1, aire: 0 });
+    }
+    const STYLES = {
+      'hotel-de-ville': { couleur: PIERRE_ROSE, toit: 'tuiles', hauteur: 17, mat: MAT.FACADE + 0.1 },
+      eglise: { couleur: PIERRE_BLONDE, toit: 'tuiles', hauteur: 16, mat: MAT.PAVE, plein: true },
+      clocher: { couleur: PIERRE_BLONDE, toit: 'terrasse', hauteur: 27, mat: MAT.PAVE, plein: true },
+      halle: { couleur: [0.92, 0.89, 0.82], toit: 'tuiles', hauteur: 7, mat: MAT.PAVE, plein: true },
+      palais: { couleur: [0.88, 0.84, 0.75], toit: 'zinc', hauteur: 22, mat: MAT.FACADE + 0.02 },
+      charite: { couleur: PIERRE_ROSE, toit: 'tuiles', hauteur: 12, mat: MAT.FACADE - 0.3 },
+    };
     const bats = [], boites = [];
     let ombriere = null;
     // Les boucles lourdes vivent dans de petites fonctions : V8 n'optimise pas une fonction aussi longue que creerVille.
-    (() => { for (let k = 0; k < P.batiments.length; k++) {
-      const b = P.batiments[k];
-      if (b.contour) continue;
-      const p = b.points;
-      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-      for (let q = 0; q < p.length; q += 2) {
-        if (p[q] < x0) x0 = p[q]; if (p[q] > x1) x1 = p[q]; if (p[q + 1] < z0) z0 = p[q + 1]; if (p[q + 1] > z1) z1 = p[q + 1];
+    (() => {
+      const NB = P.batiments.length, bb = new Float32Array(NB * 4), aires = new Float32Array(NB);
+      for (let k = 0; k < NB; k++) {
+        const p = P.batiments[k].points;
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        for (let q = 0; q < p.length; q += 2) {
+          if (p[q] < x0) x0 = p[q]; if (p[q] > x1) x1 = p[q]; if (p[q + 1] < z0) z0 = p[q + 1]; if (p[q + 1] > z1) z1 = p[q + 1];
+        }
+        bb[4 * k] = x0; bb[4 * k + 1] = z0; bb[4 * k + 2] = x1; bb[4 * k + 3] = z1;
+        aires[k] = aire(p);
+        for (const m of monuments) {
+          if (m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1 && aires[k] > m.aire && dansAnneau(p, m.x, m.z)) { m.aire = aires[k]; m.hote = k; }
+        }
       }
-      if (x1 < -D || x0 > D || z1 < -D || z0 > D) continue;
-      const A = aire(p);
-      if (A < 3) continue;
-      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-      if (repOmbriere && !ombriere && dansAnneau(p, repOmbriere.x, repOmbriere.z)) { ombriere = boiteMinimale(p); continue; }
-      const detail = enDetail(cx, cz);
-      let liste;
-      if (b.trous.length && A > 60) liste = decomposerTrame(p, b.trous, detail ? 6 : 3);
-      else if (!detail || A < 40) { const m = morceau(p); const bx = m.plein > 0.97 ? boiteMinimale(p) : boiteDe(m); liste = bx ? [bx] : []; }
-      else liste = decomposer(p, A > 1500 ? 6 : 4).map(boiteDe).filter(Boolean);
-      const [dAxe, pierre] = pres(cx, cz);
-      const axe = dAxe < 24, t = hacher(k, 11);
-      const auPanier = longueur(cx - panier.x, cz - panier.z) < 300 && cz < -60 && cx < -170;
-      let h;
-      if (b.connue) h = Math.max(b.hauteur, b.base + 2.5);
-      else if (A < 18) h = 3 + 1.5 * t;
-      else if (A < 45) h = 5 + 4 * t;
-      else {
-        const et = axe ? 6 + Math.floor(t * 2.2) : auPanier ? 3 + Math.floor(t * 3.6) : 4 + Math.floor(t * 3);
-        h = 4.4 + (et - 1) * 3.15;
+      const hotes = new Map();
+      monuments.forEach((m, q) => { if (m.hote >= 0 && !hotes.has(m.hote)) hotes.set(m.hote, q); });
+      /** Le repère dont ce bâtiment suit le style : son hôte, une partie logée dans un hôte plein, ou un voisin. */
+      const reperDe = (k, cx, cz) => {
+        if (hotes.has(k)) return hotes.get(k);
+        for (let q = 0; q < monuments.length; q++) {
+          const m = monuments[q];
+          if (m.hote < 0) continue;
+          if (m.rayon && longueur(cx - m.x, cz - m.z) <= m.rayon) return q;
+          const h4 = 4 * m.hote;
+          if (cx >= bb[h4] && cx <= bb[h4 + 2] && cz >= bb[h4 + 1] && cz <= bb[h4 + 3] && dansAnneau(P.batiments[m.hote].points, cx, cz)) return q;
+        }
+        return -1;
+      };
+      for (let k = 0; k < NB; k++) {
+        const b = P.batiments[k], p = b.points, x0 = bb[4 * k], z0 = bb[4 * k + 1], x1 = bb[4 * k + 2], z1 = bb[4 * k + 3];
+        if (x1 < -D || x0 > D || z1 < -D || z0 > D) continue;
+        const A = aires[k];
+        if (A < 3) continue;
+        const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+        if (repOmbriere && !ombriere && dansAnneau(p, repOmbriere.x, repOmbriere.z)) { ombriere = boiteMinimale(p); continue; }
+        const im = reperDe(k, cx, cz), mon = im >= 0 ? monuments[im] : null, style = mon ? STYLES[mon.modele] : null;
+        const hote = mon !== null && mon.hote === k;
+        // L'emprise d'un bâtiment décrit par ses parties ne s'élève pas, sauf si elle porte un modèle plein (une église) ;
+        // les parties logées dans un hôte plein lui laissent la place.
+        if (b.contour && !(hote && style.plein)) continue;
+        if (mon && style.plein && !hote) continue;
+        const detail = enDetail(cx, cz);
+        let liste;
+        if (b.trous.length && A > 60) liste = decomposerTrame(p, b.trous, detail ? 6 : 3);
+        else if (!detail || A < 40) { const m = morceau(p); const bx = m.plein > 0.97 ? boiteMinimale(p) : boiteDe(m); liste = bx ? [bx] : []; }
+        else liste = decomposer(p, A > 1500 ? 6 : 4).map(boiteDe).filter(Boolean);
+        const [dAxe, pierre] = pres(cx, cz);
+        const axe = dAxe < 24, t = hacher(k, 11);
+        const auPanier = longueur(cx - panier.x, cz - panier.z) < 300 && cz < -60 && cx < -170;
+        // Au bord de l'eau, un bâtiment sans hauteur connue est un kiosque ou un abri du quai.
+        const kiosque = !b.connue && !style && A < 400 && (surEau(cx + 9, cz) || surEau(cx - 9, cz) || surEau(cx, cz + 9) || surEau(cx, cz - 9));
+        let h;
+        if (b.connue && !(hote && style.plein)) h = Math.max(b.hauteur, b.base + 2.5);
+        else if (style) h = style.hauteur + (hote ? 0 : 2 * t - 1);
+        else if (kiosque) h = 3.3 + 0.9 * t;
+        else if (A < 18) h = 3 + 1.5 * t;
+        else if (A < 45) h = 5 + 4 * t;
+        else {
+          // Étages : le gabarit de l'îlot, un immeuble sur trois qui dépasse ou qui manque d'un étage, des corniches
+          // jamais tout à fait alignées.
+          const g = gabarit(cx, cz), e = hacher(k, 13);
+          let et = axe ? 6 + (g > 0.5 ? 1 : 0) : auPanier ? 3 + Math.floor(g * 2.5) : 4 + Math.floor(g * 2.7);
+          if (e < 0.16) et--; else if (e > 0.84) et++;
+          if (A > 1500) et = Math.min(et, 5);
+          h = 4.4 + (et - 1) * 3.15 + (hacher(k, 17) - 0.5) * 0.9;
+        }
+        const base = b.base >= 2.5 ? b.base : 0;
+        // Une partie mince posée haut (OSM décrit ainsi les toits et les corniches) est un morceau de toit.
+        const toiture = base >= 6 && h - base <= 4.6;
+        const t2 = hacher(k, 23);
+        let couleur = b.couleur ? b.couleur.slice() : style ? style.couleur : axe && pierre ? PIERRE[Math.floor(t2 * PIERRE.length)]
+          : auPanier ? ENDUITS_PANIER[Math.floor(t2 * ENDUITS_PANIER.length)] : ENDUITS[Math.floor(t2 * ENDUITS.length)];
+        couleur = couleur.map((v, q) => borner(v + (hacher(k, 31 + q) - 0.5) * (style ? 0.025 : 0.05), 0, 1));
+        let toit;
+        if ((base > 0 && !toiture) || A < 30 || kiosque) toit = 'terrasse';
+        else if (style) toit = style.toit;
+        else if (hacher(k, 41) < (auPanier ? 0.06 : 0.11)) toit = 'terrasse';
+        else if (axe && pierre && hacher(k, 43) < 0.6) toit = 'zinc';
+        else if (!auPanier && A > 120 && hacher(k, 43) > 0.94) toit = 'zinc';
+        else toit = 'tuiles';
+        const bat = { k, A, h, base, couleur, toit, toiture, detail, souleve: base > 0, tuile: TUILES[Math.floor(hacher(k, 47) * TUILES.length)],
+          mat: style ? style.mat : MAT.FACADE - 0.45 + hacher(k, 53) * 0.9, monument: im, hote, boites: [] };
+        for (const bx of liste) {
+          if (bx.a < 0.5 || bx.b < 0.5) continue;
+          if (bx.a > 1 && bx.b > 1) { bx.a += GONFLE; bx.b += GONFLE; }
+          bx.bat = bat;
+          bat.boites.push(bx);
+        }
+        if (bat.boites.length) { bats.push(bat); if (hote) mon.bat = bat; }
       }
-      const base = b.base >= 2.5 ? b.base : 0;
-      const t2 = hacher(k, 23);
-      let couleur = b.couleur ? b.couleur.slice() : axe && pierre ? PIERRE[Math.floor(t2 * PIERRE.length)] : ENDUITS[Math.floor(t2 * ENDUITS.length)];
-      couleur = couleur.map((v, q) => borner(v + (hacher(k, 31 + q) - 0.5) * 0.05, 0, 1));
-      const toit = base > 0 || A < 30 ? 'terrasse' : (A > 2500 && !b.connue) || hacher(k, 41) < 0.12 ? 'terrasse'
-        : axe && pierre && hacher(k, 43) < 0.55 ? 'zinc' : 'tuiles';
-      const bat = { k, A, h, base, couleur, toit, detail, souleve: base > 0, tuile: TUILES[Math.floor(hacher(k, 47) * TUILES.length)],
-        mat: MAT.FACADE - 0.45 + hacher(k, 53) * 0.9, boites: [] };
-      for (const bx of liste) {
-        if (bx.a < 0.5 || bx.b < 0.5) continue;
-        if (bx.a > 1 && bx.b > 1) { bx.a += GONFLE; bx.b += GONFLE; }
-        bx.bat = bat;
-        bat.boites.push(bx);
-      }
-      if (bat.boites.length) bats.push(bat);
-    } })();
+    })();
     chrono('batiments');
 
     // ---- 3. Dégagements : ruelles élargies, terrains des QG et des chantiers. ----
