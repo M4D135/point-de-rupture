@@ -706,11 +706,11 @@ premier jet) pendant que DeepSeek fait les premières passes de L3 et de L4 ; L4
 | Réparation du test du noyau | fait | `a4cfed3` | |
 | L1 Rendu | fait | `71f99a6`, `d871672` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
 | L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
-| L3 Musique | en cours | `6b8509b` | 12/11 au soir : première passe de DeepSeek dans `wt-musique` (consigne `t2-musique.md`), à relire. |
+| L3 Musique | en cours | `681cac7` | 12/11 au soir : premier jet de DeepSeek committé (test aux nouveaux tempos, outils de mesure rangés), `musique` et `son` verts. Reste : le préchauffage (872 ms de médiane contre 502 en 0.2), La Préfecture plus claire qu'avant au lieu de plus grave, la relecture des morceaux, l'écoute. |
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
 | Version à l'écran titre | fait, en ligne | `3601ca6` | 12/11 : essai 0.3b, « 03 / MARSEILLE V0.3b » ; `construire.py` écrit version et édition dans la page. |
 | ZQSD et pancartes (D11) | fait, en ligne | `5f9c3b7` | 12/11, vers 21 h 45 : essai 0.3c en ligne (empreinte de la page servie `470ac778935bbd86` vérifiée), aperçu republié. Réglages en version 2 (migration testée, et vérifiée dans Chrome avec de vraies touches), une banderole ou pancarte sur huit (captures de près). Suites vertes. |
-| L4 Simulation | en cours | `a73a2dd` | 12/11 au soir : première passe de DeepSeek dans `wt-feu-sim` (consigne `t3-sim.md`), puis Opus. |
+| L4 Simulation | en cours | `dd1a161` | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Le reste du lot est pour Opus. |
 | L9 Immeubles et pompiers | à faire | | Ajouté le 12/11 au soir (D9). |
 | IB | provisoire | `706eb9f` | `main` + la simulation en premier jet (`a73a2dd`) : la base de L5. À refaire après L4 et L9. |
 | L5 Feu à l'écran | en cours | `ffa4c74` | Agent Opus, branche `v03-feu-ecran` : premier jet committé, il continue. |
