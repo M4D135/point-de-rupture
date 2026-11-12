@@ -74,6 +74,9 @@
   const VCODE = Uint8Array.from(VI, (di, k) => NAV.cap(di, VJ[k]) >> 1);
 
   const carre = v => v * v;
+  // Le rythme : toutes les pressions des tables (contact, salve, jet, pierres, charge, souffle) sont multipliées par
+  // RYTHME ; le feu et le gaz, qui chassent plus qu'ils ne blessent, gardent leurs chiffres.
+  const RYTHME = K.RYTHME, REPLI_PCT = Math.round(K.REPLI_SEUIL * 100);
   /** Tables entières par type d'unité, tirées de regles.TYPES. */
   const NT = R.TYPES.length;
   const T = {
@@ -92,7 +95,7 @@
   };
   for (const t of R.TYPES) {
     const k = t.id, c = t.capacites;
-    T.fac[k] = t.faction; T.coh[k] = t.coh * 1000; T.pres[k] = Math.round(t.pression * 1000 / IT_S);
+    T.fac[k] = t.faction; T.coh[k] = t.coh * 1000; T.pres[k] = Math.round(t.pression * RYTHME * 1000 / IT_S);
     T.rayon[k] = Math.round(t.rayon * 1000); T.portee[k] = Math.round(t.portee * 1000);
     T.v[k] = Math.round(t.vitesse * 1000 / IT_S); T.vhc[k] = t.vitesseHorsChaussee ? Math.round(t.vitesseHorsChaussee * 1000 / IT_S) : 0;
     T.r8[k] = Math.ceil(t.vision / K.CELLULE_VOILE); T.pop[k] = t.pop; T.protege[k] = t.protege ? 1 : 0; T.vehicule[k] = t.vehicule ? 1 : 0;
@@ -103,31 +106,31 @@
     T.base[k] = t.base ? 1 : 0;
     if (c.pierres) {
       T.pierres[k] = 1; T.piMin2[k] = carre(c.pierres.porteeMin * 1000); T.piMax2[k] = carre(c.pierres.portee * 1000);
-      T.piPres[k] = Math.round(c.pierres.pression * 1000); T.piRech[k] = Math.round(c.pierres.recharge * IT_S);
+      T.piPres[k] = Math.round(c.pierres.pression * RYTHME * 1000); T.piRech[k] = Math.round(c.pierres.recharge * IT_S);
     }
     if (c.charge) {
       T.charge[k] = 1; T.chMin2[k] = carre(c.charge.porteeMin * 1000); T.chMax2[k] = carre(c.charge.portee * 1000);
-      T.chPres[k] = Math.round(c.charge.pression * 1000); T.chRech[k] = Math.round(c.charge.recharge * IT_S);
+      T.chPres[k] = Math.round(c.charge.pression * RYTHME * 1000); T.chRech[k] = Math.round(c.charge.recharge * IT_S);
       T.chElan[k] = Math.round(c.charge.elan * 16); T.chDuree[k] = Math.round(c.charge.duree * IT_S); T.chRecul[k] = Math.round(c.charge.recul * 1000);
       T.chPerce[k] = c.charge.perce ? 1 : 0;
     }
     T.molotov[k] = c.molotov ? 1 : 0; T.lacrymo[k] = c.lacrymo ? 1 : 0;
   }
   const SALVE = R.TYPES[10].capacites.salve, JET = R.TYPES[12].capacites.jet;
-  const SALVE_PORTEE = SALVE.portee * 1000, SALVE_RAYON = SALVE.rayon * 1000, SALVE_COUPS = SALVE.pression * 1000;
+  const SALVE_PORTEE = SALVE.portee * 1000, SALVE_RAYON = SALVE.rayon * 1000, SALVE_COUPS = Math.round(SALVE.pression * RYTHME * 1000);
   const SALVE_ANNONCE_IT = Math.round(SALVE.annonce * IT_S), SALVE_RECHARGE_IT = Math.round(SALVE.recharge * IT_S);
   const SALVE_MAX = SALVE.max || 1e9;
   /** Cases de 4 m autour du point de chute, des plus proches aux plus lointaines : le plafond touche les plus près. */
   const ORDRE_SALVE = [];
   for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) ORDRE_SALVE.push([di * di + dj * dj, di, dj]);
   ORDRE_SALVE.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
-  const JET_PORTEE = JET.portee * 1000, JET_COUPS = Math.round(JET.pression * 1000 * JET_PAS / IT_S);
+  const JET_PORTEE = JET.portee * 1000, JET_COUPS = Math.round(JET.pression * RYTHME * 1000 * JET_PAS / IT_S);
   const JET_RECUL = Math.round(JET.recul * 1000 * JET_PAS / IT_S), JET_COS1000 = 940;   // cos 20° (demi-angle de 40°)
   const SALVE_A_TERRE = SALVE.aTerre || 0, JET_A_TERRE2 = carre((JET.aTerre || 0) * 1000);
   // ---- 0.3 : le cocktail Molotov (Furets), la grenade lacrymogène (Compagnie), le feu, le gaz, les projectiles. ----
   const MOLOTOV = R.TYPES.find(t => t.capacites.molotov).capacites.molotov, LACRYMO = R.TYPES.find(t => t.capacites.lacrymo).capacites.lacrymo;
   const MO_MIN2 = carre(MOLOTOV.porteeMin * 1000), MO_MAX = MOLOTOV.portee * 1000, MO_MAX2 = MO_MAX * MO_MAX, MO_RAYON = MOLOTOV.rayon * 1000;
-  const MO_PRES = Math.round(MOLOTOV.pression * 1000), MO_MAXU = MOLOTOV.max, MO_A_TERRE = MOLOTOV.aTerre, MO_RECH = Math.round(MOLOTOV.recharge * IT_S);
+  const MO_PRES = Math.round(MOLOTOV.pression * RYTHME * 1000), MO_MAXU = MOLOTOV.max, MO_A_TERRE = MOLOTOV.aTerre, MO_RECH = Math.round(MOLOTOV.recharge * IT_S);
   const MO_COUT = MOLOTOV.cout * 1000;
   const LA_MIN2 = carre(LACRYMO.porteeMin * 1000), LA_MAX = LACRYMO.portee * 1000, LA_MAX2 = LA_MAX * LA_MAX, LA_RECH = Math.round(LACRYMO.recharge * IT_S);
   const FEU = K.FEU, GAZ = K.GAZ, PJ = K.PROJECTILES;
@@ -263,8 +266,12 @@
     const facteurRevenu = new Int32Array(3).fill(5);  // revenus × facteur / 5 ; l'IA facile 4, difficile 6
     const estIA = [0, 1, 2].map(f => (opt.ia ? opt.ia.includes(f) : f !== opt.joueur));
     for (let f = 0; f < 3; f++) if (estIA[f]) facteurRevenu[f] = [4, 5, 6][opt.difficulte];
+    // En démo, les renforts ne tarissent pas : tous les revenus sont multipliés (§1.11).
+    if (DEMO) for (let f = 0; f < 3; f++) facteurRevenu[f] *= K.DEMO_RENFORTS;
     const bilan = [0, 1, 2].map(() => ({ produites: 0, horsJeu: 0, infliges: 0, barricadesPosees: 0, barricadesLevees: 0,
       casses: 0, lieuxPris: 0, recolte: 0, molotovs: 0, grenades: 0, pierres: 0, charges: 0, aTerre: 0, feux: 0, eteints: 0 }));
+    // D'où viennent les coups de chaque camp (millièmes) : contact, salve, jet, pierres, charge, souffle, feu, gaz.
+    const sources = new Float64Array(3 * 8);
     for (let f = 0; f < 3; f++) {
       depart[f] = Math.trunc(E * PARTS[f] / 100);
       popMax[f] = Math.trunc(E * PARTS[f] * 125 / 10000);
@@ -1026,14 +1033,22 @@
     const NFEUX_AUTO = (NFEUX * 3) >> 2, NNUAGES_AUTO = (NNUAGES * 3) >> 2, MO_RESERVE = 60000 * echelle;
 
     /** Un coup porté de loin ou par une zone : la pression p du camp f (lanceur i, ou -1) sur l'unité j. */
-    function toucher(j, p, f, i) {
+    function toucher(j, p, f, i, source) {
       if (udeg[j] === 0) touches[nTouches++] = j;
       udeg[j] += p;
       if (i >= 0) uagr[j] = i;
-      bilan[f].infliges += p;
+      bilan[f].infliges += p; sources[f * 8 + source] += p;
       if (f === PREF && ufac[j] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
       const cb = combDeC8[uc8[j]];
       if (combats[cb] < 65535) combats[cb]++;
+    }
+    /** La pression d'une zone (feu, gaz) sur l'unité i, de type t : appliquée tout de suite, sans l'éclair « touchée »
+     *  des coups. Rend vrai si l'unité est hors jeu (par : le camp à qui cela revient, -1 pour personne). */
+    function presser(i, t, p, par) {
+      ucoh[i] -= p;
+      if (ucoh[i] <= 0) { horsJeu(i, false, par); return true; }
+      if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
+      return false;
     }
     /** Jette l'unité j au sol pour trois secondes ; rend vrai si elle tombe. Un véhicule ne tombe pas ; une unité déjà
      *  à terre, ou relevée depuis moins de six secondes, non plus ; une unité protégée ne tombe que si « force ». */
@@ -1092,7 +1107,7 @@
           if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
           if (d2 > r2) continue;
-          toucher(u, T.protege[utyp[u]] ? MO_PRES >> 1 : MO_PRES, f, lanceur);
+          toucher(u, T.protege[utyp[u]] ? MO_PRES >> 1 : MO_PRES, f, lanceur, 5);
           // Soufflée hors du foyer : personne ne reste couché dans les flammes.
           const d = Math.sqrt(d2) | 0, pousse = FEU_RAYON + 700 - d;
           if (d > 0 && pousse > 0 && !T.vehicule[utyp[u]]) deplacer(u, Math.trunc(dx * pousse / d), Math.trunc(dz * pousse / d));
@@ -1116,7 +1131,7 @@
         const j = sCible[sTete], f = sCamp[sTete];
         if (ufac[j] !== LIBRE && ugen[j] === sGen[sTete] && uetat[j] !== ET.HORS_JEU && hostile[f * 4 + ufac[j]]) {
           const i = sTireur[sTete];
-          toucher(j, sPres[sTete], f, ufac[i] === f && uetat[i] !== ET.HORS_JEU ? i : -1);
+          toucher(j, sPres[sTete], f, ufac[i] === f && uetat[i] !== ET.HORS_JEU ? i : -1, 3);
         }
         sTete = (sTete + 1) & (NPIERRES - 1);
       }
@@ -1133,7 +1148,7 @@
       bilan[f].pierres++;
       if (nEvPierres < EV_PIERRE_MAX) { nEvPierres++; evenement(EV.PIERRE, ux[i], uz[i], f, dx / 1000, dz / 1000); }
       const suivant = (sQueue + 1) & (NPIERRES - 1);
-      if (suivant === sTete) { toucher(j, p, f, i); return; }          // file pleine : le coup porte tout de suite
+      if (suivant === sTete) { toucher(j, p, f, i, 3); return; }       // file pleine : le coup porte tout de suite
       sIt[sQueue] = it + PIERRE_IT; sCible[sQueue] = j; sGen[sQueue] = ugen[j]; sTireur[sQueue] = i; sCamp[sQueue] = f; sPres[sQueue] = p;
       sQueue = suivant;
     }
@@ -1269,7 +1284,7 @@
 
     // ---- Coups : pression au contact, flanc × 1,5, protégé × 0,5 de face, interpeller × 2 sous 30 %. ----
     let colereAllumee = false;
-    function frapper(i, j, p) {
+    function frapper(i, j, p, source) {
       const g = ufac[j], tj = utyp[j], f = ufac[i];
       // Interpeller : pression doublée sur une unité sous 30 % de cohésion, et la matraque la jette au sol.
       if (T.interpeller[utyp[i]] && ucoh[j] * 10 < T.coh[tj] * 3) { p *= 2; if (uterre[j] === 0 && uimm[j] === 0) mettreATerre(j, CAUSE.MATRAQUE, f, false); }
@@ -1280,7 +1295,7 @@
       if (udeg[j] === 0) touches[nTouches++] = j;
       udeg[j] += p;
       uagr[j] = i;
-      bilan[f].infliges += p;
+      bilan[f].infliges += p; sources[f * 8 + source] += p;
       if (f === PREF && g === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
       const c8 = uc8[j], cb = combDeC8[c8];
       if (combats[cb] < 65535) combats[cb]++;
@@ -1379,7 +1394,7 @@
           n++;
         }
       }
-      bilan[f].infliges += n * SALVE_COUPS;
+      bilan[f].infliges += n * SALVE_COUPS; sources[f * 8 + 1] += n * SALVE_COUPS;
       evenement(EV.SALVE, x, z, f, SALVE.rayon, n);
     }
     function jet(i) {
@@ -1400,6 +1415,7 @@
           if (udeg[u] === 0) touches[nTouches++] = u;
           udeg[u] += JET_COUPS;
           uagr[u] = i;
+          bilan[f].infliges += JET_COUPS; sources[f * 8 + 2] += JET_COUPS;
           if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
           deplacer(u, Math.trunc(dx * JET_RECUL / d), Math.trunc(dz * JET_RECUL / d));
           if (d2 <= JET_A_TERRE2) mettreATerre(u, CAUSE.JET, f, false);
@@ -1410,8 +1426,8 @@
 
     // ---- Hors jeu : l'unité reste couchée six secondes (1,5 s au-delà de 4 096 gisants, ou si « vite »), puis son
     // emplacement se libère. Dans un foyer, elle disparaît aussitôt : personne n'est montré en feu. ----
-    function horsJeu(i, vite) {
-      const f = ufac[i], t = utyp[i], a = uagr[i], af = a >= 0 && ufac[a] < 3 ? ufac[a] : -1;
+    function horsJeu(i, vite, par) {
+      const f = ufac[i], t = utyp[i], a = uagr[i], af = par !== undefined ? par : a >= 0 && ufac[a] < 3 ? ufac[a] : -1;
       quitterOrdre(i);
       uetat[i] = ET.HORS_JEU; ucoh[i] = 0; ucharge[i] = 0; usal[i] = 0; umode[i] = 0;
       uterre[i] = 0; uimm[i] = 0; ulance[i] = 0;
@@ -1507,12 +1523,12 @@
           const q = kf - 1, dx = x - fX[q], dz = z - fZ[q], d2 = dx * dx + dz * dz, r = fR[q];
           if (d2 <= r * r) {
             if (fAge[q] >= fDelai[q]) {
-              if (udeg[i] === 0) touches[nTouches++] = i;
-              udeg[i] += FEU_PRES; uagr[i] = -1;
               const camp = fCamp[q];
-              if (camp >= 0 && hostile[camp * 4 + f]) bilan[camp].infliges += FEU_PRES;
+              if (camp >= 0 && hostile[camp * 4 + f]) { bilan[camp].infliges += FEU_PRES; sources[camp * 8 + 6] += FEU_PRES; }
               const cb = combDeC8[uc8[i]];
               if (combats[cb] < 65535) combats[cb]++;
+              if (presser(i, t, FEU_PRES, -1)) continue;
+              ord = uord[i];
             }
             if (!T.vehicule[t]) {
               uterre[i] = 0; ulance[i] = 0; uassaut[i] = 0;
@@ -1538,7 +1554,12 @@
         if (kg && hostile[gCamp[kg - 1] * 4 + f] && !T.vehicule[t]) {
           const q = kg - 1, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
           if (d2 <= r * r) {
-            toucher(i, GAZ_PRES, gCamp[q], -1);
+            const camp = gCamp[q];
+            bilan[camp].infliges += GAZ_PRES; sources[camp * 8 + 7] += GAZ_PRES;
+            if (camp === PREF && f === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+            const cb = combDeC8[uc8[i]];
+            if (combats[cb] < 65535) combats[cb]++;
+            if (presser(i, t, GAZ_PRES, camp)) continue;
             ulance[i] = 0; uassaut[i] = 0;
             let vx = dx, vz = dz;
             if (d2 < 10000) { const h = Math.imul(i, 0x9E3779B1) >>> 24; vx = DX[h]; vz = DZ[h]; }
@@ -1643,11 +1664,11 @@
               if (uassaut[i] > 0) {
                 // L'élan d'une charge arrive au contact : le choc, le recul de la cible, sa chute.
                 uassaut[i] = 0;
-                frapper(i, cible, T.chPres[t]);
+                frapper(i, cible, T.chPres[t], 4);
                 const d = Math.sqrt(d2) | 0;
                 if (d > 0 && !T.vehicule[utyp[cible]]) deplacer(cible, Math.trunc(dx * T.chRecul[t] / d), Math.trunc(dz * T.chRecul[t] / d));
                 mettreATerre(cible, CAUSE.CHARGE, f, T.chPerce[t] === 1);
-              } else if (T.pres[t]) frapper(i, cible, T.pres[t]);
+              } else if (T.pres[t]) frapper(i, cible, T.pres[t], 0);
               // Au contact d'un groupe, la Compagnie annonce une salve.
               if (T.salve[t] && urech[i] === 0 && pres[ufac[cible] * N8 + uc8[cible]] >= 6) lancerSalve(i, ux[cible], uz[cible]);
             } else if (T.pierres[t] && urech[i] === 0 && d2 >= T.piMin2[t] && d2 <= T.piMax2[t]) {
@@ -1818,7 +1839,9 @@
       if (ph === PH.RECOLTE) {
         uetat[i] = ET.RECOLTE;
         if (--uminu[i] > 0) return false;
-        const pris = Math.min(K.CHARGE_RECOLTE, stock[g]);
+        // 0.3 : la charge suit l'échelle, comme les coûts, les stocks et les autres revenus (à 100 000 unités, les
+        // 800 places des gisements rapportaient autant qu'à 20 000 : la production ne comptait plus).
+        const pris = Math.min(K.CHARGE_RECOLTE * echelle, stock[g]);
         stock[g] -= pris; actifs[g]--;
         if (pris > 0 && stock[g] === 0) evenement(EV.GISEMENT_EPUISE, gs.x, gs.z, -1, g, 0);
         ucharge[i] = pris;
@@ -1981,7 +2004,7 @@
         ucoh[i] -= udeg[i]; udeg[i] = 0; utouche[i] = TOUCHE_IT;
         const t = utyp[i];
         if (ucoh[i] <= 0) { horsJeu(i); continue; }
-        if (ucoh[i] * 4 < T.coh[t] && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
+        if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
       }
       nTouches = 0;
     }
@@ -2063,7 +2086,8 @@
           else { ennemis += compte[g]; if (compte[g] > plus) { plus = compte[g]; occupant = g; } }
         }
         if (!q.occupe) {
-          if (ennemis > 0 && defenseurs === 0) {
+          // En démo, un QG ne s'occupe pas : chaque camp garde sa base et ses renforts, le spectacle dure (§1.11).
+          if (ennemis > 0 && defenseurs === 0 && !DEMO) {
             q.occupation += pas; structuresDetail++;
             if (q.occupation >= K.OCCUPATION_QG_S * IT_S) { q.occupe = true; q.reprise = 0; versionStructures++; evenement(EV.QG_OCCUPE, q.x, q.z, f, occupant, 0); }
           }
@@ -2412,7 +2436,8 @@
       get delaiAlliance() { return delaiAlliance; },
       soumettre, injecter, iterer, etat, empreinte,
       enregistrement: () => ({ version: P.VERSION, options: { ...opt }, commandes: journal.slice(), empreintes: empreintes.slice() }),
-      bilan: () => bilan.map(b => ({ ...b, infliges: Math.round(b.infliges / 1000) })),
+      bilan: () => bilan.map((b, f) => ({ ...b, infliges: Math.round(b.infliges / 1000),
+        sources: Array.from(sources.subarray(f * 8, f * 8 + 8), v => Math.round(v / 1000)) })),
       ajouter: (f, t, x, z) => creerUnite(f, t, mm(x), mm(z), 0),
       ressources: (f, moyens, materiaux) => { res[f * 2] = moyens * 1000; res[f * 2 + 1] = materiaux * 1000; },
       hostileA: (a, b) => hostile[a * 4 + b] === 1,

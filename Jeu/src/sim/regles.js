@@ -148,6 +148,11 @@
     ALLIANCE_DELAI_S: 60, COALITION_SEUIL: 0.45,
     RESSOURCES_DEPART: Object.freeze([{ moyens: 400, materiaux: 150 }, { moyens: 400, materiaux: 100 }, { moyens: 600, materiaux: 100 }]),
     // ---- Version 0.3. ----
+    // Le rythme : multiplie toutes les pressions (contact, salve, jet, pierres, charge, souffle du cocktail). Sous 1,
+    // les combats durent, on voit les charges et les chutes, et la production a le temps de compter.
+    RYTHME: 1,
+    // La démo est un spectacle qui dure : les revenus y sont multipliés, pour que les renforts suivent les pertes.
+    DEMO_RENFORTS: 2,
     // À terre : trois secondes au sol, puis six secondes pendant lesquelles on ne retombe pas. Hors jeu : l'unité reste
     // couchée GISANT_S, tant qu'il n'y a pas plus de GISANTS_MAX gisants ; au-delà (et dans un feu), HORS_JEU_S.
     A_TERRE_S: 3, A_TERRE_IMMUNITE_S: 6, GISANT_S: 6, GISANTS_MAX: 4096, HORS_JEU_S: 1.5,

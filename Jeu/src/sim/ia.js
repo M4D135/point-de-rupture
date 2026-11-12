@@ -178,9 +178,10 @@
       }
       if (!opt.coalitions || total <= 0) return;
       if (alliance) {
-        // Une coalition d'IA se rompt quand l'allié devient à son tour dominant.
+        // Une coalition d'IA se rompt quand l'allié devient à son tour dominant, ou quand le camp qu'elle visait ne
+        // pèse plus rien (moins d'un cinquième de la force totale) : elle n'a plus d'objet.
         const allie = alliance[0] === f ? alliance[1] : alliance[1] === f ? alliance[0] : -1;
-        if (allie >= 0 && c.coalition && forceCamp[allie] > 0.55 * total) {
+        if (allie >= 0 && c.coalition && (forceCamp[allie] > 0.55 * total || forceCamp[3 - f - allie] < 0.2 * total)) {
           ordonner(c, CMD.DIPLOMATIE, { action: 'rompre', avec: allie });
           c.coalition = false; camps[allie].coalition = false;
         }

@@ -135,6 +135,7 @@ for (const v of VILLES) for (const g of GRAINES) {
       + `  barricades ${b.barricadesPosees}/${b.barricadesLevees}`
       + (b.molotovs === undefined ? '' : `  cocktails ${b.molotovs}  grenades ${b.grenades}  pierres ${b.pierres}  charges ${b.charges}  mises à terre ${b.aTerre}  feux ${b.feux}  éteints ${b.eteints}`)
       + `  ressources ${r.ressources[f].join(' / ')}`);
+    if (b.sources) console.log(`               coups par origine : ${b.sources.map((v, k) => (P.SOURCES_COUPS[k] || k) + ' ' + v).join(', ')}`);
   }
   console.log('  évènements : ' + Object.entries(r.compte).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([k, n]) => `${k} ${n}`).join(', '));
   console.log('  premières itérations : ' + Object.entries(r.premier).map(([k, it]) => `${k} ${it} (${(it / IT_S).toFixed(1)} s)`).join(', '));

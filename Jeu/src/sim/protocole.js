@@ -82,7 +82,8 @@
                  ralliement: [x, z] ou null }
    BILAN = [ { produites, horsJeu, infliges, barricadesPosees, barricadesLevees, casses, lieuxPris, recolte,
                molotovs, grenades (lacrymogènes), pierres, charges, aTerre (mises à terre infligées), feux (foyers
-               allumés : cocktails, casse, propagation), eteints (foyers éteints à l'eau) } × 3 ]
+               allumés : cocktails, casse, propagation), eteints (foyers éteints à l'eau),
+               sources: [8] (les points de « infliges » par origine, dans l'ordre de SOURCES_COUPS) } × 3 ]
    FIN = { type: 'fin', vainqueur: VAINQUEUR, raison: RAISONS_FIN, temps (s de partie), victoire (celle de l'état),
            eco (celle du dernier état), bilan: BILAN, enregistrement (null si options.enregistrer est faux) }
 
@@ -183,6 +184,8 @@
   const SORTES_CASSABLES = Object.freeze(['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere']);
   /** Sorte d'un foyer (etat.feux, FEU_ALLUME). */
   const SORTES_FEU = Object.freeze({ SOL: 0, OBJET: 1, BARRICADE: 2, POSTE: 3 });
+  /** D'où viennent les coups d'un camp (BILAN.sources). */
+  const SOURCES_COUPS = Object.freeze(['contact', 'salve', 'jet', 'pierres', 'charge', 'souffle', 'feu', 'gaz']);
   /** Ce qui a jeté une unité au sol (A_TERRE). */
   const CAUSES_A_TERRE = Object.freeze({ SALVE: 1, CHARGE: 2, MOLOTOV: 3, MATRAQUE: 4, JET: 5 });
   /** VAINQUEUR : -1 en cours ; 0, 1, 2 : un camp ; 3 : une alliance (les deux camps de etat.alliance) ; 4 : nul. */
@@ -250,7 +253,7 @@
 
   PDR.protocole = Object.freeze({
     VERSION: 2, CAPACITE, FLOATS_PAR_UNITE, LARGEUR_TEXTURE, EV_TAILLE, FEU_TAILLE, NUAGE_TAILLE,
-    CMD, NOMS_CMD, EV, RAISONS, SORTES_CASSABLES, SORTES_FEU, CAUSES_A_TERRE, VAINQUEUR, RAISONS_FIN,
+    CMD, NOMS_CMD, EV, RAISONS, SORTES_CASSABLES, SORTES_FEU, CAUSES_A_TERRE, SOURCES_COUPS, VAINQUEUR, RAISONS_FIN,
     VILLES, villeDe, tamponUnites, lireUnite, lireEvenement, lireFeu, lireNuage, commande, forme,
   });
 })(globalThis.PDR = globalThis.PDR || {});
