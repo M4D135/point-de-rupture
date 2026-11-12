@@ -1,7 +1,9 @@
 // Banc de la simulation : millisecondes par itération à 100 000 et 200 000 unités, sur 200 itérations mesurées
 // après une chauffe, moyenne et 95e centile, avec les trois IA et sans IA (foule au repos).
 //   node Jeu/verifications/banc-sim.mjs [--effectifs 100000,200000] [--essais 3] [--chauffe 1200] [--mesure 200]
-//                                       [--graine 1] [--detail]
+//                                       [--graine 1] [--detail] [--ville damier|marseille] [--src chemin/vers/Jeu/src]
+// --ville : le damier de la graine (par défaut) ou le plan réel de Marseille ; --src : les sources à charger (par
+// défaut celles du dépôt), pour comparer deux versions dans les mêmes conditions, l'une après l'autre.
 // La simulation est déterministe : chaque essai refait exactement le même travail (même graine, mêmes ordres d'IA ;
 // l'empreinte finale le prouve). La machine pouvant être chargée, le banc garde l'essai de plus faible moyenne et
 // donne aussi la moyenne médiane des essais. Critère (CONCEPTION.md §4) : 25 ms au plus en moyenne à 100 000.
@@ -14,11 +16,12 @@ import os from 'node:os';
 
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const exiger = createRequire(import.meta.url);
-for (const f of ['ville.js', 'sim/regles.js', 'sim/protocole.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(ici, '..', 'src', f));
-const { ville: V, regles: R, protocole: P, monde: M, ia: IA } = globalThis.PDR;
-
 const args = process.argv.slice(2);
 const option = (nom, defaut) => { const k = args.indexOf('--' + nom); return k >= 0 && args[k + 1] && !args[k + 1].startsWith('--') ? args[k + 1] : defaut; };
+const SRC = path.resolve(option('src', path.join(ici, '..', 'src'))), VILLE = option('ville', 'damier');
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(SRC, f));
+const { regles: R, protocole: P, monde: M, ia: IA } = globalThis.PDR;
+
 const EFFECTIFS = option('effectifs', '100000,200000').split(',').map(Number);
 const ESSAIS = Number(option('essais', 3)), CHAUFFE = Number(option('chauffe', 1200)), MESURE = Number(option('mesure', 200));
 const GRAINE = Number(option('graine', 1)), DETAIL = args.includes('--detail');
@@ -60,13 +63,14 @@ function essai(villeE, E, avecIA) {
   };
 }
 
-console.log(`banc-sim : Node ${process.version}, ${os.cpus()[0].model}, ${os.cpus().length} cœurs, charge ${os.loadavg().map(v => v.toFixed(1)).join(' / ')}`);
+console.log(`banc-sim : ${SRC}, ville ${VILLE}`);
+console.log(`Node ${process.version}, ${os.cpus()[0].model}, ${os.cpus().length} cœurs, charge ${os.loadavg().map(v => v.toFixed(1)).join(' / ')}`);
 console.log(`chauffe ${CHAUFFE} itérations, mesure ${MESURE}, ${ESSAIS} essais par cas, graine ${GRAINE} ; temps en ms par itération\n`);
 const bilan = [];
 let echec = false;
 for (const E of EFFECTIFS) {
   const tv = performance.now();
-  const villeE = V.creerVille(GRAINE, { ilots: R.ilots(E) });
+  const villeE = P.villeDe({ ville: VILLE, graine: GRAINE }, R.ilots(E));
   const msVille = performance.now() - tv;
   for (const avecIA of [false, true]) {
     const essais = [];
@@ -95,5 +99,6 @@ if (cent.length) {
   const pire = Math.max(...cent.map(b => b.moyenne));
   console.log(`objectif : ${OBJECTIF_MS} ms au plus en moyenne à 100 000 unités : ${pire <= OBJECTIF_MS ? 'tenu' : 'MANQUÉ'} (${pire.toFixed(2)} ms, pire des cas)`);
 }
+console.log(`charge à la fin : ${os.loadavg().map(v => v.toFixed(1)).join(' / ')}`);
 console.log('JSON ' + JSON.stringify(bilan));
 process.exitCode = echec ? 1 : 0;

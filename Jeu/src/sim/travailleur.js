@@ -15,19 +15,23 @@
    plus ; un retard de plus de dix itérations est abandonné (la partie ralentit au lieu de s'emballer). Chaque
    itération : monde.iterer(), puis ia.penser(), puis un message « etat » dont le tampon d'unités est transféré ; la
    page le rend par « rendre », et la réserve (quatre tampons au plus) le resert. Les tableaux du message (voile,
-   minicarte, combats, cassables, gisements, évènements) sont des copies, transférées elles aussi.
+   minicarte, combats, cassables, gisements, feux, nuages, évènements) sont des copies, transférées elles aussi.
 
    Commandes : seules celles du camp du joueur sont acceptées (positions quantifiées au mm et enregistrées par le
    monde) ; les autres, et toutes en démo (joueur -1), donnent un évènement REFUS (raison INTERDIT) dans l'état
    suivant. Les mesures (msIteration, msIA, et msNav par le monde) ne changent rien à l'état.
-   Fin de partie : un dernier « etat », puis « fin » { vainqueur, bilan, enregistrement } (enregistrement : celui du
-   monde si options.enregistrer, sinon null). Une exception donne « erreur » { message, pile } et arrête tout. */
+   Fin de partie : un dernier « etat », puis « fin » { vainqueur, raison, temps, victoire, eco, bilan, enregistrement }
+   (raison : pourquoi la partie finit, protocole.RAISONS_FIN ; victoire et eco : ceux du dernier état ; enregistrement :
+   celui du monde si options.enregistrer, sinon null). Une démo finit ainsi elle aussi — au dernier debout, ou à la
+   limite de sécurité d'une heure : la page en relance alors une autre, avec une autre graine.
+   Une exception donne « erreur » { message, pile } et arrête tout. */
 (function (PDR) {
   'use strict';
 
   const P = PDR.protocole, R = PDR.regles, K = R.CONSTANTES;
   const TICK = K.TICK_MS, RATTRAPAGE = 4, RETARD_MAX = 10, RESERVE_MAX = 4, MARGE = 4096;
-  const OPTIONS_PUBLIQUES = ['graine', 'effectifs', 'joueur', 'alliance', 'difficulte', 'brouillard', 'coalitions', 'enregistrer'];
+  const OPTIONS_PUBLIQUES = ['graine', 'effectifs', 'joueur', 'alliance', 'difficulte', 'brouillard', 'coalitions', 'enregistrer',
+    'victoire', 'manifestants'];
   // options.ville : 'marseille' (plan réel) ou 'damier' ; « pret » rend celle qui est vraiment construite (P.villeDe).
 
   function creer(envoyer, reglages = {}) {
@@ -39,6 +43,7 @@
     let msIteration = 0, msIA = 0;
     const reserve = [];
     let refus = [];                                    // [camp, type de commande] en attente du prochain état
+    let dernier = null;                                // eco et victoire du dernier état, pour le message « fin »
 
     function erreur(e) {
       arreter();
@@ -61,6 +66,7 @@
       vitesse = 1; refus = []; fini = false;
       const publiques = {};
       for (const k of OPTIONS_PUBLIQUES) publiques[k] = monde.options[k];
+      publiques.victoire = { ...monde.options.victoire };
       publiques.ville = ville.nom;
       envoyer({ type: 'pret', carte: monde.carte, options: publiques });
       envoyerEtat();                                   // l'état de départ (it 0), pour dessiner tout de suite
@@ -78,6 +84,7 @@
       const msg = monde.etat(tampon, vitesse);
       msg.mesure.msIteration = msIteration;
       msg.mesure.msIA = msIA;
+      dernier = { eco: msg.eco, victoire: msg.victoire };
       if (refus.length) {
         // Les refus du travailleur s'ajoutent aux évènements de l'itération.
         const ev = new Float32Array(msg.evenements.length + refus.length * 3);
@@ -89,7 +96,7 @@
         refus = [];
       }
       const transferts = [tampon, msg.evenements.buffer];
-      for (const k of ['voile', 'minicarte', 'combats', 'cassables', 'gisements']) if (msg[k]) transferts.push(msg[k].buffer);
+      for (const k of ['voile', 'minicarte', 'combats', 'cassables', 'gisements', 'feux', 'nuages']) if (msg[k]) transferts.push(msg[k].buffer);
       envoyer(msg, transferts);
     }
 
@@ -102,7 +109,8 @@
       envoyerEtat();
       if (monde.vainqueur !== P.VAINQUEUR.EN_COURS) {
         fini = true;
-        envoyer({ type: 'fin', vainqueur: monde.vainqueur, bilan: monde.bilan(),
+        envoyer({ type: 'fin', vainqueur: monde.vainqueur, raison: monde.raison, temps: monde.it / K.IT_PAR_S,
+          victoire: dernier ? dernier.victoire : null, eco: dernier ? dernier.eco : null, bilan: monde.bilan(),
           enregistrement: monde.options.enregistrer ? monde.enregistrement() : null });
       }
     }

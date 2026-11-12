@@ -1,8 +1,11 @@
 // Vérifie la simulation (sim/nav.js, sim/monde.js, sim/ia.js, sim/travailleur.js) : déterminisme, relecture, règles
 // en situation, barricade qui ferme puis rouvre un passage, récolte, production et plafond, prise d'un lieu, repli,
 // élimination et victoire, travailleur (messages, réserve de tampons, vitesse, démo), et une partie de 10 minutes
-// simulées à trois IA et 20 000 unités. Les scripts sont chargés dans le contexte de Node, comme dans la page.
-//   node Jeu/verifications/sim.test.mjs            (environ deux minutes)
+// simulées à trois IA et 20 000 unités. Version 0.3 : cocktails Molotov, feu de ce que l'on casse, barricade en feu
+// et Canon à eau, gaz lacrymogène, mises à terre, charges, pierres, hors-jeu couchés, modes de victoire, déroute,
+// avant-postes occupés, part des manifestants, démo qui dure, graine sur le plan réel.
+// Les scripts sont chargés dans le contexte de Node, comme dans la page.
+//   node Jeu/verifications/sim.test.mjs            (environ trois minutes sur une machine au repos)
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -12,10 +15,11 @@ import assert from 'node:assert/strict';
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = f => path.join(ici, '..', 'src', f);
 const exiger = createRequire(import.meta.url);
-for (const f of ['ville.js', 'sim/regles.js', 'sim/protocole.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
 const { ville: V, regles: R, protocole: P, monde: M, ia: IA, travailleur: TR } = globalThis.PDR;
 const { CMD, EV, RAISONS } = P;
 const { CONVERGENCE: C, BASTION: B, PREFECTURE: F } = R;
+const K = R.CONSTANTES, ET = R.ETATS, IT_S = K.IT_PAR_S;
 
 let ok = 0;
 const verifier = (nom, f) => { const t0 = performance.now(); f(); ok++; console.log(`ok  ${nom} (${((performance.now() - t0) / 1000).toFixed(1)} s)`); };
@@ -36,6 +40,15 @@ function courir(m, n, ia = null, arret = null) {
   return vus;
 }
 const de = (vus, type) => vus.filter(e => e.type === type);
+/** L'état du protocole (message ETAT) et ses unités décodées à la demande. */
+const tamponEtat = new ArrayBuffer(P.CAPACITE * 16);
+function etatDe(m) {
+  const e = m.etat(tamponEtat, 1), f32 = new Float32Array(tamponEtat, 0, Math.max(1, e.n) * 4);
+  e.codeEtat = i => R.codeEtat(f32[i * 4 + 3]);
+  e.faction = i => R.codeFaction(f32[i * 4 + 3]);
+  return e;
+}
+const distance = (m, i, x, z) => Math.hypot(m.ux[i] / 1000 - x, m.uz[i] / 1000 - z);
 /** Place n unités (f, t) en grappe autour de (x, z) m, sur des cases praticables ; rend leurs emplacements. */
 function grappe(m, f, t, n, x, z) {
   const ids = [];
@@ -187,13 +200,32 @@ verifier('seule la Convergence casse et barricade ; elle y gagne des Matériaux'
   const casseurs = grappe(m2, C, 2, 10, cx, cz);
   const x0 = m2.res[C * 2 + 1];
   m2.soumettre(cmd(CMD.CASSER, C, { ids: casseurs, sorte: 'cassable', cible: k }));
-  const vus = courir(m2, 1500, null, mm => mm.casEtat[k] === 1);
-  assert.equal(m2.casEtat[k], 1);
+  const vus = courir(m2, 1500, null, mm => mm.casEtat[k] !== 0);
   const casse = de(vus, EV.CASSE)[0];
   assert.equal(casse.a, k);
   assert.equal(P.SORTES_CASSABLES[casse.b], m2.ville.sites.cassables[k].sorte);
   assert.equal(m2.res[C * 2 + 1] - x0, m2.ville.sites.cassables[k].rendement * 1000);
   assert.equal(m2.bilan()[C].casses >= 1, true);
+  // 0.3, « foutre le feu quand on casse » : l'objet cassé s'embrase (2), brûle le temps que lui donnent ses points de
+  // structure, puis reste calciné (3). Les casseurs s'écartent pendant qu'il s'embrase : le feu ne les touche pas.
+  assert.equal(m2.casEtat[k], 2, 'en feu');
+  const objet = m2.ville.sites.cassables[k], feu = R.feuObjet(objet.pv, objet.feu);
+  const allume = de(vus, EV.FEU_ALLUME)[0];
+  assert.deepEqual([allume.faction, allume.b, m2.nFeux], [C, P.SORTES_FEU.OBJET, 1]);
+  assert.ok(Math.hypot(allume.x - cx, allume.z - cz) < 0.01);
+  const e = etatDe(m2);
+  assert.equal(e.cassables[k], 2);
+  const foyer = P.lireFeu(e.feux, 0);
+  assert.deepEqual([foyer.id, foyer.sorte, foyer.cible], [allume.a, P.SORTES_FEU.OBJET, k]);
+  assert.ok(Math.abs(foyer.rayon - feu.rayon) < 1e-3 && foyer.reste > feu.duree - 1 && foyer.intensite > 0 && foyer.intensite < 1, 'il s\'embrase');
+  const debut = courir(m2, 40);
+  for (const i of casseurs) assert.ok(distance(m2, i, cx, cz) > feu.rayon, 'deux secondes plus tard, plus personne dans le foyer');
+  const suite = debut.concat(courir(m2, feu.duree * IT_S + 10, null, mm => mm.casEtat[k] === 3));
+  assert.equal(m2.casEtat[k], 3, 'calciné');
+  const eteint = de(suite, EV.FEU_ETEINT).find(x => x.a === allume.a);
+  assert.deepEqual([eteint.faction, eteint.b], [-1, 0], 'il s\'est consumé');
+  assert.ok(Math.abs((eteint.it - allume.it) / IT_S - feu.duree) < 0.2, 'durée du feu : ' + (eteint.it - allume.it) / IT_S);
+  for (const i of casseurs) assert.equal(m2.ucoh[i], R.TYPES[2].coh * 1000, 'personne n\'a brûlé');
 });
 
 // ---- La barricade ferme une rue, puis la rouvre quand le Bastion la lève. ----
@@ -300,8 +332,9 @@ verifier('production : un lot sort au terme, la file tient 5 ordres, le plafond 
   courir(m, 1);
   assert.equal(m.res[0] - avant, R.TYPES[2].cout.moyens * 1000);
   assert.equal(m.structures[C].file.length, 4);
-  // Plafond : 125 % de la part de départ.
-  assert.equal(m.popMax[C], Math.trunc(20000 * 0.5 * 1.25));
+  // Plafond : 125 % de la part de départ (40 % pour la Convergence, part par défaut depuis la 0.3).
+  assert.equal(m.popMax[C], Math.trunc(20000 * R.parts()[C] * 125 / 10000));
+  assert.equal(m.popMax[C], 10000);
   const m2 = creer({ vide: true, joueur: 0 });
   m2.ressources(C, 100000, 100000);
   const qg = m2.ville.sites.qg[C];
@@ -411,7 +444,14 @@ verifier('travailleur : pret, un état par itération, tampons rendus, vitesse, 
   const t = TR.creer((m, transferts) => recus.push({ m, transferts }), h.reglages);
   t.recevoir({ type: 'demarrer', options: { graine: 3, effectifs: 20000, joueur: -1 } });
   assert.equal(recus[0].m.type, 'pret');
-  assert.deepEqual(Object.keys(recus[0].m.options).sort(), ['alliance', 'brouillard', 'coalitions', 'difficulte', 'effectifs', 'enregistrer', 'graine', 'joueur', 'ville']);
+  assert.deepEqual(Object.keys(recus[0].m.options).sort(), ['alliance', 'brouillard', 'coalitions', 'difficulte', 'effectifs', 'enregistrer', 'graine', 'joueur',
+    'manifestants', 'victoire', 'ville']);
+  // 0.3 : une démo ne finit ni aux points ni au temps ; la part des manifestants par défaut est « moyen ».
+  assert.deepEqual(recus[0].m.options.victoire, { mode: 'dernier', points: 3000, duree: 20 });
+  assert.equal(recus[0].m.options.manifestants, 'moyen');
+  assert.deepEqual(recus[0].m.carte.parts, [40, 32, 28]);
+  assert.deepEqual(recus[0].m.carte.depart, [8000, 6400, 5600]);
+  assert.deepEqual(recus[1].m.victoire, { mode: 'dernier', points: 0, duree: 0, reste: -1, plafond: K.VICTOIRE.DEMO_PLAFOND_S, demo: true });
   assert.equal(recus[0].m.options.ville, 'damier');
   assert.equal(recus[0].m.carte.ilots, 9);
   assert.equal(recus[1].m.type, 'etat');

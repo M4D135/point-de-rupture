@@ -21,6 +21,17 @@
      (et le Bastion) lèvent les barricades qui les gênent, la Préfecture lève aussi les avant-postes ennemis.
    - Difficile : un groupe nettement plus faible que l'ennemi au contact se replie.
 
+   Version 0.3 :
+   - la graine compte partout, même sur le plan réel : chaque camp tire d'elle un penchant stable pour chaque objectif
+     (quelques points de priorité), si bien que deux graines ne donnent pas la même partie ;
+   - « jusqu'au dernier » (options.victoire.mode 'dernier', hors démo) : passé l'ouverture, le camp qui domine va
+     chercher le plus faible chez lui — tous ses groupes libres marchent sur son QG et sur ses avant-postes, qu'ils
+     occupent (la Convergence les casse et les brûle, la Préfecture les lève) ; dans les autres modes, il ne le fait
+     que s'il est deux fois et demie plus fort ; en démo jamais : la démo est un spectacle qui dure ;
+   - un groupe sans objectif ne reste plus l'arme au pied : il marche sur la force hostile la plus proche ;
+   - le feu et le gaz : les Furets et la Compagnie lancent d'eux-mêmes (monde.js) ; l'IA ajoute les cocktails sur les
+     avant-postes qu'elle attaque, et envoie le Canon à eau éteindre les foyers proches de ses groupes ou de ses postes.
+
    API :
      const ia = PDR.ia.creer(monde)   les camps de monde.estIA (tous en démo, joueur -1)
      ia.penser()                      après chaque monde.iterer()
@@ -33,6 +44,8 @@
   const IT_S = K.IT_PAR_S, HORS_JEU = ET.HORS_JEU;
   const CASE = 32000;                                   // mm : case de la vue (4 × 4 cases de 8 m)
   const REGROUPER_IT = 10 * IT_S, RELANCE_IT = 15 * IT_S, POSTE_IT = 30 * IT_S, CASSE_IT = 10 * IT_S, BARRICADE_IT = 25 * IT_S;
+  const OUVERTURE_IT = 3 * 60 * IT_S;                   // « jusqu'au dernier » : trois minutes avant d'aller achever
+  const DOMINE = 1.2, ECRASE = 2.5;                     // rapport de force pour achever : en mode « dernier », ailleurs
   const SATURE = K.RECOLTEURS_MAX + 8;                  // récolteurs envoyés par gisement au plus (40 + 8 qui attendent)
   /** Distance au carré, par multiplications (pas d'opérateur **, dont l'arrondi n'est pas garanti partout). */
   const dist2 = (ax, az, bx, bz) => { const dx = ax - bx, dz = az - bz; return dx * dx + dz * dz; };
@@ -54,6 +67,8 @@
     const periode = IT_S * diff.reflexion, fin = opt.difficulte === 2;
     const decalage = [0, Math.round(periode / 3), Math.round(2 * periode / 3)];
     const NL = monde.lieux.length, NG = monde.gis.length, NK = monde.casX.length;
+    const DEMO = !!monde.demo, ACHEVER = !DEMO && !!monde.victoire && monde.victoire.mode === 'dernier';
+    const FURETS = R.TYPES.findIndex(t => t.capacites.molotov), CANON = R.TYPES.findIndex(t => t.capacites.jet);
     const combat = o => o === O.AUCUN || o === O.ALLER || o === O.ATTAQUE_MVT || o === O.ATTAQUER || o === O.TENIR || o === O.REGROUPER;
 
     // ---- Vue partagée : force (cohésion, en millièmes) des unités de combat et Équipes, par camp et case de 32 m. ----
@@ -94,7 +109,7 @@
       parType: new Int32Array(R.TYPES.length), recolteurs: new Int32Array(NG), oisives: new Int32Array(1024), nOisives: 0,
       recolteursIds: new Int32Array(1024), nRecolteurs: 0,
       nCasseurs: 0, leveurs: new Map(), compte: new Int32Array(G), unites: new Int32Array(1024), nUnites: 0,
-      commandes: 0,
+      commandes: 0, victime: -1, dernierJet: -1e9, feuxVises: new Map(), posteBrule: new Map(),
     }));
     const tirer = c => {
       c.alea = (c.alea + 0x6D2B79F5) >>> 0;
@@ -102,6 +117,12 @@
       t = Math.imul(t ^ (t >>> 15), t | 1);
       t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
       return (t ^ (t >>> 14)) >>> 0;
+    };
+    /** Le penchant du camp pour l'objectif n (-4 à 3 points de priorité), tiré de la graine, stable toute la partie. */
+    const penchant = (c, n) => {
+      let h = Math.imul((opt.graine ^ Math.imul(c.f + 1, 0x9E3779B1) ^ Math.imul(n + 1, 0x85EBCA6B)) >>> 0, 0xC2B2AE35) >>> 0;
+      h ^= h >>> 15;
+      return (h & 7) - 4;
     };
     function ordonner(c, t, champs) {
       c.commandes++;
@@ -157,9 +178,10 @@
       }
       if (!opt.coalitions || total <= 0) return;
       if (alliance) {
-        // Une coalition d'IA se rompt quand l'allié devient à son tour dominant.
+        // Une coalition d'IA se rompt quand l'allié devient à son tour dominant, ou quand le camp qu'elle visait ne
+        // pèse plus rien (moins d'un cinquième de la force totale) : elle n'a plus d'objet.
         const allie = alliance[0] === f ? alliance[1] : alliance[1] === f ? alliance[0] : -1;
-        if (allie >= 0 && c.coalition && forceCamp[allie] > 0.55 * total) {
+        if (allie >= 0 && c.coalition && (forceCamp[allie] > 0.55 * total || forceCamp[3 - f - allie] < 0.2 * total)) {
           ordonner(c, CMD.DIPLOMATIE, { action: 'rompre', avec: allie });
           c.coalition = false; camps[allie].coalition = false;
         }
@@ -317,6 +339,7 @@
       for (const g of c.groupes) mesurer(c, g);
       objectifs(c);
       if (c.f === CONV) { barricader(c); casser(c); } else lever(c);
+      if (c.f === PREF) arroser(c);
     }
     /** Ids valides d'un groupe (du camp, en jeu, pas Équipe, ordre de combat), centre et force. */
     function mesurer(c, g) {
@@ -404,7 +427,29 @@
         const h = forceAutour(q, 1, menace);
         if (nous) { if (h > 0 || monde.lieuConteste[l]) cand.push({ prio: 70 + (monde.lieuConteste[l] ? 10 : 0), x: L.x, z: L.z, besoin: h, cle: 'l' + l }); continue; }
         if (evite(q) || (f === BAST && !colere && p === PREF)) continue;
-        cand.push({ prio: p < 0 ? 50 : 45, x: L.x, z: L.z, besoin: forceAutour(q, 1, g => menace(g) || visable(g)), cle: 'l' + l });
+        cand.push({ prio: (p < 0 ? 50 : 45) + penchant(c, l), x: L.x, z: L.z, besoin: forceAutour(q, 1, g => menace(g) || visable(g)), cle: 'l' + l });
+      }
+      // 0.3 : achever. Le camp le plus faible que l'on peut aller chercher : en « jusqu'au dernier », passé l'ouverture,
+      // dès qu'on le domine (ou que son QG est déjà occupé) ; ailleurs, seulement si on l'écrase ; jamais en démo.
+      c.victime = -1;
+      if (!DEMO && it > OUVERTURE_IT) {
+        let faible = -1;
+        for (let g = 0; g < 3; g++) {
+          if (g === f || monde.elimine[g] || allies(f, g)) continue;
+          if (faible < 0 || forceCamp[g] < forceCamp[faible]) faible = g;
+        }
+        if (faible >= 0 && (forceCamp[f] > (ACHEVER ? DOMINE : ECRASE) * forceCamp[faible] || (ACHEVER && structures[faible].occupe))) c.victime = faible;
+      }
+      // Les avant-postes hostiles : on y va pour les occuper ; ceux de la victime passent devant tout sauf la défense.
+      for (const s of structures) {
+        if (!s.vivante || s.sorte !== S.POSTE || s.chantier || s.occupe || s.faction === f || allies(f, s.faction)) continue;
+        const q = caseDe(s.x, s.z), tue = s.faction === c.victime;
+        if (!tue && (evite(q) || (f === BAST && !colere && s.faction === PREF))) continue;
+        cand.push({ prio: tue ? 62 : 40 + penchant(c, 64 + s.id), x: s.sortieX, z: s.sortieZ, besoin: tue ? 0 : forceAutour(q, 1, g => menace(g) || visable(g)), cle: 's' + s.id });
+      }
+      if (c.victime >= 0) {
+        const v = structures[c.victime];
+        cand.push({ prio: 60, x: v.sortieX, z: v.sortieZ, besoin: 0, cle: 'k' + c.victime, masse: true });
       }
       // Groupes hostiles plus faibles : les cases de force visable, près d'un de nos groupes.
       for (const g of c.groupes) {
@@ -442,6 +487,11 @@
         if (!disponibles.length) break;
         if (vus.has(o.cle)) continue;
         vus.add(o.cle);
+        if (o.masse) {
+          // L'assaut du QG de la victime : tous les groupes encore libres y vont.
+          for (const g of disponibles.splice(0)) envoyer(c, g, o);
+          break;
+        }
         // Le groupe le plus proche assez fort ; à défaut, pour une urgence, le plus proche.
         let choisi = -1, d = Infinity;
         for (let k = 0; k < disponibles.length; k++) {
@@ -455,7 +505,22 @@
         const g = disponibles.splice(choisi, 1)[0];
         envoyer(c, g, o);
       }
-      // Les groupes sans objectif tiennent le lieu le plus proche de leur camp, sinon restent où ils sont.
+      // 0.3 : un groupe sans objectif marche sur la force hostile la plus proche (à 320 m au plus), si elle ne fait pas
+      // plus du double de la sienne ; faute de quoi il tient le lieu le plus proche de son camp, ou reste où il est.
+      for (const g of disponibles.splice(0)) {
+        const q0 = caseDe(g.x, g.z), qi = q0 % gx, qj = (q0 / gx) | 0;
+        let front = -1, df = Infinity;
+        for (let j = Math.max(0, qj - 10); j <= Math.min(gz - 1, qj + 10); j++) for (let i = Math.max(0, qi - 10); i <= Math.min(gx - 1, qi + 10); i++) {
+          const q = i + j * gx;
+          let s = 0;
+          for (let h = 0; h < 3; h++) if (visable(h)) s += force[h * G + q];
+          if (s < 400000 || evite(q)) continue;
+          const e = (i - qi) * (i - qi) + (j - qj) * (j - qj);
+          if (e < df && forceAutour(q, 1, menace) < 2 * g.force) { df = e; front = q; }
+        }
+        if (front >= 0) { envoyer(c, g, { prio: 20, x: cx32(front), z: cz32(front), besoin: 0, cle: 'f' + front }); continue; }
+        disponibles.push(g);
+      }
       for (const g of disponibles) {
         let meilleur = -1, d = Infinity;
         for (let l = 0; l < NL; l++) {
@@ -553,7 +618,15 @@
         for (const g of c.groupes) {
           if (!g.n || dist2(g.x, g.z, s.x, s.z) > 70000 * 70000) continue;
           const ids = plusProches(f, s.x, s.z, 12 * echelle, i => T.casser[utyp[i]] > 0 && combat(uord[i]), 80000);
-          if (ids.length) { ordonner(c, CMD.CASSER, { ids, sorte: 'structure', cible: s.id }); c.derniereCasse = it; return; }
+          if (ids.length) {
+            ordonner(c, CMD.CASSER, { ids, sorte: 'structure', cible: s.id }); c.derniereCasse = it;
+            // 0.3 : et on y met le feu — quelques Furets, un cocktail chacun, au plus toutes les 30 s par avant-poste.
+            if (!s.feu && it - (c.posteBrule.get(s.id) || -1e9) > 30 * IT_S && monde.res[f * 2 + 1] >= 20000) {
+              const furets = plusProches(f, s.x, s.z, 3, i => utyp[i] === FURETS && combat(uord[i]) && monde.urech[i] === 0, 80000);
+              if (furets.length) { ordonner(c, CMD.MOLOTOV, { ids: furets, x: s.x / 1000, z: s.z / 1000 }); c.posteBrule.set(s.id, it); }
+            }
+            return;
+          }
         }
       }
       if (monde.res[f * 2 + 1] >= 150000 * echelle || c.nCasseurs >= 12 * echelle) return;
@@ -601,6 +674,26 @@
         if (!ids.length) continue;
         ordonner(c, CMD.LEVER, { ids, cible: s.id });
         envoyes++;
+      }
+    }
+
+    // ---- 0.3, Préfecture : le Canon à eau va éteindre les foyers qui brûlent un de ses postes ou gênent ses groupes. ----
+    function arroser(c) {
+      const f = c.f, it = monde.it, F = monde.feux;
+      if (!monde.nFeux || it - c.dernierJet < 2 * IT_S || !c.parType[CANON]) return;
+      for (const [id, quand] of c.feuxVises) if (it - quand > 20 * IT_S) c.feuxVises.delete(id);
+      for (let q = 0; q < F.max; q++) {
+        if (!F.actif[q] || F.reste[q] < 8 * IT_S || c.feuxVises.has(F.id[q])) continue;
+        let utile = false;
+        if (F.sorte[q] === P.SORTES_FEU.POSTE) { const s = monde.structures[F.cible[q]]; utile = !!s && s.faction === f; }
+        if (!utile) for (const g of c.groupes) if (g.n && dist2(g.x, g.z, F.x[q], F.z[q]) < 70000 * 70000) { utile = true; break; }
+        if (!utile) continue;
+        const ids = plusProches(f, F.x[q], F.z[q], 1, i => utyp[i] === CANON && combat(uord[i]) && monde.usal[i] === 0, 140000);
+        c.feuxVises.set(F.id[q], it);
+        if (!ids.length) continue;
+        ordonner(c, CMD.CAPACITE, { ids, capacite: 'jet', x: F.x[q] / 1000, z: F.z[q] / 1000 });
+        c.dernierJet = it;
+        return;
       }
     }
 
