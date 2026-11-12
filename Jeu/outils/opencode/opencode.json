@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "autoupdate": false,
+  "mcp": {},
+  "permission": {
+    "edit": "allow",
+    "webfetch": "deny",
+    "external_directory": "deny",
+    "bash": {
+      "*": "deny",
+      "node *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git rm *": "allow",
+      "git mv *": "allow",
+      "git checkout -- *": "allow",
+      "ls*": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "grep *": "allow",
+      "rg *": "allow",
+      "sed -n *": "allow",
+      "uptime": "allow",
+      "python3 Jeu/construire.py*": "allow",
+      "python3 Jeu/verifications/*": "allow"
+    }
+  }
+}

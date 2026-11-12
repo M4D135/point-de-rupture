@@ -23,6 +23,7 @@ Mot pour mot, le 12 novembre 2026, dans l'ordre :
 4. « demo pas assez longue »
 5. « fais un gros master plan pour le boulot avec Fable 5.2 puis passe en opus 5.5 pour l'execution »
 6. « aide toi du spark pour economiser tes tokens »
+7. « tu peux utiliser opencode cli avec deepseek free pour t'aider »
 
 Avant cela, le même jour : « fais marseille et paris pour commencer / ou juste marseille, on verra les autres seront
 pour les maj suivantes » ; puis, sur Paris : « Pas encore ».
@@ -43,7 +44,7 @@ Prises par Claude à partir de ces demandes. David peut en changer une d'un mot 
 | D4 | **Démo longue.** Mesuré en ligne : la démo s'arrête à 10 min 40, quand un camp atteint 3 000 points, avec 73 % des unités déjà hors jeu. En démo : ni fin aux points ni fin au temps, une limite de sécurité à 60 minutes, des IA qui continuent de produire et d'attaquer, les nouveautés visibles dès la première minute. Quand une partie de démo finit, la suivante part aussitôt, sans retour au titre. | L4, L7 |
 | D5 | **« Full FERRO ».** Unreal est retiré du dépôt et du Mac : le jeu ne tourne que sur le moteur de David. Il n'y a plus de dépôt commun du moteur : la copie du jeu, `Jeu/src/moteur/`, est la sienne et évolue avec lui. La branche `ferro-rendu` l'a mise à jour sur le dernier état connu du moteur (FERRO 0.2 : METAL 0.8 et les ajouts de BITUME), à image égale. On garde ce travail ; on en retire ce qui le rattachait à un dépôt de référence. Le son reste le portage en français fait depuis METAL. | L1 |
 | D6 | **Marseille seule** dans la 0.3. Paris et New York attendent. | — |
-| D7 | **Qui fait quoi.** Le plan : Fable 5.2. L'exécution : Opus 5.5, un agent à la fois, pas de rafale. Le gros des lectures, des premiers jets et des relectures : le Spark (§ 6.2). L'interface reste écrite par Claude. | tous |
+| D7 | **Qui fait quoi.** Le plan : Fable 5.2. L'exécution : Opus 5.5, un agent à la fois, pas de rafale. Le gros des lectures, des premiers jets et des relectures : le Spark (§ 6.2). Les premières passes des tâches que les suites savent vérifier : DeepSeek gratuit par opencode (§ 6.3), en parallèle, puisqu'il ne coûte rien. L'interface reste écrite par Claude. | tous |
 | D8 | **Pas dans la 0.3**, à proposer ensuite : l'heure du jour (crépuscule ou nuit, où le feu se verrait bien mieux), Paris, New York. | § 11 |
 
 ## 3. Où l'on en est (12/11/2026, 20 h)
@@ -180,7 +181,8 @@ L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préc
 - Simulation et ville déterministes : ni `Math.random` ni `Date.now` dans un résultat ; la ville évite aussi
   `Math.sin, cos, tan, atan, atan2, hypot, exp, log, pow` (`ville-reelle.test.mjs` le contrôle).
 - Fichiers du jeu, commentaires et textes à l'écran en français, dans le style des fichiers existants.
-- Ni serveur ni port. Le navigateur se pilote par tube : `Jeu/verifications/essai-jeu.py` (§ 6.4).
+- Ni serveur ni port ouvert par le jeu ou ses outils. Le navigateur se pilote par tube : `Jeu/verifications/essai-jeu.py`
+  (§ 6.5). opencode ouvre, lui, un port local le temps de son lancement : c'est son fonctionnement.
 - Un lot ne touche que ses fichiers (§ 7). S'il doit en changer un autre, il le dit dans son compte rendu.
 - Un lot ne committe jamais `Jeu/dist/point-de-rupture.html` ni `Jeu/SIZE.json` : l'intégration les reconstruit.
 - Commits fréquents, en français, sur la branche du lot ; dernière ligne : `Co-Authored-By: Claude Opus 5.5
@@ -196,6 +198,8 @@ L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préc
 - **Opus 5.5** exécute : un agent par lot, l'un après l'autre, chacun dans l'arbre de sa branche. L'agent lit ce plan,
   fait son lot, vérifie, committe, rend un compte rendu court.
 - **Le Spark** lit, résume, propose des premiers jets, relit des diffs. Il ne décide rien et ne prouve rien.
+- **DeepSeek par opencode** fait la première passe d'une tâche bornée, dans l'arbre de la branche : il lit, modifie,
+  lance les suites, rend compte. Il ne committe pas.
 - **La session principale** lance les lots, vérifie les comptes rendus sur pièces (suites, captures), fusionne, pousse,
   met en ligne, tient David au courant.
 
@@ -217,14 +221,34 @@ sans lui sur les petites choses ; pour une grosse lecture, on demande à David.
 Ne passent pas par le Spark : l'interface et le dessin (c'est le travail de Claude), les retouches de quelques lignes,
 tout ce qui demande le navigateur.
 
-### 6.3 Branches
+### 6.3 Se servir d'opencode et de DeepSeek
+
+`Jeu/outils/opencode/lancer.sh <arbre de travail> <consigne.md> [journal]` lance opencode avec
+`opencode/deepseek-v4.1-flash-free`, gratuit, sur une copie de travail. À la différence du Spark, c'est un agent : il
+ouvre lui-même les fichiers, les modifie et lance les suites.
+
+- **Réglage isolé, toujours.** Le réglage d'opencode de cette machine branche la mémoire KBZA et charge les consignes
+  globales ; or aucun LLM dans le nuage ne doit traiter cette mémoire. Le lanceur passe donc son propre réglage : pas de
+  serveur MCP, pas de consignes globales, et seulement `node`, la lecture de git et de fichiers, `git rm`, `git mv` et la
+  construction de la page ; le reste est refusé, le réseau et les fichiers hors du dossier aussi. Ne jamais lancer
+  `opencode` nu avec un modèle distant sur ce Mac.
+- **Pour quoi.** Une tâche bornée, sur des fichiers nommés, que les suites vérifient : remettre une suite au vert,
+  ranger des tests ou des documents, mesurer et rendre un tableau, la première passe d'un lot sans image à juger.
+  Pas pour l'interface ni pour ce qui se juge à l'œil : il ne voit pas les captures.
+- **La consigne** : en français, le contexte en trois lignes, les fichiers permis, les étapes numérotées, « n'affaiblis
+  aucun contrôle », « ne committe pas », et ce qu'il doit rendre. Elle renvoie à ce plan plutôt que de le recopier.
+- **Ensuite** : on relit son diff, on relance soi-même les suites qu'il dit vertes, on committe avec une ligne qui dit
+  que le premier jet vient de lui. Premier essai, le 12/11 : la provenance du moteur (commit `71f99a6`), juste du
+  premier coup, en dix minutes.
+
+### 6.4 Branches
 
 Chaque lot a sa branche et son arbre de travail. Les lots de la première vague reprennent les branches du § 3 et
 commencent par `git merge main` (pour le test du noyau et ce plan). Les lots de la seconde vague partent de
 `integration-b`. L'intégration fusionne dans `integration-a`, `-b`, `-c` ; `main` n'avance que par la session principale,
 après vérification, en avance rapide.
 
-### 6.4 Vérifier
+### 6.5 Vérifier
 
 - **Les suites** : `for f in Jeu/verifications/*.test.mjs; do node "$f" >/dev/null 2>&1 || echo "ECHEC $f"; done`.
   Quatre à cinq minutes sur la machine au calme. `son.test.mjs` contient un seuil de temps : sous charge, le rejouer seul.
@@ -543,7 +567,7 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 |---|---|---|---|
 | Retrait d'Unreal | fait | `5ac0066` | Dépôt et Mac. |
 | Réparation du test du noyau | fait | `a4cfed3` | |
-| L1 Rendu | à finir dans IA | `402268c` | |
+| L1 Rendu | à finir dans IA | `71f99a6` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Restent les points 1 et 3. |
 | L2 Marseille | à reprendre | `de8cf76` | |
 | L3 Musique | à reprendre | `2dc9248` | |
 | IA + mise en ligne | à faire | | |
