@@ -27,6 +27,10 @@ Mot pour mot, le 12 novembre 2026, dans l'ordre :
 Avant cela, le même jour : « fais marseille et paris pour commencer / ou juste marseille, on verra les autres seront
 pour les maj suivantes » ; puis, sur Paris : « Pas encore ».
 
+Dans une autre session, le même jour, à propos du dépôt commun du moteur : « en fait c con ce systme parce que le
+moteur evolue selon le jeu », puis « Supprime-le ». Le dépôt `M4D135/FERRO` et son clone `~/Projects/ferro` n'existent
+plus (vérifié à 20 h 15). Chaque jeu fait évoluer sa propre copie du moteur.
+
 ## 2. Décisions de cadrage
 
 Prises par Claude à partir de ces demandes. David peut en changer une d'un mot ; le lot concerné est indiqué.
@@ -37,10 +41,10 @@ Prises par Claude à partir de ces demandes. David peut en changer une d'un mot 
 | D2 | **Victoire au choix**, avant la partie : « Jusqu'au dernier » (défaut : « un vrai warcraft starcraft »), « Au temps » (10, 15, 20, 30 ou 40 min, le meilleur score gagne), « Aux points » (1 500, 3 000 ou 5 000), « Mixte » (points, temps ou dernier debout, le premier des trois : la règle de la 0.2, 3 000 points et 40 min). Un camp sans base est éliminé dans tous les modes. | L4, L7 |
 | D3 | **Moins de manifestants par défaut** : la part de la Convergence devient un réglage, « Peu » 34 %, « Moyen » 40 % (défaut), « Beaucoup » 50 % (la 0.2). Le total reste à 100 000 unités par défaut. Si David voulait moins d'unités au total, c'est `EFFECTIFS_DEFAUT` qu'il faut baisser. | L4, L7 |
 | D4 | **Démo longue.** Mesuré en ligne : la démo s'arrête à 10 min 40, quand un camp atteint 3 000 points, avec 73 % des unités déjà hors jeu. En démo : ni fin aux points ni fin au temps, une limite de sécurité à 60 minutes, des IA qui continuent de produire et d'attaquer, les nouveautés visibles dès la première minute. Quand une partie de démo finit, la suivante part aussitôt, sans retour au titre. | L4, L7 |
-| D5 | **« Full FERRO ».** Unreal est retiré du dépôt et du Mac. Le moteur de rendu devient une copie de FERRO v0.2 avec six retouches marquées « PDR ». Le son reste un portage en français de l'architecture de FERRO (base `metal-4ce2271`) : en faire une copie ramènerait dans la page les bruitages de METAL, qui ne servent pas ici. `motion.js` et `options.js` ne sont pas repris. | L1 |
+| D5 | **« Full FERRO ».** Unreal est retiré du dépôt et du Mac : le jeu ne tourne que sur le moteur de David. Il n'y a plus de dépôt commun du moteur : la copie du jeu, `Jeu/src/moteur/`, est la sienne et évolue avec lui. La branche `ferro-rendu` l'a mise à jour sur le dernier état connu du moteur (FERRO 0.2 : METAL 0.8 et les ajouts de BITUME), à image égale. On garde ce travail ; on en retire ce qui le rattachait à un dépôt de référence. Le son reste le portage en français fait depuis METAL. | L1 |
 | D6 | **Marseille seule** dans la 0.3. Paris et New York attendent. | — |
 | D7 | **Qui fait quoi.** Le plan : Fable 5.2. L'exécution : Opus 5.5, un agent à la fois, pas de rafale. Le gros des lectures, des premiers jets et des relectures : le Spark (§ 6.2). L'interface reste écrite par Claude. | tous |
-| D8 | **Pas dans la 0.3**, à proposer ensuite : l'heure du jour (crépuscule ou nuit, où le feu se verrait bien mieux), Paris, New York, la récolte des retouches génériques vers FERRO, l'unification de `fx.lots` avec `setLots`. | § 11 |
+| D8 | **Pas dans la 0.3**, à proposer ensuite : l'heure du jour (crépuscule ou nuit, où le feu se verrait bien mieux), Paris, New York. | § 11 |
 
 ## 3. Où l'on en est (12/11/2026, 20 h)
 
@@ -53,7 +57,7 @@ passage à Opus) ; leur travail est committé, le dernier commit de trois branch
 
 | Branche | Dernier commit | Ce qu'elle contient | Tests (vérifié, machine chargée) |
 |---|---|---|---|
-| `ferro-rendu` | `402268c` | Le renderer fusionné avec FERRO v0.2, `REGLAGES_MOTEUR` dans `jeu.js`, `PROVENANCE.md` réécrit, `FERRO.md`, `ferro.test.mjs`, `originaux-ferro.mjs`, `rendu.test.mjs` refait. | Tout passe, sauf `noyau` (réparé depuis sur `main`). Essai Chrome sur Marseille : même image qu'en ligne, aucune erreur de console. |
+| `ferro-rendu` | `402268c` | Le renderer fusionné avec FERRO v0.2, `REGLAGES_MOTEUR` dans `jeu.js`, `PROVENANCE.md` réécrit, `FERRO.md`, `ferro.test.mjs`, `originaux-ferro.mjs`, `rendu.test.mjs` refait. | Tout passe, sauf `noyau` (réparé depuis sur `main`). Essai Chrome sur Marseille : même image qu'en ligne, aucune erreur de console. Ses documents et trois contrôles supposent le dépôt FERRO, supprimé depuis : les contrôles se sautent, à simplifier (L1). |
 | `v03-feu-sim` | `4020ac6` (WIP) | Simulation : feu, Molotov, gaz, mises à terre, charges, pierres, modes de victoire, part des manifestants, démo sans fin aux points, IA, banc d'équilibre. Protocole version 2, documenté en tête de `protocole.js`. | `sim.test.mjs` échoue sur le contrôle « en feu ». Le reste passe. |
 | `v03-marseille` | `de8cf76` (WIP) | Outil d'extraction étendu (hauteurs, couleurs, mobilier de rue, monuments nommés, horizon lointain), données rafraîchies (184 → 240 Ko), début du générateur. | `noyau` (réparé sur `main`) et `son.test.mjs` (un seuil de temps, 3,1 ms, dépassé sous charge : à rejouer au calme). |
 | `v03-musique` | `2dc9248` (WIP) | Les quatre morceaux réécrits (59 → 91 Ko), outils de rendu hors ligne et de mesure. | `musique.test.mjs` échoue : empreintes à refaire, à relire. |
@@ -142,16 +146,20 @@ si le lot L4 change un format, il corrige ce paragraphe.
 
 ### 5.2 Le moteur de rendu (écrit par l'agent, `ferro-rendu`)
 
-`Jeu/src/moteur/renderer.js` est la copie de FERRO v0.2 (`248043a`) plus six retouches « PDR » : origine, voile
-(`fx.voile`), éclairage (`PDR_GLSL`, `PDR_INDOOR`, `PDR_UNIFORMS`), lots (`fx.lots = [{ values, groups, version }]`),
-foule (`fx.foule = { ombre, couleur }`, `renderer.gl`, `renderer.pdr`), msaa (`fx.msaa === false`). Tout le reste vient
-des réglages de FERRO, passés par `REGLAGES_MOTEUR` dans `jeu.js`. Le détail est dans `PROVENANCE.md` et `FERRO.md` de la
-branche. Règle : ne pas toucher `renderer.js` sans marquer la retouche « PDR » et l'ajouter à `PROVENANCE.md` ;
-`ferro.test.mjs` le contrôle.
+`Jeu/src/moteur/renderer.js` est le moteur de rendu du jeu. Sur la branche, c'est le dernier état du moteur commun
+(FERRO 0.2) plus six ajouts du jeu, marqués « PDR » : origine, voile (`fx.voile`), éclairage (`PDR_GLSL`, `PDR_INDOOR`,
+`PDR_UNIFORMS`), lots (`fx.lots = [{ values, groups, version }]`), foule (`fx.foule = { ombre, couleur }`,
+`renderer.gl`, `renderer.pdr`), msaa (`fx.msaa === false`). Les anciens réglages en dur passent par `REGLAGES_MOTEUR`
+dans `jeu.js` (`msaa: 4`, `shadowMapScale: 2`, `vignette: .84`, `bloomThreshold: [.86, .98]`).
 
-Ce que le décor et la foule ont pour dessiner : des primitives instanciées (`box`, `sphere`, `cylinder`, `octa`, `ring`,
-`bevel`, `foliage`), les matières 0 à 18 dont une émissive, huit lampes dynamiques au plus (`fx.lights`), le bloom. Il
-n'y a pas de transparence : la fumée et le gaz se font en volumes opaques.
+Depuis la suppression du dépôt commun, ce fichier appartient au jeu : un lot peut le faire évoluer quand le jeu en a
+besoin. La règle qui reste : une ligne dans `Jeu/src/moteur/PROVENANCE.md` pour chaque changement du moteur (quoi,
+pourquoi, quel coût), et `rendu.test.mjs` vert.
+
+Ce que le décor et la foule ont aujourd'hui pour dessiner : des primitives instanciées (`box`, `sphere`, `cylinder`,
+`octa`, `ring`, `bevel`, `foliage`), les matières 0 à 18 dont une émissive, huit lampes dynamiques au plus
+(`fx.lights`), le bloom. D'après le Spark, il n'y a pas de transparence : la fumée et le gaz se font en volumes
+opaques, sauf si L5 ajoute au moteur de quoi faire mieux.
 
 ### 5.3 La ville
 
@@ -233,13 +241,21 @@ après vérification, en avance rapide.
 
 Ordre d'exécution au § 8. Pour chaque lot : d'où il part, ses fichiers, ce qui reste, ce que le Spark fait, la recette.
 
-### L1 — Rendu sur FERRO v0.2 : finir (dans l'intégration A)
+### L1 — Moteur de rendu à jour : finir (dans l'intégration A)
 
 **Part de** `ferro-rendu` (`402268c`). Fusion faite, tests verts, image identique sur Marseille.
-**Reste** : l'essai sur le damier et sur téléphone ; le repli Canvas 2D (script `sans-webgl2.py` de `essais-rendu` : il
-existe une mesure « avant », pas « après ») ; `banc-rendu.py --moteur` avant et après sous la même charge ; les deux
-paragraphes « moteur » du README et de la conception. Trop petit pour un agent : c'est la première tâche de
-l'intégration A.
+**Reste** :
+1. L'essai sur le damier et sur téléphone ; le repli Canvas 2D (script `sans-webgl2.py` de `essais-rendu` : il existe
+   une mesure « avant », pas « après ») ; `banc-rendu.py --moteur` avant et après sous la même charge.
+2. Défaire ce qui suppose un dépôt de référence, puisqu'il n'y en a plus : `PROVENANCE.md` devient l'histoire du moteur
+   dans ce jeu (il vient du jeu METAL, `M4D135/METAL` ; mis à jour le 12/11 sur FERRO 0.2 avant la suppression de ce
+   dépôt ; les six ajouts du jeu ; puis une ligne par changement) ; `FERRO.md` s'y fond ; `ferro.test.mjs` et
+   `originaux-ferro.mjs` partent ; `rendu.test.mjs` garde ses contrôles du jeu (ajouts du jeu, interrupteur MSAA,
+   comparaison avec la copie d'avant, décor, réalisateur, caméra) et perd les trois qui se sautent faute de clone.
+   Plus de mention « à récolter ».
+3. Les paragraphes « moteur » du README et de la conception.
+
+Trop petit pour un agent : c'est la première tâche de l'intégration A.
 
 ### L2 — Marseille : finir
 
@@ -371,6 +387,9 @@ braises en `sphere`, trois sphères de fumée, une lampe pour les trois plus pro
 9. **Eau sur le feu** (`FEU_ETEINT`, `b` = 1) : un panache de vapeur.
 10. **Brouillard de guerre** : un foyer dans une case que le joueur ne voit pas ne se dessine pas, fumée comprise.
 
+Le moteur est celui du jeu (§ 5.2) : si une fumée ou un gaz convaincants demandent de la transparence ou de vraies
+particules, le lot peut les ajouter à `renderer.js`, avec sa ligne dans `PROVENANCE.md` et son coût mesuré.
+
 **Budget** : 128 foyers et 64 nuages à l'écran sans descendre sous 60 images/s à 100 000 unités ; 4 000 instances de
 plus au maximum ; le temps du décor par image (`decor.mesure`) relevé avant et après.
 **Le Spark** : fiche de `decor.js` (existe : `spark/decor.fiche.md`) ; premier jet de chaque dessin d'effet, un par
@@ -460,9 +479,8 @@ caméra, et un séquenceur de rue calé sur la musique.
 3. **La rue** : retirer les sifflets comiques et la batucada joyeuse. Convergence : tambours lourds, cris scandés.
    Bastion : tambour de guerre lent. Préfecture : boucliers frappés en cadence, radio, sifflet bref et dur à la charge.
 4. **La tension de la musique** tient compte des foyers et des charges.
-5. **Provenance** : corriger l'ancien nom (le commit `4ce2271` cité comme `github.com/M4D135/FERRO` est celui du jeu
-   METAL, aujourd'hui `M4D135/METAL` ; dans FERRO, c'est l'étiquette `metal-4ce2271`) ; regarder ce que FERRO a changé
-   dans le mixeur entre `metal-4ce2271` et `v0.2` et ne reprendre que ce qui est générique.
+5. **Provenance** : corriger l'ancien nom dans `PROVENANCE-SON.md` (le commit `4ce2271` cité comme
+   `github.com/M4D135/FERRO` est celui du jeu METAL, aujourd'hui `M4D135/METAL` ; l'autre adresse ne mène plus nulle part).
 
 **Budget** : les plafonds de voix actuels (32, 40, 48) ; le préchauffage de la banque au coût d'aujourd'hui à 20 % près.
 **Le Spark** : fiche de `audio.js` (77 Ko) avant de le lire ; premier jet de chaque bruitage calculé, un par demande, à
@@ -541,6 +559,5 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 
 - L'heure du jour : crépuscule et nuit, lampadaires allumés, fenêtres éclairées. Le feu y gagnerait beaucoup.
 - Paris, puis New York, sur leur vrai plan.
-- La récolte vers FERRO : l'interrupteur MSAA, les points d'accroche de la foule et de l'éclairage sous des noms
-  neutres, `fx.lots` à unifier avec `setLots`. C'est un travail du dépôt FERRO, par sa propre session.
-- Le son : séparer dans FERRO le mécanisme des recettes de METAL, puis reprendre le mécanisme ici.
+- Le moteur évolue avec le jeu : pas de dépôt commun, pas de récolte. Une idée utile vue dans METAL ou BITUME se
+  reprend au cas par cas, en lisant leur `PROVENANCE.md`. Le décor du jeu pourrait passer de `fx.lots` à `setLots`.
