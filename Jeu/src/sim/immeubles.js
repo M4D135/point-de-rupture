@@ -4,6 +4,23 @@
 (function (PDR) {
   'use strict';
 
+  // cos et sin sans Math.cos ni Math.sin : réduction à [-π/2, π/2], puis la série de Taylor ; écart < 1e-9
+  const CS = new Float64Array(2);
+  function cosSin(a, sortie) {
+    a -= 6.283185307179586 * Math.round(a / 6.283185307179586);
+    let signe = 1;
+    if (a > 1.5707963267948966) {
+      a -= 3.141592653589793;
+      signe = -1;
+    } else if (a < -1.5707963267948966) {
+      a += 3.141592653589793;
+      signe = -1;
+    }
+    const a2 = a * a;
+    sortie[0] = signe * (1 - a2 / 2 * (1 - a2 / 12 * (1 - a2 / 30 * (1 - a2 / 56 * (1 - a2 / 90 * (1 - a2 / 132))))));
+    sortie[1] = signe * a * (1 - a2 / 6 * (1 - a2 / 20 * (1 - a2 / 42 * (1 - a2 / 72 * (1 - a2 / 110 * (1 - a2 / 156))))));
+  }
+
   const TAILLE = 16;
   const MARGE = 20;
 
@@ -79,7 +96,7 @@
       const boites = liste[k].boites;
       for (let b = 0; b < boites.length; b++) {
         const bo = boites[b];
-        const c = Math.cos(bo.lacet), s = Math.sin(bo.lacet);
+        cosSin(bo.lacet, CS); const c = CS[0], s = CS[1];
         const o6 = off * 6;
         I.B[o6] = bo.x; I.B[o6 + 1] = bo.z;
         I.B[o6 + 2] = bo.lx * 0.5; I.B[o6 + 3] = bo.lz * 0.5;
