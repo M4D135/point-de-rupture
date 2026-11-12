@@ -33,6 +33,7 @@ Puis, le même soir, après la mise en ligne de l'essai 0.3a :
 11. « faut que ça foute le feu un peu partout et que les batiments prennent si les pompiers viennent pas eteindre, donc
     camion pompier etc, pompiers gérés avec la police »
 12. « en gros casseurs gaucho, patriotes , flics et pompiers »
+13. « go full spark pour economiser tes tokens » (12/11, vers 22 h 50 ; voir § 6.1)
 
 Avant cela, le même jour : « fais marseille et paris pour commencer / ou juste marseille, on verra les autres seront
 pour les maj suivantes » ; puis, sur Paris : « Pas encore ».
@@ -246,9 +247,14 @@ L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préc
 - **David** tranche. Une décision datée de lui passe avant ce plan.
 - **Fable 5.2** a écrit ce plan. Depuis le 12/11 au soir, la session principale tourne sur Opus 5.5 (choix de David) :
   c'est elle qui le corrige quand une décision change, et qui y a ajouté D9 à D11, L9 et L5b.
-- **Opus 5.5** exécute : un agent par lot, l'un après l'autre, chacun dans l'arbre de sa branche. L'agent lit ce plan,
-  fait son lot, vérifie, committe, rend un compte rendu court.
-- **Le Spark** lit, résume, propose des premiers jets, relit des diffs. Il ne décide rien et ne prouve rien.
+- **Opus 5.5** a exécuté L5 (un agent par lot). Depuis la demande 13 (« go full spark pour economiser tes tokens »),
+  plus d'agent Opus : l'agent de L4 a été arrêté après avoir committé son travail.
+- **Le Spark** écrit le code des lots par la chaîne (`Jeu/outils/spark/chaine.py`) : la session principale découpe un
+  lot en fiches de tâche courtes (12 000 caractères de demande, 30 000 au plus, extraits désignés par lignes ou par
+  motif) ; la chaîne demande des blocs AVANT / APRÈS au Spark, les applique, contrôle la syntaxe, lance les tests de la
+  fiche, committe si c'est vert, sinon renvoie l'échec au Spark (quatre tours au plus). La session principale relit les
+  diffs, rejoue les suites et l'essai Chrome, et reprend à la main ce que la chaîne n'a pas su faire. Le Spark lit et
+  résume aussi ; il ne décide rien et ne prouve rien.
 - **DeepSeek par opencode** fait la première passe d'une tâche bornée, dans l'arbre de la branche : il lit, modifie,
   lance les suites, rend compte. Il ne committe pas.
 - **La session principale** lance les lots, vérifie les comptes rendus sur pièces (suites, captures), fusionne, pousse,

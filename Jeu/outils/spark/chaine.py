@@ -15,11 +15,11 @@ vérifie à la fin ; la chaîne fait le reste, tour par tour :
 Une fiche de tâche :
     Titre: Les quatre sortes de L2 dans SORTES_CASSABLES
     Fichiers: Jeu/src/sim/regles.js:/SORTES_CASSABLES/+40, Jeu/src/sim/monde.js:1200-1260
-    Tests: node Jeu/verifications/sim.test.mjs, node Jeu/verifications/regles.test.mjs
+    Tests: node Jeu/verifications/sim.test.mjs ; node Jeu/verifications/regles.test.mjs
     ---
     Ce qu'il faut faire, précisément : où, quoi, quels nombres, ce qu'il ne faut pas toucher.
 
-`Fichiers:` désigne les extraits envoyés (chemin entier, `chemin:a-b` en lignes, ou `chemin:/motif/+N` : N lignes à
+`Tests:` sépare ses commandes par « ; » (une virgule peut figurer dans une commande). `Fichiers:` désigne les extraits envoyés (chemin entier, `chemin:a-b` en lignes, ou `chemin:/motif/+N` : N lignes à
 partir de la première qui contient le motif). Le Spark ne voit que ces extraits : viser 12 000 caractères de demande,
 jamais plus de 30 000 (mesuré en novembre 2026 ; au-delà il boucle ou se tait). Tout ce qu'il rend reste un brouillon :
 les tests de la fiche et la relecture finale de Claude décident.
@@ -65,7 +65,7 @@ def lire_fiche(chemin):
             k, _, v = ligne.partition(':')
             champs[k.strip().lower()] = v.strip()
     return {'titre': champs.get('titre', chemin.stem), 'fichiers': [x.strip() for x in champs.get('fichiers', '').split(',') if x.strip()],
-            'tests': [x.strip() for x in champs.get('tests', '').split(',') if x.strip()], 'texte': corps.strip()}
+            'tests': [x.strip() for x in champs.get('tests', '').split(';') if x.strip()], 'texte': corps.strip()}
 
 
 def extrait(designation):
