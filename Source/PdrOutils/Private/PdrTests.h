@@ -12,6 +12,6 @@ namespace Pdr
 		TArray<FString> Echecs;
 	};
 
-	/** Joue les tests du noyau de simulation. Ne lit ni fichier ni horloge. */
+	/** Joue les tests du noyau de simulation et ceux de la ligne de commande de l'executeur. Ne lit ni fichier ni horloge. */
 	FResultatTests ExecuterTests();
 }

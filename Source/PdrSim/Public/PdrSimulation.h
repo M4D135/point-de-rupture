@@ -58,8 +58,9 @@ namespace Pdr
 	 * Elle ne lit ni horloge ni fichier, et ne calcule qu'en entiers.
 	 *
 	 * Deplacement de l'etape A1 : en ligne droite, le pas etant tronque au millimetre sur chaque axe.
-	 * La vitesse reelle depend donc de la direction : elle reste inferieure a la vitesse nominale de moins
-	 * de 1,5 mm par iteration, ce qui pese jusqu'a 29 % aux vitesses 1 et 2 et moins de 1 % a 150.
+	 * La vitesse reelle depend donc de la direction : l'escouade perd moins de 1,5 mm par iteration, ce qui pese
+	 * jusqu'a 29 % a la vitesse 1, 50 % a 2, 33 % a 3, 29 % a 4, 20 % a 5, et moins de 1 % a 150. Le dernier pas
+	 * peut depasser la vitesse nominale de moins d'un millimetre. La navigation de l'etape A2 remplace ce deplacement.
 	 */
 	class PDRSIM_API FSimulation
 	{

@@ -3,9 +3,9 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
-#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "PdrAlea.h"
+#include "PdrExecuteur.h"
 #include "PdrOctets.h"
 #include "PdrRelecture.h"
 #include "PdrSimulation.h"
@@ -18,125 +18,10 @@ namespace PdrOutils
 {
 	namespace
 	{
-		// Bornes des options. Au-dela, une mesure perd son sens, un nom de fichier change de forme ou un texte ne tient plus en memoire.
-
-		/** Une relecture de cette duree tient largement dans une seule chaine (voir FormaterRelecture). */
-		constexpr uint64 IterationsOutilMax = 10000000;
-		/** A 150 mm par iteration, les escouades de -boucle mettent plus de 9,4 millions d'iterations a traverser le monde. */
-		constexpr uint64 BoucleMax = 9000000;
-		/** Le nom des fichiers de parties porte cinq chiffres : au-dela, l'ordre des noms ne serait plus celui des graines. */
-		constexpr uint64 PartiesMax = 99999;
-		constexpr uint64 ChargeMax = 1000000;
-		constexpr uint64 CommandesParIterationMax = 64;
 		/** Critere de l'etape A3 : vingt minutes de jeu, soit 24 000 iterations, en six secondes. */
 		constexpr double BudgetMicrosecondes = 250.0;
-
-		enum class ELecture : uint8
-		{
-			Absente,
-			Valide,
-			Fausse,
-		};
-
-		/** Entier decimal sans signe : des chiffres seulement, sans depassement. */
-		bool LireChiffres(const FString& Texte, uint64& Valeur)
-		{
-			if (Texte.IsEmpty() || Texte.Len() > 20)
-			{
-				return false;
-			}
-			uint64 Cumul = 0;
-			for (int32 Indice = 0; Indice < Texte.Len(); ++Indice)
-			{
-				const TCHAR Caractere = Texte[Indice];
-				if (Caractere < TEXT('0') || Caractere > TEXT('9'))
-				{
-					return false;
-				}
-				const uint64 Chiffre = static_cast<uint64>(Caractere - TEXT('0'));
-				if (Cumul > (MAX_uint64 - Chiffre) / 10)
-				{
-					return false;
-				}
-				Cumul = Cumul * 10 + Chiffre;
-			}
-			Valeur = Cumul;
-			return true;
-		}
-
-		/**
-		 * Lit l'option '-Nom=valeur' : un entier dans [Min, Max]. Une valeur mal ecrite ou hors bornes est une erreur,
-		 * jamais une valeur approchee : la meme ligne de commande donne la meme chose sur toute machine.
-		 */
-		ELecture LireOption(const FString& Params, const TCHAR* Nom, uint64 Min, uint64 Max, uint64& Valeur)
-		{
-			FString Texte;
-			if (!FParse::Value(*Params, *FString::Printf(TEXT("%s="), Nom), Texte))
-			{
-				return ELecture::Absente;
-			}
-			uint64 Lue = 0;
-			if (!LireChiffres(Texte, Lue) || Lue < Min || Lue > Max)
-			{
-				UE_LOG(LogPdrOutils, Error, TEXT("PDR_OPTION -%s=%s refusee : entier de %llu a %llu attendu"), Nom, *Texte, Min, Max);
-				return ELecture::Fausse;
-			}
-			Valeur = Lue;
-			return ELecture::Valide;
-		}
-
-		/** Lit l'option '-Nom=valeur' : seize chiffres hexadecimaux en minuscules, comme les condenses affiches. */
-		ELecture LireCondense(const FString& Params, const TCHAR* Nom, uint64& Valeur)
-		{
-			FString Texte;
-			if (!FParse::Value(*Params, *FString::Printf(TEXT("%s="), Nom), Texte))
-			{
-				return ELecture::Absente;
-			}
-			uint64 Cumul = 0;
-			bool bValide = Texte.Len() == 16;
-			for (int32 Indice = 0; bValide && Indice < 16; ++Indice)
-			{
-				const TCHAR Caractere = Texte[Indice];
-				if (Caractere >= TEXT('0') && Caractere <= TEXT('9'))
-				{
-					Cumul = (Cumul << 4) | static_cast<uint64>(Caractere - TEXT('0'));
-				}
-				else if (Caractere >= TEXT('a') && Caractere <= TEXT('f'))
-				{
-					Cumul = (Cumul << 4) | (10 + static_cast<uint64>(Caractere - TEXT('a')));
-				}
-				else
-				{
-					bValide = false;
-				}
-			}
-			if (!bValide)
-			{
-				UE_LOG(LogPdrOutils, Error, TEXT("PDR_OPTION -%s=%s refusee : seize chiffres hexadecimaux en minuscules attendus"), Nom, *Texte);
-				return ELecture::Fausse;
-			}
-			Valeur = Cumul;
-			return ELecture::Valide;
-		}
-
-		/**
-		 * Ajoute une partie au condense : son en-tete, puis des empreintes. A l'enregistrement, celles que la partie vient
-		 * de produire ; a la relecture, celles que la simulation a recalculees, jamais celles du fichier. Deux executions
-		 * qui affichent le meme condense ont donc calcule les memes etats.
-		 */
-		void Condenser(Pdr::FEcrivain& Condense, const Pdr::FRelecture& Partie, const TArray<Pdr::FEmpreinteDatee>& Empreintes)
-		{
-			Condense.U64(Partie.Config.Graine);
-			Condense.I32(Partie.Iterations);
-			Condense.I32(Partie.Commandes.Num());
-			Condense.I32(Empreintes.Num());
-			for (const Pdr::FEmpreinteDatee& Releve : Empreintes)
-			{
-				Condense.I32(Releve.Iteration);
-				Condense.U64(Releve.Empreinte);
-			}
-		}
+		/** Dix fois le plus gros fichier que l'outil sait ecrire. Au-dela de 2 Gio, le moteur tronquerait la taille a 32 bits. */
+		constexpr int64 TailleRelectureMax = 1ll << 30;
 
 		/** Vrai si aucun condense n'est attendu, ou si c'est bien celui-la. */
 		bool CondenseAttendu(const TCHAR* Action, uint64 Obtenu, bool bAttendu, uint64 Attendu)
@@ -399,8 +284,7 @@ namespace PdrOutils
 			{
 				TArray<FString> Noms;
 				Gestionnaire.FindFiles(Noms, *(Chemin / TEXT("*.pdr")), true, false);
-				// Ordre des caracteres, casse comprise : le meme sur toute machine, et celui des graines pour les fichiers de -relectures.
-				Noms.Sort([](const FString& G, const FString& D) { return G.Compare(D, ESearchCase::CaseSensitive) < 0; });
+				TrierNomsDeParties(Noms);
 				for (const FString& Nom : Noms)
 				{
 					Fichiers.Add(Chemin / Nom);
@@ -412,43 +296,42 @@ namespace PdrOutils
 			}
 
 			const double Debut = FPlatformTime::Seconds();
-			Pdr::FEcrivain Condense;
-			int32 Conformes = 0;
+			FBilanDeRelecture Bilan;
 			for (const FString& Fichier : Fichiers)
 			{
+				const int64 Taille = Gestionnaire.FileSize(*Fichier);
 				FString Texte;
-				Pdr::FRelecture Partie;
-				FString Erreur;
+				if (Taille < 0)
+				{
+					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC fichier introuvable : %s"), *Fichier);
+					Bilan.AjouterIllisible();
+					continue;
+				}
+				if (Taille > TailleRelectureMax)
+				{
+					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC %s : %lld octets, au-dela de la limite de %lld"), *Fichier, Taille, TailleRelectureMax);
+					Bilan.AjouterIllisible();
+					continue;
+				}
 				if (!FFileHelper::LoadFileToString(Texte, *Fichier))
 				{
 					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC lecture impossible : %s"), *Fichier);
+					Bilan.AjouterIllisible();
 					continue;
 				}
-				if (!Pdr::AnalyserRelecture(Texte, Partie, Erreur))
+				FString Motif;
+				if (!Bilan.Ajouter(Texte, Motif))
 				{
-					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC %s : %s"), *Fichier, *Erreur);
-					continue;
+					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC %s : %s"), *Fichier, *Motif);
 				}
-				const Pdr::FRapportRelecture Rapport = Pdr::Rejouer(Partie);
-				if (Rapport.bConforme)
-				{
-					++Conformes;
-				}
-				else
-				{
-					UE_LOG(LogPdrOutils, Error, TEXT("PDR_RELIRE_ECHEC %s : divergence a l'iteration %d, %d empreintes verifiees %s"),
-						*Fichier, Rapport.PremiereDivergence, Rapport.EmpreintesVerifiees, *Rapport.Erreur);
-				}
-				// Les empreintes recalculees ici, pas celles du fichier : le condense depend de ce que cette machine a calcule.
-				Condenser(Condense, Partie, Rapport.Recalculees);
 			}
 			const double DureeMs = (FPlatformTime::Seconds() - Debut) * 1000.0;
 
-			const uint64 Obtenu = Pdr::Fnv1a64(Condense.Lire());
+			const uint64 Obtenu = Bilan.Condense();
 			UE_LOG(LogPdrOutils, Display, TEXT("PDR_RELIRE fichiers=%d conformes=%d condense=%016llx duree_ms=%.1f"),
-				Fichiers.Num(), Conformes, Obtenu, DureeMs);
+				Bilan.Fichiers(), Bilan.Conformes(), Obtenu, DureeMs);
 			const bool bCondense = CondenseAttendu(TEXT("PDR_RELIRE"), Obtenu, bAttendu, Attendu);
-			return Fichiers.Num() > 0 && Conformes == Fichiers.Num() && bCondense;
+			return Bilan.Fichiers() > 0 && Bilan.Conformes() == Bilan.Fichiers() && bCondense;
 		}
 	}
 }
@@ -465,94 +348,72 @@ UPdrSimCommandlet::UPdrSimCommandlet()
 
 int32 UPdrSimCommandlet::Main(const FString& Params)
 {
-	using PdrOutils::ELecture;
-
 	UE_LOG(LogPdrOutils, Display, TEXT("PDR_VERSION format=%d iterations_par_seconde=%d"), Pdr::VersionFormat, Pdr::IterationsParSeconde);
 
 	// Toutes les options sont lues et verifiees avant de rien lancer.
-	uint64 Iterations = 10000;
-	uint64 Boucle = 0;
-	uint64 Escouades = 0;
-	uint64 Charge = 0;
-	uint64 CommandesParIteration = 8;
-	uint64 File = 0;
-	uint64 Parties = 0;
-	uint64 Graine = 1;
-	uint64 Attendu = 0;
-	const ELecture LuIterations = PdrOutils::LireOption(Params, TEXT("iterations"), 0, PdrOutils::IterationsOutilMax, Iterations);
-	const ELecture LuBoucle = PdrOutils::LireOption(Params, TEXT("boucle"), 1, PdrOutils::BoucleMax, Boucle);
-	const ELecture LuEscouades = PdrOutils::LireOption(Params, TEXT("escouades"), 0, static_cast<uint64>(Pdr::EscouadesMax), Escouades);
-	const ELecture LuCharge = PdrOutils::LireOption(Params, TEXT("charge"), 1, PdrOutils::ChargeMax, Charge);
-	const ELecture LuCommandes = PdrOutils::LireOption(Params, TEXT("commandes"), 0, PdrOutils::CommandesParIterationMax, CommandesParIteration);
-	const ELecture LuFile = PdrOutils::LireOption(Params, TEXT("file"), 1, static_cast<uint64>(Pdr::CommandesEnAttenteMax), File);
-	const ELecture LuParties = PdrOutils::LireOption(Params, TEXT("relectures"), 1, PdrOutils::PartiesMax, Parties);
-	const ELecture LuGraine = PdrOutils::LireOption(Params, TEXT("graine"), 0, MAX_uint64, Graine);
-	const ELecture LuAttendu = PdrOutils::LireCondense(Params, TEXT("attendu"), Attendu);
-	if (LuIterations == ELecture::Fausse || LuBoucle == ELecture::Fausse || LuEscouades == ELecture::Fausse || LuCharge == ELecture::Fausse
-		|| LuCommandes == ELecture::Fausse || LuFile == ELecture::Fausse || LuParties == ELecture::Fausse || LuGraine == ELecture::Fausse
-		|| LuAttendu == ELecture::Fausse)
+	PdrOutils::FOptions Options;
+	TArray<FString> Fautes;
+	if (!PdrOutils::LireOptions(Params, Options, Fautes))
 	{
+		for (const FString& Faute : Fautes)
+		{
+			UE_LOG(LogPdrOutils, Error, TEXT("PDR_OPTION %s"), *Faute);
+		}
 		UE_LOG(LogPdrOutils, Display, TEXT("PDR_RESULTAT ECHEC"));
 		return 1;
 	}
-	const bool bAttendu = LuAttendu == ELecture::Valide;
-
-	bool bDemande = false;
-	bool bReussi = true;
-
-	if (FParse::Param(*Params, TEXT("tests")))
+	if (!Options.UneActionDemandee())
 	{
-		bDemande = true;
-		bReussi = PdrOutils::LancerTests() && bReussi;
-	}
-
-	if (LuBoucle == ELecture::Valide)
-	{
-		bDemande = true;
-		bReussi = PdrOutils::MesurerBoucle(static_cast<int32>(Boucle), static_cast<int32>(Escouades)) && bReussi;
-	}
-
-	if (LuCharge == ELecture::Valide)
-	{
-		// Sans precision, le regime charge prend l'effectif maximal.
-		const int32 Effectif = LuEscouades == ELecture::Valide ? static_cast<int32>(Escouades) : Pdr::EscouadesMax;
-		bDemande = true;
-		bReussi = PdrOutils::MesurerCharge(static_cast<int32>(Charge), Effectif, static_cast<int32>(CommandesParIteration)) && bReussi;
-	}
-
-	if (LuFile == ELecture::Valide)
-	{
-		bDemande = true;
-		bReussi = PdrOutils::MesurerFile(static_cast<int32>(File)) && bReussi;
-	}
-
-	if (LuParties == ELecture::Valide)
-	{
-		FString Dossier;
-		FParse::Value(*Params, TEXT("dossier="), Dossier);
-		bDemande = true;
-		bReussi = PdrOutils::LancerRelectures(static_cast<int32>(Parties), static_cast<int32>(Iterations), Dossier, bAttendu, Attendu) && bReussi;
-	}
-
-	FString FichierEnregistre;
-	if (FParse::Value(*Params, TEXT("enregistrer="), FichierEnregistre))
-	{
-		bDemande = true;
-		bReussi = PdrOutils::Enregistrer(FichierEnregistre, Graine, static_cast<int32>(Iterations)) && bReussi;
-	}
-
-	FString CheminRelu;
-	if (FParse::Value(*Params, TEXT("relire="), CheminRelu))
-	{
-		bDemande = true;
-		bReussi = PdrOutils::Relire(CheminRelu, bAttendu, Attendu) && bReussi;
-	}
-
-	if (!bDemande)
-	{
-		UE_LOG(LogPdrOutils, Error, TEXT("PDR_USAGE -tests | -boucle=N [-escouades=N] | -charge=N [-escouades=N] [-commandes=N] | -file=N | -relectures=N [-iterations=N] [-dossier=D] [-attendu=H] | -enregistrer=F [-graine=G] [-iterations=N] | -relire=F [-attendu=H]"));
+		UE_LOG(LogPdrOutils, Error, TEXT("PDR_USAGE -tests | -boucle=N [-escouades=N] | -charge=N [-escouades=N] [-commandes=N] | -file=N | -relectures=N [-iterations=N] [-dossier=D] [-attendu=H] | -enregistrer=F.pdr [-graine=G] [-iterations=N] | -relire=F [-attendu=H]"));
 		return 2;
 	}
+
+	// Les chemins retenus sont dits tels qu'ils ont ete lus, chacun sur sa ligne.
+	if (Options.bDossier)
+	{
+		UE_LOG(LogPdrOutils, Display, TEXT("PDR_CHEMIN dossier %s"), *Options.Dossier);
+	}
+	if (Options.bEnregistrer)
+	{
+		UE_LOG(LogPdrOutils, Display, TEXT("PDR_CHEMIN enregistrer %s"), *Options.Enregistrer);
+	}
+	if (Options.bRelire)
+	{
+		UE_LOG(LogPdrOutils, Display, TEXT("PDR_CHEMIN relire %s"), *Options.Relire);
+	}
+
+	bool bReussi = true;
+	if (Options.bTests)
+	{
+		bReussi = PdrOutils::LancerTests() && bReussi;
+	}
+	if (Options.bBoucle)
+	{
+		bReussi = PdrOutils::MesurerBoucle(Options.Boucle, Options.Escouades) && bReussi;
+	}
+	if (Options.bCharge)
+	{
+		// Sans precision, le regime charge prend l'effectif maximal.
+		const int32 Effectif = Options.bEscouades ? Options.Escouades : Pdr::EscouadesMax;
+		bReussi = PdrOutils::MesurerCharge(Options.Charge, Effectif, Options.CommandesParIteration) && bReussi;
+	}
+	if (Options.bFile)
+	{
+		bReussi = PdrOutils::MesurerFile(Options.File) && bReussi;
+	}
+	if (Options.bRelectures)
+	{
+		bReussi = PdrOutils::LancerRelectures(Options.Parties, Options.Iterations, Options.Dossier, Options.bAttendu, Options.Attendu) && bReussi;
+	}
+	if (Options.bEnregistrer)
+	{
+		bReussi = PdrOutils::Enregistrer(Options.Enregistrer, Options.Graine, Options.Iterations) && bReussi;
+	}
+	if (Options.bRelire)
+	{
+		bReussi = PdrOutils::Relire(Options.Relire, Options.bAttendu, Options.Attendu) && bReussi;
+	}
+
 	UE_LOG(LogPdrOutils, Display, TEXT("PDR_RESULTAT %s"), bReussi ? TEXT("REUSSI") : TEXT("ECHEC"));
 	return bReussi ? 0 : 1;
 }

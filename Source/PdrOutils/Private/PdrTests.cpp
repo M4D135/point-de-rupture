@@ -2,12 +2,13 @@
 
 #include "PdrAlea.h"
 #include "PdrCommande.h"
+#include "PdrExecuteur.h"
 #include "PdrOctets.h"
 #include "PdrRelecture.h"
 #include "PdrSimulation.h"
 #include "PdrTypes.h"
 
-// Tests du noyau de simulation. Ils n'utilisent que son interface publique.
+// Tests du noyau de simulation, par sa seule interface publique, et de ce que l'executeur fait sans fichier (PdrExecuteur.h).
 // Les valeurs de reference (empreintes, positions, tirages, octets d'une sauvegarde) viennent d'un modele
 // independant ecrit en Python, pas du code teste : Outils/modele/modele_a1.py, commande 'valeurs'.
 namespace Pdr
@@ -745,6 +746,81 @@ namespace Pdr
 				Banc.Egal64(Copie.Empreinte(), Simulation.Empreinte(), TEXT("la copie rechargee finit dans le meme etat"));
 			}
 
+			// Chargement dans une simulation en cours, dont la file garde encore en tete des commandes deja appliquees :
+			// rien de son passe ne doit rester, ni dans l'etat, ni dans la file.
+			{
+				FSimulation Sauvegardee;
+				Sauvegardee.Soumettre(Cmd(0, 0, 0, Creer, 0, 0, 20));
+				Sauvegardee.AvancerJusqua(12);
+				Sauvegardee.Soumettre(Cmd(12, 0, 1, Deplacer, 1, 600, 0));
+				Sauvegardee.Soumettre(Cmd(13, 0, 2, Creer, 50, 50, 5));
+				Sauvegardee.Soumettre(Cmd(14, 0, 3, Arreter, 1));
+				FEcrivain Ecrit;
+				Sauvegardee.Serialiser(Ecrit);
+				const TArray<uint8> Octets = Ecrit.Lire();
+
+				FSimulation Vivante;
+				Vivante.Soumettre(Cmd(0, 1, 0, Creer, 7, 7, 7));
+				Vivante.Soumettre(Cmd(0, 1, 1, Creer, 8, 8, 8));
+				for (uint32 Rang = 0; Rang < 5; ++Rang)
+				{
+					Vivante.Soumettre(Cmd(30, 1, 2 + Rang, Arreter, 1));
+				}
+				// Deux commandes appliquees, cinq en attente : trop peu de commandes jouees pour que la file soit tassee.
+				Vivante.Avancer();
+				Banc.Vrai(Vivante.CommandesEnAttente() == 5 && Vivante.LireEtat().Escouades.Num() == 2, TEXT("simulation en cours : deux escouades, cinq commandes en attente"));
+
+				Banc.Vrai(Charger(Vivante, Octets), TEXT("chargement dans une simulation en cours accepte"));
+				Banc.EgalEntier(Vivante.CommandesEnAttente(), 3, TEXT("apres chargement, seules les commandes de la sauvegarde attendent"));
+				FEcrivain Reecrit;
+				Vivante.Serialiser(Reecrit);
+				Banc.Vrai(Reecrit.Lire() == Octets, TEXT("apres chargement, la simulation se reecrit a l'identique"));
+				bool bMemesEmpreintes = true;
+				for (int32 Tour = 0; Tour < 4; ++Tour)
+				{
+					Sauvegardee.Avancer();
+					Vivante.Avancer();
+					bMemesEmpreintes = bMemesEmpreintes && Vivante.Empreinte() == Sauvegardee.Empreinte();
+				}
+				Banc.Vrai(bMemesEmpreintes, TEXT("apres chargement, la simulation suit la partie sauvegardee"));
+				Banc.Vrai(Vivante.LireEtat().Escouades.Num() == 2 && Vivante.CommandesEnAttente() == 0, TEXT("apres chargement, les trois commandes ont ete jouees"));
+			}
+
+			// Le plafond ne compte que les commandes en attente, pas celles deja appliquees qui restent en tete de file.
+			{
+				FSimulation Simulation;
+				bool bAcceptees = true;
+				for (uint32 Rang = 0; Rang < 10; ++Rang)
+				{
+					bAcceptees = Acceptee(Simulation.Soumettre(Cmd(0, 0, Rang, Creer, 0, 0, 0))) && bAcceptees;
+				}
+				for (int32 Rang = 0; Rang < CommandesEnAttenteMax - 10; ++Rang)
+				{
+					bAcceptees = Acceptee(Simulation.Soumettre(Cmd(50, 1, static_cast<uint32>(Rang), Arreter, 1))) && bAcceptees;
+				}
+				Banc.Vrai(bAcceptees && Simulation.CommandesEnAttente() == CommandesEnAttenteMax, TEXT("file au plafond, dont dix commandes pour la premiere iteration"));
+				Simulation.Avancer();
+				Banc.EgalEntier(Simulation.CommandesEnAttente(), CommandesEnAttenteMax - 10, TEXT("dix commandes appliquees : dix places libres"));
+				bool bDixDePlus = true;
+				for (uint32 Rang = 0; Rang < 10; ++Rang)
+				{
+					bDixDePlus = Acceptee(Simulation.Soumettre(Cmd(50, 2, Rang, Arreter, 1))) && bDixDePlus;
+				}
+				Banc.Vrai(bDixDePlus, TEXT("les dix places liberees servent de nouveau"));
+				Banc.Vrai(Simulation.Soumettre(Cmd(50, 2, 10, Arreter, 1)) == ESoumission::FilePleine, TEXT("la onzieme commande est refusee : file pleine"));
+				Banc.Vrai(Simulation.Soumettre(Cmd(0, 2, 11, Arreter, 1)) == ESoumission::Tardive, TEXT("tardive et file pleine a la fois : dite tardive"));
+			}
+
+			// Rang libre : un de plus que le plus grand rang en attente, quel que soit l'ordre des iterations, et sans revenir a zero.
+			{
+				FSimulation Simulation;
+				Simulation.Soumettre(Cmd(20, 0, 5, Deplacer, 1, 5000, 0));
+				Simulation.Soumettre(Cmd(10, 0, 6, Deplacer, 1, 0, 5000));
+				Banc.EgalEntier(Simulation.SequenceLibre(0), 7, TEXT("rang libre : apres le plus grand rang en attente, pas apres le dernier de la file"));
+				Simulation.Soumettre(Cmd(5, 3, MAX_uint32, Arreter, 1));
+				Banc.EgalEntier(Simulation.SequenceLibre(3), MAX_uint32, TEXT("rang libre : arrete au plus grand rang possible"));
+			}
+
 			// Identifiants epuises : plus aucune creation, et le compteur ne deborde pas.
 			{
 				FSauvegardeEcrite Presque;
@@ -1250,11 +1326,30 @@ namespace Pdr
 				Fausse.Commandes[0].Type = static_cast<ETypeCommande>(5);
 				Banc.Vrai(!SeCharge(Fausse.Octets()), TEXT("commande en attente de type inconnu refusee"));
 
+				// Nombre de commandes negatif, sur une sauvegarde sans commande : rien d'autre ne peut la faire refuser.
+				FSauvegardeEcrite SansCommande;
+				SansCommande.Iteration = 3;
+				TArray<uint8> Alteree = SansCommande.Octets();
+				Banc.Vrai(SeCharge(Alteree), TEXT("sauvegarde sans escouade ni commande acceptee"));
+				EcrireI32(Alteree, Alteree.Num() - 4, -1);
+				Banc.Vrai(!SeCharge(Alteree), TEXT("nombre de commandes negatif refuse"));
+
+				// Deux commandes strictement egales : Soumettre les accepte toutes deux, la sauvegarde aussi.
+				{
+					FSimulation Doublee;
+					const FCommande OrdreDouble = Cmd(4, 0, 0, Creer, 1, 2, 3);
+					Banc.Vrai(Acceptee(Doublee.Soumettre(OrdreDouble)) && Acceptee(Doublee.Soumettre(OrdreDouble)), TEXT("la meme commande soumise deux fois est acceptee deux fois"));
+					FEcrivain EcritDouble;
+					Doublee.Serialiser(EcritDouble);
+					FSimulation RelueDouble;
+					Banc.Vrai(Charger(RelueDouble, EcritDouble.Lire()) && RelueDouble.CommandesEnAttente() == 2, TEXT("sauvegarde a deux commandes egales acceptee"));
+					FEcrivain ReecritDouble;
+					RelueDouble.Serialiser(ReecritDouble);
+					Banc.Vrai(ReecritDouble.Lire() == EcritDouble.Lire(), TEXT("sauvegarde a deux commandes egales reecrite a l'identique"));
+				}
+
 				// Le nombre de commandes suit l'unique escouade de 26 octets.
 				const int32 PlaceNombreCommandes = PlacePremiereEscouade + 26;
-				TArray<uint8> Alteree = Attente.Octets();
-				EcrireI32(Alteree, PlaceNombreCommandes, -1);
-				Banc.Vrai(!SeCharge(Alteree), TEXT("nombre de commandes negatif refuse"));
 				Alteree = Attente.Octets();
 				EcrireI32(Alteree, PlaceNombreCommandes, 1);
 				Banc.Vrai(!SeCharge(Alteree), TEXT("nombre de commandes inferieur a ce qui suit refuse"));
@@ -1614,6 +1709,33 @@ namespace Pdr
 			Accepte(Remplace(TEXT("cmd 0 0 0 1 10 20 30"), TEXT("cmd 0 255 4294967295 1 -2147483648 2147483647 -1")), Extremes, TEXT("valeurs extremes d'une commande acceptees"));
 			Banc.Vrai(Extremes.Commandes.Num() == 2 && CommandesEgales(Extremes.Commandes[0], Cmd(0, 255, 4294967295u, Creer, MIN_int32, MAX_int32, -1)),
 				TEXT("valeurs extremes d'une commande lues"));
+			Banc.Vrai(FormaterRelecture(Extremes).Equals(Remplace(TEXT("cmd 0 0 0 1 10 20 30"), TEXT("cmd 0 255 4294967295 1 -2147483648 2147483647 -1")), ESearchCase::CaseSensitive),
+				TEXT("valeurs extremes d'une commande reecrites a l'identique"));
+
+			// Empreintes : par iteration strictement croissante, la derniere sur l'etat final.
+			const FString TroisIterations = Remplace(TEXT("iterations 2"), TEXT("iterations 3"));
+			FRelecture Ordonnee;
+			Accepte(TroisIterations.Replace(TEXT("empreinte 2 fedcba9876543210\n"), TEXT("empreinte 2 fedcba9876543210\nempreinte 3 0000000000000003\n"), ESearchCase::CaseSensitive),
+				Ordonnee, TEXT("empreintes des iterations 0, 2 et 3 acceptees"));
+			Refuse(TroisIterations.Replace(TEXT("empreinte 2 fedcba9876543210\n"), TEXT("empreinte 2 fedcba9876543210\nempreinte 1 0000000000000001\nempreinte 3 0000000000000003\n"), ESearchCase::CaseSensitive),
+				TEXT("empreintes des iterations 0, 2, 1 et 3 : hors d'ordre, bien que la derniere soit la finale"));
+			Refuse(Remplace(TEXT("empreinte 2 fedcba9876543210\n"), TEXT("empreinte 2 fedcba9876543210\nempreinte 2 fedcba9876543210\n")), TEXT("empreinte de la meme iteration ecrite deux fois"));
+
+			// Duree maximale : la regle vaut aussi pour une relecture construite en memoire, sans passer par le texte.
+			// Elle n'est pas donnee a Rejouer, qui ne rendrait pas la main si la regle manquait.
+			{
+				FRelecture AuMaximum;
+				AuMaximum.Iterations = IterationMax;
+				FEmpreinteDatee Finale;
+				Finale.Iteration = IterationMax;
+				AuMaximum.Empreintes.Add(Finale);
+				FString Verdict;
+				Banc.Vrai(ValiderRelecture(AuMaximum, Verdict) && Verdict.IsEmpty(), TEXT("relecture en memoire de la duree maximale acceptee"));
+				FRelecture TropLongue = AuMaximum;
+				TropLongue.Iterations = IterationMax + 1;
+				TropLongue.Empreintes[0].Iteration = IterationMax + 1;
+				Banc.Vrai(!ValiderRelecture(TropLongue, Verdict) && !Verdict.IsEmpty(), TEXT("relecture en memoire plus longue que la duree maximale refusee"));
+			}
 
 			Refuse(TEXT(""), TEXT("texte vide"));
 			Refuse(TEXT("fin\n"), TEXT("texte reduit a la ligne de fin"));
@@ -1724,6 +1846,134 @@ namespace Pdr
 			}
 		}
 
+		/** L'executeur, pour ce qu'il fait sans fichier ni horloge : sa ligne de commande, l'ordre des fichiers, le bilan d'une relecture. */
+		void TesterExecuteur(FBanc& Banc)
+		{
+			Banc.Section(TEXT("executeur"));
+			using PdrOutils::FOptions;
+
+			const auto Lit = [](const TCHAR* Ligne, FOptions& Options) -> bool
+			{
+				TArray<FString> Fautes;
+				return PdrOutils::LireOptions(Ligne, Options, Fautes) && Fautes.Num() == 0;
+			};
+			// Une ligne fautive est refusee pour une faute, et une seule : celle que le test vise.
+			const auto Refuse = [&Banc](const TCHAR* Ligne, const TCHAR* Quoi)
+			{
+				FOptions Options;
+				TArray<FString> Fautes;
+				const bool bLue = PdrOutils::LireOptions(Ligne, Options, Fautes);
+				Banc.Vrai(!bLue && Fautes.Num() == 1, Quoi);
+			};
+
+			// Les lignes que passe le script de verification, telles que le moteur les remet au commandlet.
+			FOptions Lues;
+			Banc.Vrai(Lit(TEXT("/projets/PointDeRupture.uproject -run=PdrSim -tests -boucle=24000 -file=100000 -relectures=100 -iterations=10000 ")
+				TEXT("-attendu=9565f56e1f910d8d -dossier=/tmp/pdr -relire=/tmp/pdr -nullrhi -unattended -nosplash -nopause -stdout -notraceserver -notracethreading"), Lues),
+				TEXT("ligne ordinaire du script de verification acceptee"));
+			Banc.Vrai(Lues.bTests && Lues.bBoucle && Lues.Boucle == 24000 && Lues.bFile && Lues.File == 100000 && Lues.bRelectures && Lues.Parties == 100
+				&& Lues.bIterations && Lues.Iterations == 10000 && Lues.bDossier && Lues.Dossier == TEXT("/tmp/pdr") && Lues.bRelire && Lues.Relire == TEXT("/tmp/pdr"),
+				TEXT("ligne ordinaire : chaque option lue"));
+			Banc.Vrai(Lues.bAttendu, TEXT("ligne ordinaire : condense attendu present"));
+			Banc.Egal64(Lues.Attendu, 0x9565f56e1f910d8dull, TEXT("ligne ordinaire : condense attendu lu"));
+			Banc.Vrai(!Lues.bCharge && !Lues.bEscouades && !Lues.bCommandes && !Lues.bGraine && !Lues.bEnregistrer && Lues.UneActionDemandee(),
+				TEXT("ligne ordinaire : rien d'autre n'est demande"));
+			Banc.Vrai(Lit(TEXT("-run=PdrSim -boucle=24000 -escouades=4096"), Lues) && Lues.Boucle == 24000 && Lues.bEscouades && Lues.Escouades == 4096 && !Lues.bTests,
+				TEXT("boucle avec escouades"));
+			Banc.Vrai(Lit(TEXT("-charge=1000000 -commandes=64 -escouades=0"), Lues) && Lues.Charge == 1000000 && Lues.CommandesParIteration == 64 && Lues.Escouades == 0,
+				TEXT("regime charge aux bornes"));
+			Banc.Vrai(Lit(TEXT("-enregistrer=/tmp/a.pdr -graine=18446744073709551615 -iterations=0"), Lues) && Lues.bEnregistrer && Lues.Enregistrer == TEXT("/tmp/a.pdr")
+				&& Lues.Iterations == 0, TEXT("enregistrement, plus grande graine et duree nulle"));
+			Banc.Egal64(Lues.Graine, MAX_uint64, TEXT("plus grande graine lue"));
+			Banc.Vrai(Lit(TEXT("-relectures=99999 -iterations=10000000"), Lues) && Lues.Parties == 99999 && Lues.Iterations == 10000000, TEXT("relectures aux bornes"));
+			Banc.Vrai(Lit(TEXT(""), Lues) && !Lues.UneActionDemandee(), TEXT("ligne vide : lue, sans action"));
+			Banc.Vrai(Lit(TEXT("-nullrhi -stdout projet.uproject"), Lues) && !Lues.UneActionDemandee(), TEXT("options du moteur seules : ignorees, sans action"));
+			Banc.Vrai(Lues.Iterations == 10000 && Lues.CommandesParIteration == 8 && Lues.Graine == 1, TEXT("valeurs par defaut"));
+			Banc.Vrai(Lit(TEXT("-TESTS -Boucle=5"), Lues) && Lues.bTests && Lues.Boucle == 5, TEXT("noms lus sans egard a la casse"));
+
+			// Une valeur va jusqu'au bout de son jeton : ni virgule, ni parenthese, ni nom d'option ne la coupent.
+			Banc.Vrai(Lit(TEXT("-relectures=1 -dossier=/tmp/essai,2/parties(v2)"), Lues) && Lues.Dossier == TEXT("/tmp/essai,2/parties(v2)"), TEXT("chemin avec virgule et parentheses lu en entier"));
+			Banc.Vrai(Lit(TEXT("-relire=/tmp/essai-file=3/a.pdr"), Lues) && Lues.Relire == TEXT("/tmp/essai-file=3/a.pdr") && !Lues.bFile,
+				TEXT("un nom d'option a l'interieur d'un chemin n'est pas une option"));
+			Banc.Vrai(Lit(TEXT("-relire=\"/tmp/dossier a espace/a.pdr\""), Lues) && Lues.Relire == TEXT("/tmp/dossier a espace/a.pdr"), TEXT("valeur entre guillemets, comme la remet le lanceur du moteur"));
+			Banc.Vrai(Lit(TEXT("\"-relire=/tmp/dossier a espace/a.pdr\""), Lues) && Lues.Relire == TEXT("/tmp/dossier a espace/a.pdr"), TEXT("jeton entier entre guillemets"));
+			Banc.Vrai(Lit(TEXT("\"\" -tests"), Lues) && Lues.bTests, TEXT("un jeton vide n'arrete pas la lecture"));
+
+			// Nombres : des chiffres seulement, dans les bornes, jamais arrondis ni coupes.
+			Refuse(TEXT("-relectures=100 -iterations=10,000"), TEXT("nombre avec virgule"));
+			Refuse(TEXT("-boucle=24000)"), TEXT("nombre suivi d'une parenthese"));
+			Refuse(TEXT("-boucle="), TEXT("nombre vide"));
+			Refuse(TEXT("-boucle"), TEXT("option a valeur donnee sans valeur"));
+			Refuse(TEXT("-boucle=+5"), TEXT("nombre avec signe plus"));
+			Refuse(TEXT("-boucle=-5"), TEXT("nombre negatif"));
+			Refuse(TEXT("-boucle=5.0"), TEXT("nombre a virgule"));
+			Refuse(TEXT("-boucle=0x10"), TEXT("nombre hexadecimal"));
+			Refuse(TEXT("-boucle=\"5 6\""), TEXT("nombre avec un blanc entre guillemets"));
+			Refuse(TEXT("-boucle=0"), TEXT("boucle sous sa borne"));
+			Refuse(TEXT("-boucle=9000001"), TEXT("boucle au-dela de sa borne"));
+			Refuse(TEXT("-boucle=5 -escouades=4097"), TEXT("escouades au-dela de la borne"));
+			Refuse(TEXT("-charge=1000001"), TEXT("charge au-dela de la borne"));
+			Refuse(TEXT("-charge=5 -commandes=65"), TEXT("commandes par iteration au-dela de la borne"));
+			Refuse(TEXT("-file=1000001"), TEXT("file au-dela du plafond de la file d'attente"));
+			Refuse(TEXT("-relectures=100000"), TEXT("relectures au-dela de la borne"));
+			Refuse(TEXT("-relectures=1 -iterations=10000001"), TEXT("iterations au-dela de la borne"));
+			Refuse(TEXT("-enregistrer=/tmp/a.pdr -graine=18446744073709551616"), TEXT("graine au-dela de 64 bits"));
+			Refuse(TEXT("-boucle=99999999999999999999999"), TEXT("nombre trop long"));
+
+			// Formes : drapeau, doublon, condense.
+			Refuse(TEXT("-tests=1"), TEXT("valeur donnee a une option qui n'en prend pas"));
+			Refuse(TEXT("-boucle=5 -boucle=6"), TEXT("option donnee deux fois"));
+			Refuse(TEXT("-tests -tests -tests"), TEXT("drapeau donne trois fois"));
+			Refuse(TEXT("-relectures=1 -attendu=9565F56E1F910D8D"), TEXT("condense en majuscules"));
+			Refuse(TEXT("-relectures=1 -attendu=9565f56e1f910d8"), TEXT("condense a quinze chiffres"));
+			Refuse(TEXT("-relectures=1 -attendu=9565f56e1f910d8dd"), TEXT("condense a dix-sept chiffres"));
+
+			// Chemins : absolus, et un fichier enregistre porte l'extension des parties.
+			Refuse(TEXT("-relire=parties"), TEXT("chemin relatif"));
+			Refuse(TEXT("-relire=~/parties/a.pdr"), TEXT("chemin commencant par un tilde, que le shell ne developpe pas apres un signe egal"));
+			Refuse(TEXT("-relire="), TEXT("chemin vide"));
+			Refuse(TEXT("-relectures=5 -dossier= -iterations=500"), TEXT("dossier vide : l'option suivante n'est pas avalee"));
+			Refuse(TEXT("-enregistrer=/tmp/a.txt"), TEXT("fichier enregistre sans l'extension des parties"));
+
+			// Une option sans l'action qui s'en sert est refusee : elle n'aurait aucun effet.
+			Refuse(TEXT("-tests -attendu=0000000000000000"), TEXT("condense attendu sans relecture"));
+			Refuse(TEXT("-tests -dossier=/tmp/x"), TEXT("dossier sans relectures"));
+			Refuse(TEXT("-tests -escouades=5"), TEXT("escouades sans boucle ni charge"));
+			Refuse(TEXT("-tests -commandes=5"), TEXT("commandes sans charge"));
+			Refuse(TEXT("-tests -graine=5"), TEXT("graine sans enregistrement"));
+			Refuse(TEXT("-tests -iterations=5"), TEXT("iterations sans relectures ni enregistrement"));
+
+			// Ordre des fichiers d'un dossier : celui des caracteres, la majuscule avant la minuscule, sur toute machine.
+			TArray<FString> Noms = { TEXT("a.pdr"), TEXT("partie-00010.pdr"), TEXT("B.pdr"), TEXT("partie-00002.pdr"), TEXT("A.pdr") };
+			PdrOutils::TrierNomsDeParties(Noms);
+			Banc.Vrai(Noms.Num() == 5 && Noms[0] == TEXT("A.pdr") && Noms[1] == TEXT("B.pdr") && Noms[2] == TEXT("a.pdr")
+				&& Noms[3] == TEXT("partie-00002.pdr") && Noms[4] == TEXT("partie-00010.pdr"), TEXT("noms de parties tries par caracteres, casse comprise"));
+
+			// Bilan d'une relecture : le condense porte les empreintes recalculees, pas celles du texte.
+			// Valeurs du modele : Outils/modele/modele_a1.py, parties des graines 1 et 2 sur 300 iterations.
+			const FString TexteUn = FormaterRelecture(GenererPartie(1, 300));
+			const FString TexteDeux = FormaterRelecture(GenererPartie(2, 300));
+			const FString DeuxFaussee = TexteDeux.Replace(TEXT("empreinte 300 e45320f32d301907\n"), TEXT("empreinte 300 e45320f32d301908\n"), ESearchCase::CaseSensitive);
+			Banc.Vrai(!DeuxFaussee.Equals(TexteDeux, ESearchCase::CaseSensitive), TEXT("la derniere empreinte de la graine 2 est celle du modele, et elle est retouchee"));
+
+			PdrOutils::FBilanDeRelecture Bilan;
+			FString Motif;
+			Banc.Vrai(!Bilan.Ajouter(DeuxFaussee, Motif) && !Motif.IsEmpty(), TEXT("partie a l'empreinte finale retouchee : non conforme, motif donne"));
+			Banc.Vrai(Bilan.Ajouter(TexteUn, Motif) && Motif.IsEmpty(), TEXT("partie intacte : conforme"));
+			Banc.Vrai(Bilan.Fichiers() == 2 && Bilan.Conformes() == 1, TEXT("bilan : deux fichiers, un seul conforme"));
+			Banc.Egal64(Bilan.Condense(), 0xa3a42db04b355912ull, TEXT("bilan : condense des empreintes recalculees, graine 2 puis graine 1"));
+
+			PdrOutils::FBilanDeRelecture DansLOrdre;
+			Banc.Vrai(DansLOrdre.Ajouter(TexteUn, Motif) && DansLOrdre.Ajouter(TexteDeux, Motif) && DansLOrdre.Conformes() == 2, TEXT("deux parties intactes : conformes"));
+			Banc.Egal64(DansLOrdre.Condense(), 0x019e9e1a4ef5f07aull, TEXT("bilan : le condense depend de l'ordre des fichiers"));
+
+			PdrOutils::FBilanDeRelecture Illisibles;
+			Illisibles.AjouterIllisible();
+			Banc.Vrai(!Illisibles.Ajouter(TEXT("ceci n'est pas une partie"), Motif) && !Motif.IsEmpty(), TEXT("texte qui n'est pas une partie : non conforme, motif donne"));
+			Banc.Vrai(Illisibles.Fichiers() == 2 && Illisibles.Conformes() == 0, TEXT("bilan : les fichiers illisibles sont comptes, aucun n'est conforme"));
+			Banc.Egal64(Illisibles.Condense(), 0xcbf29ce484222325ull, TEXT("bilan : un fichier illisible n'entre pas dans le condense"));
+		}
+
 		void TesterDeterminisme(FBanc& Banc)
 		{
 			Banc.Section(TEXT("determinisme"));
@@ -1804,6 +2054,7 @@ namespace Pdr
 		TesterEnregistreur(Banc);
 		TesterRelecture(Banc);
 		TesterTexte(Banc);
+		TesterExecuteur(Banc);
 		TesterDeterminisme(Banc);
 		return Resultat;
 	}
