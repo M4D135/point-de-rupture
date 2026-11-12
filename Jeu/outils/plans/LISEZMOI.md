@@ -23,9 +23,10 @@ côté, soit le plus grand carré de jeu (1 100 m) et 60 m de marge. Elles se no
 donne, ville par ville, les tuiles `14/x/y` qu'il faut et si elles sont là (2 à 4 par ville ; Marseille :
 `14/8436/6001` et `14/8436/6002`). Les tuiles marquées « lointain, facultative » ne servent qu'au lointain : s'il en
 manque une, sa zone est rognée de ce côté et le module le dit (`lointain.tuilesAbsentes`). Le module livré le
-12/11/2026 est fait sans `14/8435/6001` ni `14/8435/6002` : le lointain s'arrête à 979 m à l'ouest, avant le MuCEM
-(le J4) ; avec `14/8435/6001`, le MuCEM entre dans le plan sans rien changer d'autre à l'outil. L'adresse des tuiles dépend de la version du jeu de données ; elle est dans la
-description TileJSON du service :
+12/11/2026 au soir (lot L2 de la 0.3) est fait avec les six tuiles, `14/8435/6001` et `14/8435/6002` comprises
+(version `20261101_080013_pt`) : le lointain va de -1 250 à 1 250 m d'ouest en est, le MuCEM et la villa Méditerranée
+y sont. L'adresse des tuiles dépend de la version du jeu de données ; elle est dans la description TileJSON du
+service :
 
     curl -sfA 'osm-extract-client/1.0' https://tiles.openfreemap.org/planet -o DOSSIER/tilejson.json
 
@@ -140,3 +141,19 @@ d'OpenFreeMap au schéma OpenMapTiles.
   diffusé, ces modules (et l'outil qui les refait) doivent pouvoir être fournis sous cette licence ; le reste du jeu
   n'en relève pas, mais la mention doit l'accompagner. En résumé seulement : le texte de la licence fait foi.
 - Ne retirer ni l'en-tête d'un module ni sa mention.
+
+## 8. Mesurer et regarder
+
+    node Jeu/outils/plans/comptes.cjs [DOSSIER_SRC] [ilots…]
+
+rend, pour 9, 13 et 15 îlots, les pièces du décor par primitive, les cassables par sorte, le temps de construction
+(meilleur de cinq) et la taille du module. Pour une mesure « avant », extraire l'autre version
+(`git archive main Jeu/src | tar -x -C /tmp/avant`) et passer `/tmp/avant/Jeu/src`. Noter `uptime` avec chaque mesure.
+
+    python3 Jeu/construire.py
+    python3 Jeu/outils/plans/vues.py Jeu/dist/point-de-rupture.html SORTIE 100000 Jeu/outils/plans/vues.json
+    PARTIE=1 python3 Jeu/outils/plans/vues.py …     # dans une partie : cassables, foule, effets
+
+pose la caméra sur les vues de `vues.json` (les neuf premières : la comparaison avant / après du lot L2 ; puis le
+nord-ouest et l'est, pour le lointain), interface cachée, et rend une capture et les images/s de chaque vue.
+Sans `PARTIE=1`, c'est la ville d'accueil de l'écran de préparation : le décor fixe seul.
