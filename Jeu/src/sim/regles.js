@@ -52,7 +52,7 @@
   //            bouscule et la jette au sol ;
   //   lacrymo { portee, porteeMin (m), recharge (s) } : grenade lancée en cloche ; le nuage : CONSTANTES.GAZ.
   const sans = { recolter: false, construire: false, barricader: false, casser: 0, lever: 0, leverTout: false,
-    interpeller: false, salve: null, jet: null, soigner: 0, pierres: null, molotov: null, charge: null, lacrymo: null };
+    interpeller: false, salve: null, jet: null, soigner: 0, pierres: null, molotov: null, charge: null, lacrymo: null, lance: null };
   const PIERRES = Object.freeze({ portee: 14, porteeMin: 3.5, pression: 3, recharge: 5 });
   /** Un type d'unité. Vitesses en m/s, distances en m, pression en points de cohésion par seconde au contact,
    *  coût et durée par lot ; « lot » unités sortent ensemble d'un ordre de production. */
@@ -119,9 +119,18 @@
         cout: { moyens: 300, materiaux: 120 }, duree: 30, lot: 1 },
       { lever: 6, leverTout: true, jet: Object.freeze({ portee: 18, angle: 40, pression: 12, recul: 2.0, aTerre: 9, max: 8 }) }, 'T',
       'Jet : cône de 18 m qui repousse, jette au sol de près et éteint les feux ; lève six fois plus vite.'),
+    type(13, 'pompiers', 2, 'Pompiers', 'Pompiers', 'secours',
+      { coh: 40, pression: 0.3, portee: 1.2, vitesse: 3.6, vision: 16, cout: { moyens: 60, materiaux: 0 }, duree: 12, lot: 6 },
+      { lance: Object.freeze({ portee: 8, debit: 1 }) }, 'U',
+      'Six pompiers, lance à 8 m : éteignent les feux des objets et des immeubles.'),
+    type(14, 'camion-pompiers', 2, 'Camion de pompiers', 'Camions de pompiers', 'secours',
+      { coh: 400, pression: 0.3, portee: 1.2, vitesse: 5.0, vision: 20, rayon: 1.6, vehicule: true, pop: 6,
+        cout: { moyens: 150, materiaux: 20 }, duree: 20, lot: 1 },
+      { lance: Object.freeze({ portee: 16, debit: 4.5 }) }, 'I',
+      'Un camion, lance à 16 m, quatre à cinq fois le débit d’un pompier ; plus rapide sur la chaussée.'),
   ];
 
-  const TYPES_PAR_FACTION = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11, 12]];
+  const TYPES_PAR_FACTION = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14]];
   const OUVRIER = [0, 4, 8];     // l'Équipe de chaque camp
   const BASE = [1, 5, 9];        // l'unité de base, produite aussi aux avant-postes
 

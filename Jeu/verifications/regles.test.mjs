@@ -82,7 +82,7 @@ verifier('codage des unités : aller-retour exact en Float32 sur tout le domaine
 });
 
 verifier('tables : 13 types, factions et listes cohérentes, chiffres finis', () => {
-  assert.equal(R.TYPES.length, 13);
+  assert.equal(R.TYPES.length, 15);
   R.TYPES.forEach((t, k) => {
     assert.equal(t.id, k);
     assert.ok(R.TYPES_PAR_FACTION[t.faction].includes(k));
@@ -190,7 +190,7 @@ verifier('0.3 : protocole version 2, sortes de cassables, numéros laissés aux 
   assert.equal(new Set(Object.values(P.CMD)).size, Object.keys(P.CMD).length);
   assert.equal(Math.max(...Object.values(P.CMD)), 17);
   assert.equal(Math.max(...Object.values(P.EV)), 37);
-  assert.equal(R.TYPES.length, 13);
+  assert.equal(R.TYPES.length, 15);
   assert.deepEqual(Object.values(R.ETATS), Array.from({ length: 16 }, (_, k) => k), 'les seize états servent');
   const ids = Int32Array.of(4);
   assert.equal(P.forme(P.commande(P.CMD.MOLOTOV, 0, { ids, x: 1, z: 2 })), '');

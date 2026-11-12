@@ -294,7 +294,7 @@ verifier('ordres de visée : attaque, regrouper, barricade, lever, casser, avant
 });
 
 verifier('production : types produits, raisons de refus, lots bornés par la file et les moyens', () => {
-  assert.deepEqual(O.typesProduits(R, qg(2)), [8, 9, 10, 11, 12]);
+  assert.deepEqual(O.typesProduits(R, qg(2)), [8, 9, 10, 11, 12, 13, 14]);
   assert.deepEqual(O.typesProduits(R, avantPoste(1)), [4, 5]);
   const c0 = ctxDe(0, ids(), types());
   let r = O.ordreProduction(R, P, c0, qg(0), 1, 1);
