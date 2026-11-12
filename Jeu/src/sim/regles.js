@@ -117,7 +117,7 @@
     type(12, 'canon-a-eau', 2, 'Canon à eau', 'Canons à eau', 'vehicule',
       { coh: 600, pression: 0, portee: 1.2, vitesse: 4.0, vision: 24, rayon: 1.6, vehicule: true, pop: 8,
         cout: { moyens: 300, materiaux: 120 }, duree: 30, lot: 1 },
-      { lever: 6, leverTout: true, jet: Object.freeze({ portee: 18, angle: 40, pression: 12, recul: 2.0, aTerre: 9 }) }, 'T',
+      { lever: 6, leverTout: true, jet: Object.freeze({ portee: 18, angle: 40, pression: 12, recul: 2.0, aTerre: 9, max: 8 }) }, 'T',
       'Jet : cône de 18 m qui repousse, jette au sol de près et éteint les feux ; lève six fois plus vite.'),
   ];
 
@@ -175,8 +175,9 @@
       propagation: Object.freeze({ rayon: 7, delai: 6, chance: 0.5, generations: 2 }), eau: 3 }),
     // Le gaz lacrymogène : au plus « max » nuages. Le nuage grossit pendant « montee » secondes jusqu'à « rayon »,
     // dure « duree » ; qui s'y trouve (hors la Préfecture et ses alliés, et hors véhicules) perd « pression » points
-    // par seconde, ne frappe plus et en sort à « lenteur » × sa vitesse.
-    GAZ: Object.freeze({ max: 64, rayon: 7, duree: 14, pression: 3, lenteur: 0.5, montee: 2, marge: 2 }),
+    // par seconde, ne frappe plus et en sort à « lenteur » × sa vitesse. Un nuage presse à plein « plein » unités ; s'il
+    // en tient davantage, la pression se partage entre elles : une foule plus dense n'y perd pas davantage.
+    GAZ: Object.freeze({ max: 64, rayon: 7, duree: 14, pression: 3, lenteur: 0.5, montee: 2, marge: 2, plein: 20 }),
     // Projectiles : durée de vol = vol + distance / vitesse (secondes, mètres ; vitesse 0 : durée fixe). Voir dureeVol.
     PROJECTILES: Object.freeze({ pierre: Object.freeze({ vol: 0.6, vitesse: 0 }), molotov: Object.freeze({ vol: 0.5, vitesse: 20 }),
       lacrymo: Object.freeze({ vol: 0.6, vitesse: 22 }) }),

@@ -17,8 +17,9 @@
      pris dans l'ordre : défendre le QG, défendre un lieu attaqué, prendre un lieu, frapper un groupe plus faible,
      harceler des récolteurs ;
    - règles du camp : la Convergence barricade les rues qui mènent à ses lieux quand l'ennemi approche, et casse
-     quand elle manque de Matériaux ; le Bastion évite la Préfecture tant qu'il n'est pas en colère ; la Préfecture
-     (et le Bastion) lèvent les barricades qui les gênent, la Préfecture lève aussi les avant-postes ennemis.
+     (en 0.2, quand elle manquait de Matériaux) ; le Bastion évite la Préfecture tant qu'il n'est pas en colère ;
+     la Préfecture (et le Bastion) lèvent les barricades qui les gênent, la Préfecture lève aussi les avant-postes
+     ennemis.
    - Difficile : un groupe nettement plus faible que l'ennemi au contact se replie.
 
    Version 0.3 :
@@ -30,7 +31,9 @@
      que s'il est deux fois et demie plus fort ; en démo jamais : la démo est un spectacle qui dure ;
    - un groupe sans objectif ne reste plus l'arme au pied : il marche sur la force hostile la plus proche ;
    - le feu et le gaz : les Furets et la Compagnie lancent d'eux-mêmes (monde.js) ; l'IA ajoute les cocktails sur les
-     avant-postes qu'elle attaque, et envoie le Canon à eau éteindre les foyers proches de ses groupes ou de ses postes.
+     avant-postes qu'elle attaque, et envoie le Canon à eau éteindre les foyers proches de ses groupes ou de ses postes ;
+   - la Convergence casse (et donc met le feu) toutes les 10 s, qu'elle manque ou non de Matériaux, avec 12 unités
+     par tranche de 20 000 au plus : ce sont les casseurs (D10).
 
    API :
      const ia = PDR.ia.creer(monde)   les camps de monde.estIA (tous en démo, joueur -1)
@@ -611,7 +614,7 @@
     function casser(c) {
       const f = c.f, it = monde.it;
       if (it - c.derniereCasse < CASSE_IT) return;
-      // Les avant-postes ennemis proches d'un groupe d'abord, puis le mobilier quand les Matériaux manquent.
+      // Les avant-postes ennemis proches d'un groupe d'abord, puis le mobilier.
       for (const s of monde.structures) {
         if (!s.vivante || s.sorte !== S.POSTE || !R.peutCasserStructure(f, { sorte: 'avant-poste', faction: s.faction }, monde.alliance)) continue;
         if ((c.leveurs.get(s.id) || 0) > 0) continue;
@@ -629,7 +632,8 @@
           }
         }
       }
-      if (monde.res[f * 2 + 1] >= 150000 * echelle || c.nCasseurs >= 12 * echelle) return;
+      // 0.3 : la casse ne dépend plus des Matériaux (ils ne manquent guère) : casser, c'est mettre le feu.
+      if (c.nCasseurs >= 12 * echelle) return;
       // Le groupe le moins occupé casse l'objet intact le plus proche de lui (la casse s'enchaîne ensuite).
       let g = null;
       for (const h of c.groupes) if (h.n && (!g || (h.but ? h.but.prio : 0) < (g.but ? g.but.prio : 0))) g = h;

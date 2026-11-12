@@ -127,6 +127,10 @@
   ORDRE_SALVE.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
   const JET_PORTEE = JET.portee * 1000, JET_COUPS = Math.round(JET.pression * RYTHME * 1000 * JET_PAS / IT_S);
   const JET_RECUL = Math.round(JET.recul * 1000 * JET_PAS / IT_S), JET_COS1000 = 940;   // cos 20° (demi-angle de 40°)
+  // Le jet touche les plus proches d'abord, « max » unités par impulsion : une foule plus dense n'y perd pas davantage.
+  const JET_MAX = JET.max || 1e9, ORDRE_JET = [], JET_RC = Math.ceil(JET.portee / 4);
+  for (let dj = -JET_RC; dj <= JET_RC; dj++) for (let di = -JET_RC; di <= JET_RC; di++) ORDRE_JET.push([di * di + dj * dj, di, dj]);
+  ORDRE_JET.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
   const SALVE_A_TERRE = SALVE.aTerre || 0, JET_A_TERRE2 = carre((JET.aTerre || 0) * 1000);
   // ---- 0.3 : le cocktail Molotov (Furets), la grenade lacrymogène (Compagnie), le feu, le gaz, les projectiles. ----
   const MOLOTOV = R.TYPES.find(t => t.capacites.molotov).capacites.molotov, LACRYMO = R.TYPES.find(t => t.capacites.lacrymo).capacites.lacrymo;
@@ -141,6 +145,7 @@
   const FEU_PROPAGE_CHANCE = Math.round(FEU.propagation.chance * 100), FEU_GENERATIONS = FEU.propagation.generations;
   const NNUAGES = GAZ.max, GAZ_RAYON = GAZ.rayon * 1000, GAZ_DUREE = GAZ.duree * IT_S, GAZ_PRES = Math.round(GAZ.pression * 1000 / IT_S);
   const GAZ_MONTEE = GAZ.montee * IT_S, GAZ_MARGE = GAZ.marge * 1000, GAZ_LENTEUR16 = Math.round(GAZ.lenteur * 16);
+  const GAZ_PLEIN = GAZ.plein || 1e9;
   const NVOLS = 256, NPIERRES = 16384, PIERRE_IT = Math.round(PJ.pierre.vol * IT_S);
   const EV_A_TERRE_MAX = 24, EV_PIERRE_MAX = 12;
   /** Durée de vol en itérations d'un cocktail ou d'une grenade lancés à d mm (regles.dureeVol, en entiers). */
@@ -1008,12 +1013,16 @@
     const gX = new Int32Array(NNUAGES), gZ = new Int32Array(NNUAGES), gRc = new Int32Array(NNUAGES), gReste = new Int32Array(NNUAGES);
     const gAge = new Int32Array(NNUAGES), gCamp = new Int8Array(NNUAGES), gId = new Int32Array(NNUAGES), gActif = new Uint8Array(NNUAGES);
     const gazCase = new Uint8Array(NC);
+    // Un nuage presse à plein GAZ.plein unités ; s'il en tenait davantage à l'itération précédente (gN), la pression
+    // de l'itération (gPres) se partage entre elles : une foule plus dense n'y perd pas davantage.
+    const gN = new Int32Array(NNUAGES), gPres = new Int32Array(NNUAGES);
     let nNuages = 0, prochainNuage = 1, grilleGaz = false, versionGaz = 0, gazEnvoye = 0;
     function creerNuage(x, z, camp) {
       if (nNuages >= NNUAGES) return -1;
       let q = 0;
       while (gActif[q]) q++;
       gActif[q] = 1; gX[q] = x; gZ[q] = z; gRc[q] = 2000; gReste[q] = GAZ_DUREE; gAge[q] = 0; gCamp[q] = camp; gId[q] = prochainNuage++;
+      gN[q] = 0; gPres[q] = GAZ_PRES;
       nNuages++; grilleGaz = true; versionGaz++;
       evenement(EV.GAZ, x, z, camp, gId[q], GAZ.rayon);
       return q;
@@ -1026,6 +1035,7 @@
         const age = ++gAge[q];
         if (--gReste[q] <= 0) { gActif[q] = 0; nNuages--; grilleGaz = true; versionGaz++; continue; }
         gRc[q] = age >= GAZ_MONTEE ? GAZ_RAYON : 2000 + Math.trunc((GAZ_RAYON - 2000) * age / GAZ_MONTEE);
+        gPres[q] = gN[q] > GAZ_PLEIN ? Math.trunc(GAZ_PRES * GAZ_PLEIN / gN[q]) : GAZ_PRES; gN[q] = 0;
       }
       if (!grilleGaz) return;
       grilleGaz = false;
@@ -1409,7 +1419,8 @@
     }
 
     // ---- Capacités de zone : la salve tombe 1,5 s après l'annonce et jette au sol les quatre premières unités
-    // touchées ; le jet pousse et presse dans un cône, jette au sol de près et éteint les foyers. ----
+    // touchées ; le jet pousse et presse dans un cône (les plus proches, JET.max par impulsion), jette au sol de près
+    // et éteint les foyers. ----
     function salve(i) {
       const f = ufac[i], x = usx[i], z = usz[i], r2 = SALVE_RAYON * SALVE_RAYON;
       const c0 = nav.caseDe(x, z), ci = c0 % nx, cj = (c0 / nx) | 0;
@@ -1437,10 +1448,13 @@
     function jet(i) {
       const f = ufac[i], x = ux[i], z = uz[i], ax = usx[i] - x, az = usz[i] - z, la = Math.sqrt(ax * ax + az * az) | 0;
       if (la === 0) return;
-      const c0 = uc4[i], ci = c0 % nx, cj = (c0 / nx) | 0, r2 = JET_PORTEE * JET_PORTEE, rc = Math.ceil(JET_PORTEE / 4000);
-      for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let ii = Math.max(0, ci - rc); ii <= Math.min(nx - 1, ci + rc); ii++) {
+      const c0 = uc4[i], ci = c0 % nx, cj = (c0 / nx) | 0, r2 = JET_PORTEE * JET_PORTEE;
+      let n = 0;
+      for (let q = 0; q < ORDRE_JET.length && n < JET_MAX; q++) {
+        const ii = ci + ORDRE_JET[q][1], j = cj + ORDRE_JET[q][2];
+        if (ii < 0 || j < 0 || ii >= nx || j >= nz) continue;
         const cc = ii + j * nx;
-        for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin; p++) {
+        for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < JET_MAX; p++) {
           const u = tri[p];
           if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
@@ -1451,7 +1465,7 @@
           if (dot * 1000 < JET_COS1000 * la * d) continue;
           if (udeg[u] === 0) touches[nTouches++] = u;
           udeg[u] += JET_COUPS;
-          uagr[u] = i;
+          uagr[u] = i; n++;
           bilan[f].infliges += JET_COUPS; sources[f * 8 + 2] += JET_COUPS;
           if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
           deplacer(u, Math.trunc(dx * JET_RECUL / d), Math.trunc(dz * JET_RECUL / d));
@@ -1591,12 +1605,13 @@
         if (g >= 0) {
           const q = g, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
           if (d2 <= r * r) {
-            const camp = gCamp[q];
-            bilan[camp].infliges += GAZ_PRES; sources[camp * 8 + 7] += GAZ_PRES;
+            const camp = gCamp[q], pg = gPres[q];
+            gN[q]++;
+            bilan[camp].infliges += pg; sources[camp * 8 + 7] += pg;
             if (camp === PREF && f === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
             const cb = combDeC8[uc8[i]];
             if (combats[cb] < 65535) combats[cb]++;
-            if (presser(i, t, GAZ_PRES, camp)) continue;
+            if (presser(i, t, pg, camp)) continue;
             ulance[i] = 0; uassaut[i] = 0;
             let vx = dx, vz = dz;
             if (d2 < 10000) { const h = Math.imul(i, 0x9E3779B1) >>> 24; vx = DX[h]; vz = DZ[h]; }
@@ -2302,7 +2317,7 @@
     const PAR_UNITE = [ux, uz, ucoh, ubx, ubz, ucib, ufac, utyp, ucap, uetat, uord, uphase, umode, ucharge, uminu, urech, usal, uchamp, ugen,
       uterre, uimm, ulance, uassaut, urech2];
     const GLOBAUX = [res, acc, score, pop, vivantes, elimine, lieuProp, lieuPreneur, lieuProgres, stock, actifs, casEtat, casPv,
-      sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif];
+      sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif, gN, gPres];
     let cliche = new Uint8Array(1 << 20);
     const ecrire = (vue, o) => {
       if (o + vue.length > cliche.length) { const plus = new Uint8Array(Math.max(cliche.length * 2, o + vue.length)); plus.set(cliche.subarray(0, o)); cliche = plus; }
