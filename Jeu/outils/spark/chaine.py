@@ -14,12 +14,12 @@ vérifie à la fin ; la chaîne fait le reste, tour par tour :
 
 Une fiche de tâche :
     Titre: Les quatre sortes de L2 dans SORTES_CASSABLES
-    Fichiers: Jeu/src/sim/regles.js:/SORTES_CASSABLES/+40, Jeu/src/sim/monde.js:1200-1260
+    Fichiers: Jeu/src/sim/regles.js:/SORTES_CASSABLES/+40 ; Jeu/src/sim/monde.js:1200-1260
     Tests: node Jeu/verifications/sim.test.mjs ; node Jeu/verifications/regles.test.mjs
     ---
     Ce qu'il faut faire, précisément : où, quoi, quels nombres, ce qu'il ne faut pas toucher.
 
-`Tests:` sépare ses commandes par « ; » (une virgule peut figurer dans une commande). `Fichiers:` désigne les extraits envoyés (chemin entier, `chemin:a-b` en lignes, ou `chemin:/motif/+N` : N lignes à
+`Fichiers:` et `Tests:` séparent leurs éléments par « ; » (une virgule peut figurer dans un motif ou une commande). `Fichiers:` désigne les extraits envoyés (chemin entier, `chemin:a-b` en lignes, ou `chemin:/motif/+N` : N lignes à
 partir de la première qui contient le motif). Le Spark ne voit que ces extraits : viser 12 000 caractères de demande,
 jamais plus de 30 000 (mesuré en novembre 2026 ; au-delà il boucle ou se tait). Tout ce qu'il rend reste un brouillon :
 les tests de la fiche et la relecture finale de Claude décident.
@@ -64,7 +64,7 @@ def lire_fiche(chemin):
         if ':' in ligne:
             k, _, v = ligne.partition(':')
             champs[k.strip().lower()] = v.strip()
-    return {'titre': champs.get('titre', chemin.stem), 'fichiers': [x.strip() for x in champs.get('fichiers', '').split(',') if x.strip()],
+    return {'titre': champs.get('titre', chemin.stem), 'fichiers': [x.strip() for x in champs.get('fichiers', '').split(';') if x.strip()],
             'tests': [x.strip() for x in champs.get('tests', '').split(';') if x.strip()], 'texte': corps.strip()}
 
 
@@ -247,10 +247,14 @@ p.add_argument('--tours', type=int, default=4)
 p.add_argument('--sortie', type=pathlib.Path, default=pathlib.Path('spark-chaine'))
 p.add_argument('--essai', action='store_true', help='construit les demandes sans appeler le Spark')
 p.add_argument('--sans-commit', action='store_true')
+p.add_argument('--arret', action='store_true', help='s\'arrête à la première fiche rouge (fiches qui dépendent les unes des autres)')
 a = p.parse_args()
 bilan = []
 for f in a.fiches:
     ok, quoi = mener(f.resolve(), a)
     bilan.append(f'{"VERT " if ok else "ROUGE"} {f.stem} : {quoi}')
+    if not ok and a.arret:
+        bilan += [f'ARRÊT {g.stem} : pas lancée' for g in a.fiches[len(bilan):]]
+        break
 print('\n'.join(['', 'BILAN DE LA CHAÎNE'] + bilan), flush=True)
 sys.exit(0 if all(b.startswith('VERT') for b in bilan) else 1)
