@@ -35,7 +35,7 @@ const MANIFESTANTS = option('manifestants', ''), COALITIONS = option('coalitions
 const DETAIL = args.includes('--detail');
 
 const exiger = createRequire(import.meta.url);
-for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(SRC, f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(SRC, f));
 const { regles: R, protocole: P, monde: M, ia: IA } = globalThis.PDR;
 const NOM_EV = Object.fromEntries(Object.entries(P.EV).map(([k, v]) => [v, k]));
 const IT_S = R.CONSTANTES.IT_PAR_S;

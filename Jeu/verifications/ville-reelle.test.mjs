@@ -15,7 +15,7 @@ const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = f => path.join(ici, '..', 'src', f);
 const exiger = createRequire(import.meta.url);
 const PARTAGES = ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js'];
-for (const f of [...PARTAGES, 'sim/nav.js', 'sim/monde.js', 'sim/ia.js']) exiger(src(f));
+for (const f of [...PARTAGES, 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js']) exiger(src(f));
 const { villeReelle: VR, protocole: P, regles: R, nav: NAV, monde: M, ia: IA } = globalThis.PDR;
 const { SORTES_CASSABLES } = P;
 

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = f => path.join(ici, '..', 'src', f);
 const exiger = createRequire(import.meta.url);
-for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
 const { ville: V, regles: R, protocole: P, monde: M, ia: IA, travailleur: TR } = globalThis.PDR;
 const { CMD, EV, RAISONS } = P;
 const { CONVERGENCE: C, BASTION: B, PREFECTURE: F } = R;
@@ -81,7 +81,7 @@ verifier('empreinte FNV-1a 64 : valeurs de référence (les mêmes que noyau.js)
 });
 
 verifier('le pas ne lit ni Math.sin, ni Math.cos, ni horloge, ni hasard non semé', () => {
-  for (const f of ['sim/monde.js', 'sim/nav.js', 'sim/ia.js']) {
+  for (const f of ['sim/immeubles.js', 'sim/monde.js', 'sim/nav.js', 'sim/ia.js']) {
     const texte = fs.readFileSync(src(f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     assert.ok(!/Math\.(sin|cos|tan|atan2?|random|exp|log|pow|hypot)\b|\bDate\b|performance\.|\*\*/.test(texte), f);
   }

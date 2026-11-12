@@ -32,6 +32,7 @@ MODULES = [
     ('villes/marseille.js', 'partage'),
     ('ville-reelle.js', 'partage'),
     ('sim/nav.js', 'simulation'),
+    ('sim/immeubles.js', 'simulation'),
     ('sim/monde.js', 'simulation'),
     ('sim/ia.js', 'simulation'),
     ('sim/travailleur.js', 'simulation'),
