@@ -9,7 +9,8 @@ ni réseau ; copie étendue de essai-jeu.py.
    sol, objet, barricade, avant-poste, foyer mourant), nuages de gaz à trois densités, vols de bouteilles, grenades et
    pierres relancés en continu, feux éteints (traces de brûlé, vapeur). Captures de près et de loin.
 3. Le coût : images/s, images lentes, decor.mesure, instances translucides du moteur, sans feu puis avec 128 foyers
-   et 64 nuages à l'écran, de loin et de près ; et le brouillard (un foyer dans une case non vue ne se dessine pas)."""
+   et 64 nuages à l'écran, de loin et de près ; et le brouillard (un foyer dans une case non vue ne se dessine pas).
+BANC=cout : seulement les mesures du 3 (sans la démo ni les captures de la scène), pour comparer deux pages."""
 import base64
 import fcntl
 import json
@@ -251,19 +252,21 @@ try:
     envoyer('Page.addScriptToEvaluateOnNewDocument', {'source': f"try {{ localStorage.setItem('pdr.reglages', JSON.stringify({json.dumps(reglages)})); }} catch (e) {{}}"}, session)
     envoyer('Page.navigate', {'url': page.as_uri()}, session)
     attendre("PDR.page && PDR.page.ui.ecran === 'titre'", 90)
+    COUT = os.environ.get('BANC') == 'cout'
     # ---- 1. La démo, avec ses vrais feux. ----
-    attendre("PDR.page.ui.ecran === 'demo'", 40)
+    attendre("PDR.page.ui.ecran === 'demo'", 5 if COUT else 40)
     attendre("PDR.page.jeu", 30)
     evaluer(ECOUTE)
-    time.sleep(12)
-    capture('demo-1-realisateur.png')
-    time.sleep(10)
-    capture('demo-2-realisateur.png')
+    time.sleep(0 if COUT else 12)
+    if not COUT:
+        capture('demo-1-realisateur.png')
+        time.sleep(10)
+        capture('demo-2-realisateur.png')
     resultats['demo_sim'] = evaluer("PDR.page.mesure")
     foyer = evaluer(FOYER)
     resultats['demo_foyer'] = foyer
     evaluer("PDR.page.ui.realisateur && PDR.page.ui.realisateur.arreter(), true")
-    if foyer:
+    if foyer and not COUT:
         placer(foyer[0], foyer[1], 90, 0.6)
         time.sleep(1.5)
         capture('demo-3-pres.png')
@@ -274,7 +277,8 @@ try:
         time.sleep(1.5)
         capture('demo-5-loin.png')
     resultats['demo_uptime'] = uptime()
-    resultats['demo_mesure'] = evaluer(MESURE, 30)
+    if not COUT:
+        resultats['demo_mesure'] = evaluer(MESURE, 30)
     # ---- 2. Une partie, simulation en pause, faux état. ----
     clic(700, 450)
     attendre("PDR.page.ui.ecran === 'titre'", 10)
@@ -308,6 +312,8 @@ try:
     evaluer("__banc.vider()")
     time.sleep(1)
     resultats['sans_feu_160'] = evaluer(MESURE, 30)
+    if COUT:
+        raise SystemExit
     # La scène : chaque sorte dans ses quatre états, la place ; la foule est retirée pour qu'on voie les objets.
     evaluer("PDR.page.jeu.foule.recevoir(new Float32Array(4), 0), true")
     resultats['foyers_poses'] = evaluer("__banc.poser()")

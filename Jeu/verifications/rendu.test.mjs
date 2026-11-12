@@ -25,7 +25,7 @@ const AVANT = Object.freeze({ commit: '5ac0066', sha256: '4207b9df5373ef7585229f
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(ici, '..', 'src');
 const charger = createRequire(import.meta.url);
-for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'decor.js', 'camera.js']) charger(path.join(src, f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'decor.js', 'camera.js']) charger(path.join(src, f));
 const PDR = globalThis.PDR;
 
 let ok = 0, sautees = 0;
@@ -700,6 +700,102 @@ verifier('décor : états reçus, lots versionnés, brouillard, effets de chaque
   // Tableaux réutilisés d'une image à l'autre.
   assert.equal(decor.cadre(vue, 2).dynamique, sortie.dynamique);
   console.log('    instances des lots : ' + decor.lots.map(l => l.nom + ' ' + l.instances).join(', '));
+});
+
+verifier('décor, feu : les sortes de Marseille (deux-roues, conteneur, terrasse, kiosque) dans leurs quatre états, au format de pack', () => {
+  const marseille = PDR.villeReelle.creerVille('marseille', { ilots: 9 }), cas = marseille.sites.cassables;
+  const nouvelles = ['deux-roues', 'conteneur', 'terrasse', 'kiosque'], vues = new Set();
+  for (const c of cas) {
+    if (!nouvelles.includes(c.sorte)) continue;
+    vues.add(c.sorte);
+    assert.equal(memeQuePack(p => PDR.decor.construireCassable(c, false, p)), c.pieces.length);
+    const casse = memeQuePack(p => PDR.decor.construireCassable(c, true, p));
+    assert.ok(casse >= c.pieces.length - 1, c.sorte + ' cassé : ses pièces restent');
+  }
+  assert.deepEqual([...vues].sort(), nouvelles.slice().sort(), 'les quatre sortes sont dans la ville');
+  // Dans le décor : un exemplaire de chaque sorte par état ; 2 et 3 gardent la géométrie du cassé, teintes brûlées.
+  const decor = PDR.decor.creerDecor(marseille, { joueur: -1 }), lc = decor.lots[0], etats = new Uint8Array(cas.length);
+  const instances = [];
+  for (let e = 0; e < 4; e++) {
+    for (let i = 0; i < cas.length; i++) etats[i] = e;
+    decor.etat({ cassables: etats.slice() });
+    let clarte = 0, mat = 0;
+    for (let k = 0; k < lc.instances; k++) { const o = k * 16; clarte += lc.values[o + 12] + lc.values[o + 13] + lc.values[o + 14]; if (lc.values[o + 3] === PDR.decor.MAT.MAT) mat++; }
+    instances.push([lc.instances, clarte / lc.instances / 3, mat / lc.instances]);
+  }
+  assert.equal(instances[2][0], instances[1][0]); assert.equal(instances[3][0], instances[1][0]);
+  assert.ok(instances[2][1] < instances[1][1] * 0.5, 'en feu : roussi');
+  assert.ok(instances[3][1] < 0.12 && instances[3][2] === 1, 'calciné : noir et mat');
+  console.log('    cassables de Marseille (9 îlots) : ' + cas.length + ' ; instances par état : ' + instances.map(i => i[0]).join(', '));
+});
+
+verifier('décor, feu : foyers de chaque sorte, colonnes, nuages, vols, souffle, vapeur, traces, lampes, brouillard', () => {
+  const EV = PDR.protocole.EV, cas = ville.sites.cassables;
+  const iv = cas.findIndex(c => c.sorte === 'voiture'), cv = cas[iv];
+  const decor = PDR.decor.creerDecor(ville, { joueur: -1 });
+  const vue = { pos: [cv.x, 180, cv.z + 200], axes: { forward: [0, -0.67, -0.74], right: [1, 0, 0], up: [0, 0.74, -0.67] }, fov: 42, cible: [cv.x, cv.z] };
+  const structures = [{ id: 7, sorte: 'barricade', faction: 0, x: cv.x - 20, z: cv.z, x2: cv.x - 10, z2: cv.z, pv: 500, pvMax: 600, chantier: false, feu: true },
+    { id: 8, sorte: 'avant-poste', faction: 2, x: cv.x + 20, z: cv.z, pv: 900, pvMax: 1500, chantier: false, feu: true }];
+  const etats = new Uint8Array(cas.length); etats[iv] = 2;
+  const feux = Float32Array.from([1, cv.x - 8, cv.z + 8, 4, 1, 12, 0, -1, 2, cv.x, cv.z, 3, 1, 20, 1, iv, 3, cv.x - 15, cv.z, 3.2, 0.7, 20, 2, 7,
+    4, cv.x + 20, cv.z, 6, 1, 20, 3, 8, 5, cv.x + 8, cv.z + 8, 4, 0.1, 0.5, 0, -1]);
+  const nuages = Float32Array.from([1, cv.x, cv.z + 15, 7, 1, 12, 2, cv.x + 10, cv.z + 15, 5, 0.3, 2]);
+  const ev = [EV.MOLOTOV, cv.x - 20, cv.z + 20, 0, 18, -4, EV.LACRYMO, cv.x + 25, cv.z + 20, 2, -20, -5, EV.PIERRE, cv.x - 5, cv.z + 25, 0, 4, -10,
+    EV.A_TERRE, cv.x, cv.z + 5, 1, 0, 3, EV.JET, cv.x, cv.z - 18, 2, 0, 18];
+  decor.cadre(vue, 10);
+  decor.etat({ structures, cassables: etats, feux, nuages, evenements: Float32Array.from(ev), vitesse: 1 });
+  const mesures = [];
+  let sortie, lampes = 0, fumee = 0, bouteille = false, souffle = false, vapeur = 0;
+  for (let k = 0; k <= 40; k++) {
+    sortie = decor.cadre(vue, 10 + k * 0.05);
+    const d = sortie.dynamique;
+    for (const m of d) {
+      assert.ok([...m.p, ...m.s, ...m.r, ...m.color, m.emissive].every(Number.isFinite), JSON.stringify(m));
+      assert.ok(m.s.every(v => v > 0));
+      if (m.fx) assert.ok(m.alpha >= 0 && m.alpha <= 1);
+    }
+    lampes = Math.max(lampes, sortie.lumieres.length);
+    assert.ok(sortie.lumieres.length <= 8);
+    fumee = Math.max(fumee, d.filter(m => m.fxSmoke && m.color[0] < 0.1).length);
+    if (d.some(m => !m.fx && m.shape === 'cylinder' && m.mat === PDR.decor.MAT.LAQUE && m.color[1] > m.color[0] * 2)) bouteille = true;
+    if (k > 26 && d.filter(m => m.fxFire).length > 30) souffle = true;
+    mesures.push(Object.assign({}, decor.mesure));
+  }
+  const m0 = mesures[0];
+  assert.equal(m0.feux, 5, 'cinq foyers en vue'); assert.equal(m0.nuages, 2, 'deux nuages');
+  assert.ok(m0.feuxPres >= 4);
+  assert.ok(fumee >= 30, 'colonnes de fumée noire : ' + fumee);
+  assert.ok(lampes >= 5, 'les foyers éclairent : ' + lampes);
+  assert.ok(bouteille, 'bouteille en vol'); assert.ok(m0.vols >= 3, 'trois projectiles en vol');
+  assert.ok(souffle, 'le cocktail éclate à l’arrivée');
+  // Feux éteints : une trace chacun (cinq disques), de la vapeur pour l'eau ; le lot des traces ne repart qu'au changement.
+  const lt = decor.lots[decor.lots.length - 1];
+  assert.equal(lt.nom, 'traces'); assert.equal(lt.instances, 0);
+  decor.etat({ evenements: Float32Array.from([EV.FEU_ETEINT, cv.x - 8, cv.z + 8, 2, 1, 1, EV.FEU_ETEINT, cv.x, cv.z, -1, 2, 0]) });
+  assert.equal(lt.instances, 10);
+  const version = lt.version;
+  decor.etat({ feux: feux.slice(16) });
+  for (let k = 0; k < 10; k++) { sortie = decor.cadre(vue, 12.1 + k * 0.05); vapeur = Math.max(vapeur, sortie.dynamique.filter(m => m.fxSmoke && m.color[0] > 0.9).length); }
+  assert.equal(lt.version, version, 'rien de neuf : les traces ne repartent pas');
+  assert.ok(vapeur >= 9, 'vapeur du feu éteint à l’eau : ' + vapeur);
+  assert.equal(decor.mesure.feux, 3);
+  // Des traces au plus TRACES_MAX : l'anneau tourne.
+  const beaucoup = [];
+  for (let k = 0; k < 600; k++) beaucoup.push(EV.FEU_ETEINT, cv.x + (k % 30) * 3, cv.z + ((k / 30) | 0) * 3, -1, 1000 + k, 0);
+  decor.etat({ evenements: Float32Array.from(beaucoup) });
+  assert.equal(lt.instances, 512 * 5);
+  // Brouillard : un foyer dans une case non vue ne se dessine pas, fumée comprise ; les traces non plus.
+  const carte = { nx: 200, nz: 200, x0: -800, z0: -800, cellule: 8 };
+  decor.regler({ joueur: 0, brouillard: true });
+  decor.voile(new Uint8Array(200 * 200), carte);
+  sortie = decor.cadre(vue, 13);
+  assert.equal(decor.mesure.feux, 0); assert.equal(decor.mesure.nuages, 0);
+  assert.ok(!sortie.dynamique.some(m => m.fxFire || m.fxSmoke), 'rien du feu sous le voile');
+  assert.equal(lt.instances, 0, 'traces cachées');
+  decor.voile(new Uint8Array(200 * 200).fill(255), carte);
+  sortie = decor.cadre(vue, 13.05);
+  assert.equal(decor.mesure.feux, 3); assert.ok(lt.instances > 0);
+  console.log('    image la plus chargée : ' + Math.max(...mesures.map(m => m.particules)) + ' particules, ' + lampes + ' lampes');
 });
 
 // ---- Le réalisateur de la démo. ----

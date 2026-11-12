@@ -883,7 +883,7 @@
     function empriseFeu(k) {
       const o = k * FT, x = feux[o + 1], z = feux[o + 2], r = borner(fini(feux[o + 3]) ? feux[o + 3] : 3, 0.5, 12);
       const sorte = feux[o + 6] | 0, cible = feux[o + 7];
-      EMP[0] = x; EMP[1] = z; EMP[2] = sol(x, z); EMP[3] = EMP[4] = r * 0.7; EMP[5] = 0; EMP[6] = 0; EMP[7] = 1.4; EMP[8] = 30; EMP[9] = 11;
+      EMP[0] = x; EMP[1] = z; EMP[2] = sol(x, z); EMP[3] = EMP[4] = r * 0.7; EMP[5] = 0; EMP[6] = 0; EMP[7] = 1.4; EMP[8] = 40; EMP[9] = 13;
       if (sorte === 1 && cible >= 0 && cible < nC) {
         const i = cible | 0, c = cassables[i], q = FEU_CASSABLE[c.sorte] || FEU_DEFAUT, o7 = i * 7;
         const l = emprise[o7 + 3], du = emprise[o7 + 5], dv = emprise[o7 + 6];
@@ -1091,11 +1091,16 @@
 
     /** Colonne de fumée : n volumes qui montent sans fin le long de la colonne, s'élargissent, penchent avec le vent de
      *  plus en plus haut. noir : 1 fumée d'incendie (noire en bas, gris sombre en haut), 0 fumerolle grise. */
+    // Réutilisables (L5b, façades et toits) : lampeFeu, colonne, flammes, flaque, nuage — position, taille, force, graine.
+    function lampeFeu(x, y, z, force, graine, portee) {
+      const vacille = 0.8 + 0.12 * Math.sin(horloge * 13 + graine) + 0.08 * Math.sin(horloge * 23.7 + graine * 3);
+      lampe(x, y, z, T_LAMPE_FEU, (1.6 + 1.8 * force) * vacille, portee);
+    }
     function colonne(x, y, z, hauteur, largeur, force, graine, noir, n) {
       if (!(force > 0.01) || !(hauteur > 1)) return;
       const periode = 4 + hauteur / 5, base = Math.max(2.4, largeur * 0.28), amax = 0.97 - 0.3 * (1 - noir);
-      // De loin, la colonne grossit un peu : elle reste lisible d'un bout à l'autre de la carte.
-      const loin = oeil ? borner((distanceOeil(x, y + hauteur * 0.5, z) - 350) / 500, 0, 1) : 0, gros = 1 + 0.35 * loin;
+      // De loin, la colonne s'élargit (vue de haut, sa hauteur se tasse) : elle reste lisible d'un bout à l'autre de la carte.
+      const loin = oeil ? borner((distanceOeil(x, y + hauteur * 0.5, z) - 300) / 500, 0, 1) : 0, gros = 1 + 0.9 * loin;
       for (let j = 0; j < n; j++) {
         const ph = frac(horloge / periode + j / n + graine), h = Math.pow(ph, 1.5) * hauteur;
         const derive = hauteur * 0.45 * Math.pow(ph, 1.7) + Math.sin(horloge * 0.31 + j * 1.7 + graine * 9) * largeur * 0.07 * ph;
@@ -1413,9 +1418,7 @@
       for (let j = 0; j < nl; j++) {
         const k = LAMPES_K[j], o = k * FT;
         empriseFeu(k);
-        const force = borner(feux[o + 4], 0, 1), g = feux[o] * 1.7;
-        const vacille = 0.8 + 0.12 * Math.sin(horloge * 13 + g) + 0.08 * Math.sin(horloge * 23.7 + g * 3);
-        lampe(EMP[0], EMP[2] + EMP[6] + 1.2 + EMP[7] * 0.4, EMP[1], T_LAMPE_FEU, (1.6 + 1.8 * force) * vacille, borner(10 + EMP[7] * 3 + EMP[3] * 2, 10, 30));
+        lampeFeu(EMP[0], EMP[2] + EMP[6] + 1.2 + EMP[7] * 0.4, EMP[1], borner(feux[o + 4], 0, 1), feux[o] * 1.7, borner(10 + EMP[7] * 3 + EMP[3] * 2, 10, 30));
       }
       let nn = 0;
       for (let k = 0; k < nNuages; k++) {

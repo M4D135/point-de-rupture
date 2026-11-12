@@ -1867,6 +1867,8 @@
       stats.staticVisible=shown.length;stats.staticCulled=world.length-shown.length;
       const planned=actorLightPlan&&actorLightPlan.previous===shadowLight&&eye.every((v,k)=>v===actorLightPlan.eye[k])?actorLightPlan.plan:lightPlan(eye);actorLightPlan=null;
       const {sorted,distanceTo,chosen,shadowLights}=planned;shadowLight=chosen;
+      // PDR (lampes) : huit lampes passagères (quatre en qualité basse) au lieu de trois : les huit foyers les plus proches
+      // de la visée éclairent façades et foule (decor.js) ; la ville n'a pas de lampe fixe, les douze places restent assez.
       const transient=transientLights(fx.lights,eye,quality==='low'?4:8);stats.dynamicLights=transient.length;
       const selected=shadowLights.map(light=>({light,d:distanceTo(light)})).concat(transient.map(light=>({light,d:distanceTo(light)})),sorted.filter(entry=>!shadowLights.includes(entry.light)).slice(0,(quality==='low'?6:12)-shadowLights.length-transient.length));
       const blackout=horrorLights(fx.horror,lights);stats.blackoutLights=blackout?.size||0;

@@ -9,7 +9,7 @@ Le dossier `Jeu/src/moteur/` contient :
 
 | Fichier | Quoi | Détail |
 |---|---|---|
-| `renderer.js` | le moteur de rendu : FERRO 0.2 et six ajouts du jeu, marqués « PDR (nom) » | ce fichier |
+| `renderer.js` | le moteur de rendu : FERRO 0.2 et huit ajouts du jeu, marqués « PDR (nom) » | ce fichier |
 | `audio.js` | portage en français du son du jeu METAL ; les sons sont ceux du jeu | `PROVENANCE-SON.md` |
 | `musique.js` | portage en français de la musique du jeu METAL ; les morceaux sont ceux du jeu | `PROVENANCE-SON.md` |
 
@@ -100,6 +100,11 @@ ces constantes dans le texte du shader, et ne les trouveraient pas si elles avai
 6. **msaa** — L'interrupteur de l'anticrénelage : `fx.msaa === false` dessine la scène droit dans la cible du
    post-traitement, sans recréer une seule cible (réglage « Anticrénelage » du jeu). Sans ce champ, rien ne change.
    FERRO 0.2 n'a que le réglage de création.
+7. **grain** — Dans le shader des effets translucides, le grain de surface (`vSurface`) est ramené à l'échelle d'une
+   particule de 2,6 m au plus : sur les grandes bouffées de fumée et les flammes, le bruit ne crénèle plus en pointillé.
+   Les particules de 2,6 m et moins gardent l'image de FERRO.
+8. **lampes** — Huit lampes passagères au lieu de trois (quatre au lieu de deux en qualité basse) : les huit foyers les
+   plus proches de la visée éclairent la scène (`decor.js`).
 
 ## Ce que le passage change à l'image
 
@@ -144,3 +149,4 @@ Une ligne par changement du moteur, de la plus ancienne à la plus récente.
 | Date | Quoi | Pourquoi | Coût |
 |---|---|---|---|
 | 12/11/2026 | Le renderer passe à FERRO 0.2 (commit `248043a`) : fusion à trois, réglages de création, six ajouts du jeu conservés. | Prendre le dernier état du moteur commun avant sa suppression, sans changer l'image. | 14 blocs, 212 lignes ajoutées, 2 lignes remplacées ; sur seize vues, 0,5 à 3,3 % des pixels diffèrent de la copie d'avant, moins de 0,01 % de plus de 24 sur 255, écart moyen sous 0,2 sur 255 ; deux rendus de la même copie sont identiques. |
+| 12/11/2026 | Ajouts « grain » et « lampes » (lot L5, le feu à l'écran). | Fumées et flammes sans moiré ; les foyers éclairent façades et foule. | 2 lignes. Banc `BANC=cout`, 128 foyers et 64 nuages, 100 000 unités, deux passages par réglage (charge 7 à 9) : à 600 m, 60,1 à 60,2 images/s avec 8 ou 3 lampes ; à 160 m, 60,1 avec 8 et 60,1 / 51,8 avec 3 : l'écart suit la charge de la machine, pas le nombre de lampes. |
