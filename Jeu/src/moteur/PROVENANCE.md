@@ -1,32 +1,34 @@
-# Provenance du moteur de rendu
+# Histoire du moteur de rendu
 
-`renderer.js` est une copie du renderer de FERRO, le moteur commun aux jeux de David (`github.com/M4D135/FERRO`, dépôt
-privé), à sa version 0.2 :
+`renderer.js` est le moteur de rendu de Point de rupture. Il vient du jeu METAL (`github.com/M4D135/METAL`) et a été
+mis à jour le 12 novembre 2026 sur le dernier état du moteur commun, « FERRO 0.2 », commit
+`248043a674e5353724731a7322ae932487c236b7`, avant la suppression de ce dépôt. Depuis, le moteur appartient au jeu et
+évolue avec lui : il n'y a plus de copie de référence ni de dépôt commun.
 
-| | Fichier | Taille | sha256 |
-|---|---|---|---|
-| Original | `src/renderer.js` de FERRO à l'étiquette `v0.2`, commit `248043a674e5353724731a7322ae932487c236b7` du 12 novembre 2026 | 120 863 octets | `d57dae38eed729f6ba72b6673a2174e82869c8ab85670dd7c6a71628504a85a1` |
-| Copie du jeu | `Jeu/src/moteur/renderer.js` | 137 113 octets | `4b1fcc5317b645bda9272a575c270d801c6fb58d02d79f71927529442bfc3398` |
+Le dossier `Jeu/src/moteur/` contient :
 
-La copie est l'original plus les retouches du jeu, et rien d'autre : 14 blocs, 212 lignes ajoutées et 2 lignes de FERRO
+| Fichier | Quoi | Détail |
+|---|---|---|
+| `renderer.js` | le moteur de rendu : FERRO 0.2 et six ajouts du jeu, marqués « PDR (nom) » | ce fichier |
+| `audio.js` | portage en français du son du jeu METAL ; les sons sont ceux du jeu | `PROVENANCE-SON.md` |
+| `musique.js` | portage en français de la musique du jeu METAL ; les morceaux sont ceux du jeu | `PROVENANCE-SON.md` |
+
+Rien d'autre n'est repris : `camera.js` reprend seulement la formule d'amortissement de `motion.js` de METAL, avec
+mention ; `options.js` ne sert pas. Le son est décrit dans `PROVENANCE-SON.md`.
+
+Le moteur est FERRO 0.2 plus les retouches du jeu, et rien d'autre : 14 blocs, 212 lignes ajoutées et 2 lignes de FERRO
 remplacées. Chaque bloc commence par un commentaire « PDR (nom) », où le nom est celui d'une des retouches décrites plus
-bas. Les lignes marquées « PDR : » ou « BITUME : », sans nom entre parenthèses, sont à FERRO : il les a reprises des jeux
-en gardant leur marque. `verifications/ferro.test.mjs` tient ce paragraphe à jour : il recalcule le sha256 de la copie,
-compare la copie à l'original ligne à ligne et recompte les blocs.
-
-Rien d'autre de FERRO n'est copié ici. `camera.js` reprend seulement la formule d'amortissement de `src/motion.js`, avec
-mention. Le son est décrit dans `PROVENANCE-SON.md`, et la vue d'ensemble dans `FERRO.md`.
+bas. Les lignes marquées « PDR : » ou « BITUME : », sans nom entre parenthèses, viennent du moteur commun : il les avait
+reprises des jeux en gardant leur marque.
 
 ## Avant la 0.2
 
-Jusqu'à l'essai 0.2 du jeu (commit `5ac0066`), la copie partait du renderer de METAL 0.6 et portait 17 retouches. Ce
+Jusqu'à l'essai 0.2 du jeu (commit `5ac0066`), le moteur partait du renderer de METAL 0.6 et portait 17 retouches. Ce
 fichier citait alors « `github.com/M4D135/FERRO`, commit `950f743` » : c'était le dépôt du jeu METAL, qui portait ce nom
-avant d'être renommé `M4D135/METAL`. Le moteur a maintenant son propre dépôt, `M4D135/FERRO`, où cet état est l'étiquette
-`metal-0.6` (commit `c863bd4`, `src/renderer.js` de sha256
-`45c1b17014fb5310f89ea6ca982d91a9a9158f71472eaf82c5eadeae817df0a4`).
+avant d'être renommé `M4D135/METAL` ; cet état était l'étiquette `metal-0.6`.
 
-FERRO 0.2 a récolté les retouches génériques du jeu, prises à son commit `b695b51`, et l'évolution de METAL jusqu'à sa
-version 0.8. Ce que le jeu retouchait et que FERRO fait maintenant lui-même :
+FERRO 0.2 avait repris les retouches génériques du jeu, prises à son commit `b695b51`, et l'évolution de METAL jusqu'à sa
+version 0.8. Ce que le jeu retouchait et que FERRO 0.2 faisait déjà :
 
 | Ce que le jeu avait retouché | Dans FERRO 0.2 |
 |---|---|
@@ -43,21 +45,24 @@ version 0.8. Ce que le jeu retouchait et que FERRO fait maintenant lui-même :
 | Plans proche et lointain | `camera.near`, `camera.far` |
 | Sans lampe torche | `fx.torch === false` |
 
-`jeu.js` passe les quatre réglages de création (`REGLAGES_MOTEUR`) ; la caméra et `fx` gardent les mêmes champs, aux
-mêmes noms et au même sens.
-
 ## Méthode du passage
 
-Fusion à trois, comme le demande `VERSIONS.md` de FERRO : `git merge-file --diff3` entre la base (`metal-0.6`), FERRO
-(`v0.2`) et la copie du jeu (commit `5ac0066`). Treize conflits : les huit que FERRO annonçait pour la copie du commit `b695b51`
-(anti-scintillement, MSAA, atlas d'ombre, tampon de la foule, champ de vision, plans), et cinq autres là où le jeu avait
-ajouté depuis ses lots, sa foule et son interrupteur du MSAA. Dans chacun, la version de FERRO est gardée ; les retouches
-du jeu sont ensuite reposées autour, en blocs marqués.
+Fusion à trois : `git merge-file --diff3` entre la base (`metal-0.6`), FERRO (`v0.2`) et la copie du jeu (commit
+`5ac0066`). Treize conflits : les huit que FERRO annonçait pour la copie du commit `b695b51` (anti-scintillement, MSAA,
+atlas d'ombre, tampon de la foule, champ de vision, plans), et cinq autres là où le jeu avait ajouté depuis ses lots, sa
+foule et son interrupteur du MSAA. Dans chacun, la version de FERRO est gardée ; les retouches du jeu sont ensuite
+reposées autour, en blocs marqués.
 
 La fusion gardait aussi, sans conflit, deux lignes du jeu que FERRO n'avait pas touchées : le vignettage à 0,84 et le
 seuil du bloom à 0,86, écrits en dur dans les shaders. Elles sont rendues à FERRO : ses réglages de création remplacent
 ces constantes dans le texte du shader, et ne les trouveraient pas si elles avaient déjà changé. C'est le point à relire
 à chaque passage : ce que la fusion garde du jeu sans rien signaler.
+
+## Réglages passés au moteur
+
+À la création, `jeu.js` passe `REGLAGES_MOTEUR` : `{ msaa: 4, shadowMapScale: 2, vignette: 0.84, bloomThreshold:
+[0.86, 0.98] }`. Sur la caméra, `near`, `far`, `allStatic` et `sun` (`camera.js`) ; sur `fx`, `sunOnly`, `torch: false`,
+`shadows`, `bloom`, `lights`, et les quatre champs des ajouts du jeu : `voile`, `lots`, `foule`, `msaa`.
 
 ## Retouches du jeu, dans l'ordre du fichier
 
@@ -74,8 +79,7 @@ ces constantes dans le texte du shader, et ne les trouveraient pas si elles avai
    `pdrFinir`. Le shader du monde n'en dépend pas. Son vignettage suit le réglage de création, comme celui du monde.
    Deux apports de METAL 0.8 au shader du monde n'y sont pas, pour que la foule garde son image et son coût : la
    rugosité élargie là où la normale varie d'un pixel à l'autre, et le reflet des nuages sur les surfaces lisses. Un jeu
-   qui dessine lui-même dans les passes du moteur a besoin de ces formules : générique dans son principe, à récolter
-   avec les points d'accroche de la retouche « foule », sous des noms neutres.
+   qui dessine lui-même dans les passes du moteur a besoin de ces formules.
 4. **lots** — Les lots du jeu : `fx.lots = [{ values, groups, version }]`, au format de `pack`. Chaque lot a son tampon
    GPU, renvoyé seulement quand l'objet ou sa `version` change ; il entre dans l'ombre du soleil et dans la passe
    couleur, après la foule empaquetée (`fx.instances`). C'est le décor vivant du jeu : bâtiments du joueur, barricades,
@@ -92,10 +96,10 @@ ces constantes dans le texte du shader, et ne les trouveraient pas si elles avai
    `stats`. Le moteur expose `renderer.gl` (le contexte WebGL 2) et `renderer.pdr` : `glsl`, `uniformes`, `generation`
    (change à chaque création du contexte, donc après une perte), `programme(vertex, fragment)` et `lier(programme)`.
    Le rendu logiciel (Canvas 2D) n'a ni l'un ni l'autre. La foule elle-même est propre au jeu ; le point d'accroche,
-   lui, servirait à d'autres : générique dans son principe, à récolter sous des noms neutres.
+   lui, servirait à d'autres.
 6. **msaa** — L'interrupteur de l'anticrénelage : `fx.msaa === false` dessine la scène droit dans la cible du
    post-traitement, sans recréer une seule cible (réglage « Anticrénelage » du jeu). Sans ce champ, rien ne change.
-   FERRO 0.2 n'a que le réglage de création : générique, à récolter.
+   FERRO 0.2 n'a que le réglage de création.
 
 ## Ce que le passage change à l'image
 
@@ -127,13 +131,16 @@ port). Deux rendus de la même copie ne diffèrent d'aucun pixel.
 
 ## Vérifications
 
-- `verifications/ferro.test.mjs` : version, commit et sha256 écrits ici et dans `FERRO.md` ; chaque « PDR (nom) » de
-  la copie décrite ici, et l'inverse ; la copie comparée à l'original ligne à ligne.
-- `verifications/rendu.test.mjs`, sur un contexte WebGL 2 simulé qui note chaque appel : sans réglage ni champ du jeu,
-  puis avec les réglages du jeu, la copie envoie exactement les commandes GPU de l'original, image après image, sur une
-  scène à hauteur d'homme et sur la ville vue de haut (seul s'ajoute le voile, déclaré une fois à la création) ; le
-  rendu logiciel aussi, appel pour appel ; le passage depuis la copie d'avant, écart par écart ; les retouches du jeu.
-- Les originaux de FERRO se lisent de son clone (`verifications/originaux-ferro.mjs`) ; sans lui, les comparaisons avec
-  eux sont sautées, et les suites le disent.
-- `verifications/banc-rendu.py` mesure le rendu dans un vrai navigateur ; `--moteur` y met une autre copie, pour
+- `verifications/rendu.test.mjs`, sur un contexte WebGL 2 simulé qui note chaque appel : les ajouts du jeu (foule, lots,
+  voile), l'interrupteur MSAA, le passage depuis la copie d'avant (commit `5ac0066`), écart par écart, le décor, le
+  réalisateur et la caméra.
+- `verifications/banc-rendu.py` mesure le rendu dans un vrai navigateur ; `--moteur` y met un autre `renderer.js`, pour
   comparer l'avant et l'après sous la même charge.
+
+## Journal
+
+Une ligne par changement du moteur, de la plus ancienne à la plus récente.
+
+| Date | Quoi | Pourquoi | Coût |
+|---|---|---|---|
+| 12/11/2026 | Le renderer passe à FERRO 0.2 (commit `248043a`) : fusion à trois, réglages de création, six ajouts du jeu conservés. | Prendre le dernier état du moteur commun avant sa suppression, sans changer l'image. | 14 blocs, 212 lignes ajoutées, 2 lignes remplacées ; sur seize vues, 0,5 à 3,3 % des pixels diffèrent de la copie d'avant, moins de 0,01 % de plus de 24 sur 255, écart moyen sous 0,2 sur 255 ; deux rendus de la même copie sont identiques. |

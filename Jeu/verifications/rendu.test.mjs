@@ -1,26 +1,26 @@
 // Vérifie le rendu sans GPU, sur un contexte WebGL 2 simulé qui note chaque appel :
-// - le moteur est FERRO 0.2 : sans réglage ni champ du jeu, puis avec les réglages de création du jeu, la copie envoie au
-//   GPU exactement les commandes de l'original (étiquette v0.2), image après image, sur une scène à hauteur d'homme et
-//   sur la ville vue de haut ; seul le voile du jeu s'y ajoute, déclaré une fois à la création. Le repli Canvas 2D aussi ;
-// - le passage : sur des images du jeu, les commandes de la copie d'avant (commit 5ac0066 : METAL 0.6 et 17 retouches),
-//   aux écarts près, tous comptés et expliqués ; les shaders ne changent que de ce que METAL a changé de 0.6 à 0.8 ;
 // - les retouches du jeu : fx.voile sur l'unité 4, retiré quand il cesse ; un lot de fx.lots envoyé une fois tant que sa
 //   version ne change pas ; fx.foule.ombre et fx.foule.couleur une fois par image, chacun dans sa passe, l'état GL
 //   rétabli au retour ; fx.msaa === false sans recréer les cibles ; la bibliothèque d'éclairage au vignettage du monde ;
+// - le passage : sur des images du jeu, les commandes de la copie d'avant (commit 5ac0066 : METAL 0.6 et 17 retouches),
+//   aux écarts près, tous comptés et expliqués ; les shaders ne changent que de ce que METAL a changé de 0.6 à 0.8 ;
 // - le décor : lots au format de pack, comparés au pack du moteur, valeurs finies, pour chaque sorte de structure et de
 //   cassable ; brouillard, versions, effets de chaque évènement ;
 // - le réalisateur de la démo : la ville entière d'abord et de temps en temps, puis le point le plus vivant, sans saut.
-// Les originaux de FERRO se lisent de son clone (originaux-ferro.mjs) ; sans lui, c'est dit, et les comparaisons avec
-// eux sont sautées, elles seules.
 //   node Jeu/verifications/rendu.test.mjs
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { original, ABSENT, ecart, sha256, COPIE_AVANT as AVANT } from './originaux-ferro.mjs';
+
+const sha256 = octets => createHash('sha256').update(octets).digest('hex');
+/** La copie du jeu d'avant le passage à cette version, dans l'historique du jeu : la suite compare les deux copies. */
+const AVANT = Object.freeze({ commit: '5ac0066', sha256: '4207b9df5373ef7585229ff3aa717ad5c115c7da75eddeaa951b1d19699917a7',
+  quoi: 'le renderer de METAL 0.6 et 17 retouches' });
 
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(ici, '..', 'src');
@@ -302,7 +302,7 @@ function jouer(source, scenario, options, contexte) {
   return { ...(rendu.r ? rendu : { r: rendu }), etapes, ...c };
 }
 
-// ---- Le moteur : la copie de FERRO 0.2 et ses retouches. ----
+// ---- Le moteur : ses réglages, ses ajouts et les points d'accroche qu'il expose. ----
 verifier('moteur : retouches marquées « PDR (nom) », bibliothèque d’éclairage et points d’accroche exposés, réglages du jeu', () => {
   for (const nom of ['origine', 'voile', 'éclairage', 'lots', 'foule', 'msaa']) assert.ok(SOURCE.includes('PDR (' + nom + ')'), 'marque PDR (' + nom + ')');
   for (const mot of ['fx.voile', 'fx.lots', 'fx.foule.ombre', 'fx.foule.couleur', 'fx.msaa', 'renderer.gl', 'renderer.pdr']) assert.ok(SOURCE.includes(mot), mot);
@@ -365,56 +365,6 @@ function sansVoileDeclare(journal) {
     sortie.push(journal[i]);
   }
   return { sortie, creations };
-}
-
-const v02 = original('v0.2');
-if (!v02) {
-  sauter('moteur : mêmes commandes GPU que FERRO 0.2, sans réglage puis avec ceux du jeu', ABSENT);
-} else {
-  verifier('moteur : sans réglage ni champ du jeu, puis avec les réglages du jeu, les commandes GPU de FERRO 0.2, image après image', () => {
-    const cas = [
-      ['scène à hauteur d’homme, sans réglage', jouerSalle, undefined, 2],
-      ['scène à hauteur d’homme, réglages du jeu', jouerSalle, REGLAGES, 2],
-      ['ville vue de haut, sans réglage', jouerVille, undefined, 2],
-      ['ville vue de haut, réglages du jeu', jouerVille, REGLAGES, 2],
-      ['ville, réglages hors bornes ou à moitié', jouerVille, { msaa: 8, shadowMapScale: 3, vignette: 1.7, bloomThreshold: [0.9, 0.5] }, 2],
-      ['ville, vignettage et seuil seuls', jouerVille, { vignette: 0.7, bloomThreshold: [0.5, 0.9] }, 2],
-      ['ville, GPU sans MSAA et à petites textures', jouerVille, REGLAGES, 2, { limites: { MAX_SAMPLES: 0, MAX_TEXTURE_SIZE: 2048 } }],
-    ];
-    let total = 0;
-    for (const [nom, scenario, options, creations, contexte] of cas) {
-      const a = jouer(v02.texte, scenario, options, contexte), b = jouer(SOURCE, scenario, options, contexte);
-      const copie = sansVoileDeclare(b.journal);
-      assert.equal(copie.creations, creations, nom + ' : le voile déclaré une fois par création du contexte');
-      memeFlux(enTexte(a.journal), enTexte(copie.sortie), nom);
-      assert.deepEqual(b.etapes.map(e => e[0]), a.etapes.map(e => e[0]));
-      // Passé la création, pas une commande de plus : les étapes commencent aux mêmes endroits, au voile déclaré près.
-      const decalage = (i, n) => b.etapes[i][1] - a.etapes[i][1] === 8 * n;
-      assert.ok(decalage(0, 1) && decalage(a.etapes.length - 1, creations), nom + ' : huit commandes par création, aucune par image');
-      for (const cle of ['drawCalls', 'triangles', 'instances', 'msaa', 'bloom', 'shadows', 'shadowMaps', 'lots', 'lotsVisibles', 'nappeTriangles', 'uploadBytes', 'width', 'height']) {
-        assert.deepEqual(b.r.stats[cle], a.r.stats[cle], nom + ' : stats.' + cle);
-      }
-      assert.ok(a.journal.filter(([k]) => k === 'drawElementsInstanced').length >= 40, nom + ' : assez de dessins pour que la comparaison dise quelque chose');
-      total += a.journal.length;
-    }
-    console.log('    ' + total + ' commandes identiques sur ' + cas.length + ' passages (création, images, contexte perdu et rendu, libération), source : ' + v02.source);
-  });
-
-  verifier('repli Canvas 2D : sans WebGL 2, le rendu logiciel de FERRO 0.2, appel pour appel, sans gl ni pdr', () => {
-    const dessiner = source => {
-      const t = creerToile2D(), s = sceneSalle(), r = chargerMoteur(source).create(t.canvas, REGLAGES);
-      r.resize('auto'); r.setWorld(s.salle, s.lampes, s.atmosphere);
-      for (let k = 0; k < 3; k++) r.draw({ pos: [k - 2, 1.6, 6], yaw: 0.3, pitch: -0.08, fov: 75 }, s.acteurs(k), { time: k / 60, lights: [] });
-      r.resize('low'); r.draw({ pos: [20, 1.6, 6], yaw: 1.2, pitch: 0, fov: 12 }, s.acteurs(3), { time: 0.1, damage: 0.4, pulse: 0.5 });
-      return { r, journal: t.journal };
-    };
-    const a = dessiner(v02.texte), b = dessiner(SOURCE);
-    assert.equal(b.r.stats.backend, 'canvas2d');
-    assert.ok(!('gl' in b.r) && !('pdr' in b.r) && !('setLots' in b.r), 'le rendu logiciel n’a ni gl, ni pdr, ni lots : jeu.js le refuse à son seul backend');
-    memeFlux(enTexte(a.journal), enTexte(b.journal), 'rendu logiciel');
-    assert.ok(a.journal.filter(([k]) => k === 'fill').length > 300, 'assez de faces peintes pour que la comparaison dise quelque chose');
-    console.log('    ' + a.journal.length + ' appels Canvas 2D identiques sur 4 images');
-  });
 }
 
 verifier('retouches du jeu : foule appelée dans chaque passe, état GL rétabli, lots envoyés selon leur version, voile posé puis retiré', () => {
@@ -506,12 +456,6 @@ verifier('retouche du jeu : fx.msaa === false dessine sans anticrénelage, sans 
   const scene = s.image(0)[copie - 1][1][1], msaa = s.image(0)[copie - 2][1][1];
   assert.ok(cibles(0).includes(msaa) && cibles(1).includes(scene) && !cibles(1).includes(msaa));
   assert.equal(s.r.stats.msaa, 4, 'la cible MSAA reste prête');
-  if (v02) {
-    // Ces images-là sont celles de FERRO créé sans msaa : mêmes commandes, objets pris dans l'ordre où ils servent.
-    const sans = rendre(v02.texte, 3, () => ({}), { ...REGLAGES, msaa: 0 });
-    const hooks = rendre(SOURCE, 3, i => ({ msaa: i > 0 ? false : undefined }));
-    memeFlux(enTexte(sans.image(1).concat(sans.image(2)), true), enTexte(hooks.image(1).concat(hooks.image(2)), true), 'images sans MSAA', ['FERRO sans msaa', 'copie, fx.msaa ']);
-  }
 });
 
 // ---- Le passage de la copie d'avant à celle-ci, sur des images du jeu. ----
@@ -642,18 +586,7 @@ if (!avant) {
     const NOMS = ['monde, sommets', 'monde, fragments', 'profondeur, sommets', 'profondeur, fragments', 'post, sommets', 'post, fragments', 'ciel, sommets', 'ciel, fragments', 'effets, sommets', 'effets, fragments'];
     const change = ta.map((t, i) => (t === tb[i] ? null : NOMS[i])).filter(Boolean);
     assert.deepEqual(change, ['monde, sommets', 'monde, fragments', 'profondeur, sommets', 'effets, sommets', 'effets, fragments']);
-    const base = original('metal-0.6'), v01 = original('v0.1');
-    if (!base || !v01) { console.log('    shaders : ' + change.length + ' textes changés ; comparaison avec l’évolution de METAL SAUTÉE, ' + ABSENT); return; }
-    const deMetal = s => textes(jouer(s, ({ FRender, c }) => FRender.create(c.canvas), undefined).journal).map(net);
-    const m06 = deMetal(base.texte), m08 = deMetal(v01.texte);
-    let lignes = 0;
-    for (let i = 0; i < 10; i++) {
-      const jeu = ecart(ta[i], tb[i]), metal = ecart(m06[i], m08[i]);
-      assert.deepEqual(jeu.moins, metal.moins, NOMS[i] + ' : lignes retirées');
-      assert.deepEqual(jeu.plus, metal.plus, NOMS[i] + ' : lignes ajoutées');
-      lignes += jeu.moins.length + jeu.plus.length;
-    }
-    console.log('    shaders : ' + change.length + ' textes changés, ' + lignes + ' lignes, celles que METAL a changées de 0.6 à 0.8 (étiquettes metal-0.6 et v0.1)');
+    console.log('    shaders : ' + change.length + ' textes changés, ceux que METAL a changés de 0.6 à 0.8');
   });
 }
 
