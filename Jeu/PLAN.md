@@ -585,10 +585,10 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 |---|---|---|---|
 | Retrait d'Unreal | fait | `5ac0066` | Dépôt et Mac. |
 | Réparation du test du noyau | fait | `a4cfed3` | |
-| L1 Rendu | fait | `71f99a6`, IA | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
+| L1 Rendu | fait | `71f99a6`, `d871672` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
 | L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
 | L3 Musique | à reprendre | `2dc9248` | |
-| IA + mise en ligne | fait, mise en ligne à faire | IA | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. |
+| IA + mise en ligne | fait, mise en ligne à faire | `d871672` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. |
 | L4 Simulation | à reprendre | `4020ac6` | |
 | IB | à faire | | |
 | L5 Feu à l'écran | à faire | | |
