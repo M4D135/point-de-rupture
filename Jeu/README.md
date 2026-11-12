@@ -1,11 +1,44 @@
 # Point de rupture — le jeu dans le navigateur
 
 RTS urbain entièrement procédural : aucun fichier de décor, de modèle, de texture ni de son. La ville, les personnages
-et les effets sont calculés au lancement ; le rendu est celui de FERRO (`src/moteur/`, provenance dans
-`src/moteur/PROVENANCE.md`). Décision de David du 12 novembre 2026 : « oublie totalement le système classique,
-full procedural rts ».
+et les effets sont calculés au lancement ; le moteur de rendu, venu de FERRO, appartient au jeu (`src/moteur/`,
+histoire dans `src/moteur/PROVENANCE.md`). Décision de David du 12 novembre 2026 : « oublie totalement le système
+classique, full procedural rts ».
 
 En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus bas).
+
+## Essai 0.3 (en cours)
+
+Étape « essai-0.3a » (12 novembre 2026), première intégration du plan de la 0.3 (`PLAN.md`) :
+
+- **Le moteur à jour.** `src/moteur/renderer.js` passe sur FERRO 0.2, le dernier état du moteur commun avant la
+  suppression de ce dépôt, avec les six ajouts du jeu ; il appartient désormais au jeu (`src/moteur/PROVENANCE.md`).
+  Image identique à la 0.2, réglages du moteur dans `REGLAGES_MOTEUR` (`src/jeu.js`).
+- **La nouvelle Marseille.** Hauteurs réelles ou plausibles par quartier, toits de tuile, de zinc ou en terrasse,
+  monuments dessinés d'après leur emprise (Hôtel de Ville, Saint-Ferréol, la Bourse, l'Opéra, les Accoules, la Vieille
+  Charité), platanes, réverbères, terrasses, voitures et deux-roues garés, voiliers ; au loin, jusqu'à 1,25 km, la Major,
+  les forts, le MuCEM et Notre-Dame de la Garde. Quatre sortes cassables de plus : deux-roues, conteneurs, terrasses,
+  kiosques (leur feu viendra avec la simulation).
+
+Mesures du 12 novembre 2026, mêmes conditions que la 0.2 (Chrome 157 sans écran, Metal, 1 440 × 900, MSAA ×4, ombres,
+bloom, 5 s par relevé), charge moyenne de 5 :
+
+| Ville | Écran | Images/s | Images lentes | Simulation par itération (moyenne, p95) |
+|---|---|---|---|---|
+| Marseille | démo | 60,1 | 0 | 24,1 ms (36,2) |
+| Marseille | partie, vue par défaut | 60,1 | 0 | 14,9 ms (29,1) |
+| imaginaire | démo | 60,2 | 0 | 23,2 ms (33,4) |
+| imaginaire | partie, vue par défaut | 60,1 | 0 | 14,3 ms (21,8) |
+
+Sur téléphone (390 × 844, 20 000 unités, Marseille) : 60 images/s, aucune image lente. Le décor de Marseille passe de
+11 000 à 17 500 instances dans la vue de la partie. Le banc du rendu (`verifications/banc-rendu.py --moteur`, ancien et
+nouveau moteur l'un après l'autre) ne voit pas d'écart au-delà du bruit de la machine. La page pèse 1,37 Mo (474 Ko
+compressés), pour un budget de 3 Mo. Sans WebGL 2, la page affiche toujours son message de refus
+(`verifications/sans-webgl2.py`).
+
+Encore à venir, selon le plan : la musique sombre ; le feu, les cocktails Molotov, le gaz et la victoire au choix dans
+la simulation ; le feu à l'écran ; des personnages mieux animés ; l'interface des nouveaux ordres et modes ; les
+nouveaux bruitages de rue ; une démo qui dure. Musique et bruitages restent ceux de la 0.2 d'ici là.
 
 ## Essai 0.2 (12 novembre 2026)
 

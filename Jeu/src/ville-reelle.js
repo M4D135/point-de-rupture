@@ -533,7 +533,14 @@
     voiture: Object.freeze({ pv: 300, rendement: 20 }), abribus: Object.freeze({ pv: 200, rendement: 12 }),
     vitrine: Object.freeze({ pv: 80, rendement: 6 }), poubelle: Object.freeze({ pv: 40, rendement: 3 }),
     banc: Object.freeze({ pv: 60, rendement: 4 }), barriere: Object.freeze({ pv: 50, rendement: 5 }),
+    // Sortes propres à la ville réelle (0.3), tirées du mobilier d'OpenStreetMap et des rues : même format. La
+    // simulation ne les connaît pas par leur nom (indice -1 dans SORTES_CASSABLES) : leur feu vient de leurs points de
+    // structure (regles.feuObjet). Le décor les dessine par leurs pièces.
+    'deux-roues': Object.freeze({ pv: 120, rendement: 8 }), conteneur: Object.freeze({ pv: 90, rendement: 6 }),
+    terrasse: Object.freeze({ pv: 50, rendement: 4 }), kiosque: Object.freeze({ pv: 160, rendement: 10 }),
   });
+  /** Toutes les sortes de cassables de la ville réelle : celles du protocole d'abord, dans son ordre, puis les nouvelles. */
+  const SORTES_CASSABLES = Object.freeze(Object.keys(CASSABLES));
   const STOCK = Object.freeze({ moyens: 20000, materiaux: 12000 });
   const RAYON_GISEMENT = 9;
   const FACTIONS_DEFAUT = [
@@ -572,13 +579,20 @@
   // Palettes de Marseille : enduits crème, ocre, rose pâle, sable ; pierre de taille ; tuiles canal ; zinc.
   const ENDUITS = [[0.91, 0.85, 0.71], [0.88, 0.72, 0.48], [0.91, 0.76, 0.66], [0.85, 0.77, 0.60], [0.93, 0.83, 0.60],
     [0.90, 0.88, 0.82], [0.89, 0.66, 0.53], [0.86, 0.80, 0.66], [0.80, 0.62, 0.45], [0.92, 0.80, 0.70]];
+  const ENDUITS_PANIER = [[0.90, 0.70, 0.45], [0.88, 0.62, 0.48], [0.93, 0.80, 0.58], [0.85, 0.55, 0.40], [0.92, 0.84, 0.70],
+    [0.80, 0.66, 0.52], [0.90, 0.74, 0.62], [0.78, 0.70, 0.56]];
   const PIERRE = [[0.87, 0.83, 0.73], [0.84, 0.80, 0.70], [0.89, 0.86, 0.78]];
-  const TUILES = [[0.72, 0.37, 0.23], [0.77, 0.43, 0.27], [0.66, 0.34, 0.22], [0.80, 0.49, 0.31], [0.70, 0.46, 0.34]];
-  const ZINC = [0.46, 0.49, 0.53];
+  const PIERRE_ROSE = [0.91, 0.78, 0.68], PIERRE_BLONDE = [0.90, 0.83, 0.68], PIERRE_FORT = [0.85, 0.74, 0.62];
+  // Tuiles canal : du rouge neuf à l'ocre et au brun des vieux toits.
+  const TUILES = [[0.72, 0.37, 0.23], [0.77, 0.43, 0.27], [0.66, 0.34, 0.22], [0.80, 0.49, 0.31], [0.70, 0.46, 0.34],
+    [0.82, 0.56, 0.36], [0.60, 0.36, 0.26], [0.78, 0.52, 0.40], [0.74, 0.40, 0.28], [0.68, 0.42, 0.27]];
+  const ZINC = [0.46, 0.49, 0.53], ARDOISE = [0.30, 0.32, 0.36], VERRE = [0.34, 0.45, 0.52];
+  const TERRASSES = [[0.55, 0.54, 0.52], [0.72, 0.70, 0.66], [0.62, 0.60, 0.56], [0.70, 0.50, 0.40], [0.48, 0.48, 0.48]];
   const VOITURES = [[0.75, 0.75, 0.76], [0.12, 0.13, 0.15], [0.55, 0.08, 0.08], [0.16, 0.25, 0.45], [0.85, 0.85, 0.83],
     [0.35, 0.37, 0.38], [0.62, 0.55, 0.40], [0.20, 0.35, 0.25]];
   const AUVENTS = [[0.80, 0.22, 0.18], [0.18, 0.42, 0.66], [0.92, 0.70, 0.20], [0.24, 0.55, 0.30], [0.86, 0.86, 0.82], [0.55, 0.30, 0.55]];
   const COQUES = [[0.95, 0.95, 0.93], [0.93, 0.93, 0.90], [0.14, 0.22, 0.40], [0.72, 0.16, 0.14], [0.90, 0.88, 0.80], [0.20, 0.45, 0.62], [0.55, 0.38, 0.22]];
+  const BANDES_BARQUE = [[0.16, 0.36, 0.62], [0.72, 0.18, 0.14], [0.20, 0.50, 0.32], [0.92, 0.70, 0.18]];
   const VERTS = [[0.30, 0.45, 0.20], [0.34, 0.50, 0.22], [0.27, 0.42, 0.22], [0.38, 0.52, 0.24]];
 
   /* Aménagement de chaque ville : ce que le plan ne dit pas (où le jeu pose ses quartiers généraux, ses lieux et ses
@@ -622,6 +636,20 @@
         { nom: 'Marché aux Fleurs du Cours Saint-Louis', x: 380, z: 25, des: 13 },
         { nom: 'Marché des Capucins', x: 537, z: -28, des: 15 },
         { nom: 'Marché de la Place de Lorette', x: -338, z: -412, des: 15 },
+      ],
+      // Repères bâtis : le point d'un repère du plan (ou, faute de repère nommé, un point de son emprise) désigne le
+      // bâtiment ; le modèle l'habille. rayon : les bâtiments voisins suivent le même style (parties d'un ensemble).
+      // La mer ouverte au-delà de la zone du lointain (x0, z0, x1, z1) : à l'ouest, et au nord-ouest les bassins du port.
+      merLoin: [[-9000, -9000, -1250, 9000], [-9000, -9000, -740, -1250]],
+      monuments: [
+        { repere: 'Hôtel de ville', sorte: 'mairie', modele: 'hotel-de-ville', rayon: 30, face: [-289, 20] },
+        { repere: 'Église Saint-Ferréol', modele: 'eglise', clocher: 0.9 },
+        // Le palais de la Bourse n'a pas de repère nommé dans les tuiles : un point de son emprise (127..197 × -33..45).
+        { point: [160, 2], nom: 'Palais de la Bourse', modele: 'palais', face: [150, 60] },
+        { repere: 'Opéra de Marseille', modele: 'palais', face: [195, 285], scene: true },
+        { repere: 'Chapelle de la Vieille Charité', modele: 'charite', rayon: 64 },
+        { repere: 'Clocher des Accoules', modele: 'clocher' },
+        { repere: 'Halle Puget', modele: 'halle' },
       ],
       // Terrains de chantier : des dents creuses ouvertes sur la rue (le chantier dégage le bâti dans son rayon).
       chantiers: [
@@ -704,56 +732,129 @@
       return [d, pierre];
     };
     const panier = P.reperes.find(q => q.nom === 'Le Panier') || { x: -437, z: -351 };
+    /** Le Panier : la butte au nord du Vieux-Port, maisons basses aux enduits vifs, ruelles pavées. */
+    const auPanierEn = (x, z) => longueur(x - panier.x, z - panier.z) < 300 && z < -60 && x < -170;
     const repOmbriere = P.reperes.find(q => /^Ombrière/.test(q.nom));
 
+    // Gabarit des îlots : un bruit lent (trame de 64 m), pour que les voisins montent à peu près au même étage.
+    const gabarit = (x, z) => {
+      const i = Math.floor(x / 64), j = Math.floor(z / 64), fx = x / 64 - i, fz = z / 64 - j;
+      const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+      const c00 = hacher(i, j * 7 + 3), c10 = hacher(i + 1, j * 7 + 3), c01 = hacher(i, j * 7 + 10), c11 = hacher(i + 1, j * 7 + 10);
+      return c00 + (c10 - c00) * sx + (c01 - c00) * sz + (c00 - c10 - c01 + c11) * sx * sz;
+    };
+    // Repères bâtis : l'hôte de chaque repère est le plus grand bâtiment qui contient son point.
+    const monuments = [];
+    for (const m of AM.monuments || []) {
+      const q = m.point ? { x: m.point[0], z: m.point[1] } : P.reperes.find(d => d.nom === m.repere && (!m.sorte || d.sorte === m.sorte));
+      if (q && enDecor(q.x, q.z)) monuments.push({ ...m, x: q.x, z: q.z, hote: -1, aire: 0 });
+    }
+    for (const d of P.reperes) {
+      if (d.sorte !== 'culte' || !/^(Église|Notre-Dame|Basilique|Chapelle)/.test(d.nom) || !enDecor(d.x, d.z)) continue;
+      if (!monuments.some(m => m.repere === d.nom)) monuments.push({ repere: d.nom, modele: 'eglise', x: d.x, z: d.z, hote: -1, aire: 0 });
+    }
+    const STYLES = {
+      'hotel-de-ville': { couleur: PIERRE_ROSE, toit: 'tuiles', hauteur: 17, mat: MAT.FACADE + 0.1 },
+      eglise: { couleur: PIERRE_BLONDE, toit: 'tuiles', hauteur: 16, mat: MAT.PAVE, plein: true },
+      clocher: { couleur: PIERRE_BLONDE, toit: 'terrasse', hauteur: 27, mat: MAT.PAVE, plein: true },
+      halle: { couleur: [0.92, 0.89, 0.82], toit: 'tuiles', hauteur: 7, mat: MAT.PAVE, plein: true },
+      palais: { couleur: [0.88, 0.84, 0.75], toit: 'terrasse', hauteur: 22, mat: MAT.FACADE + 0.02 },
+      charite: { couleur: PIERRE_ROSE, toit: 'tuiles', hauteur: 12, mat: MAT.FACADE - 0.3 },
+    };
     const bats = [], boites = [];
     let ombriere = null;
     // Les boucles lourdes vivent dans de petites fonctions : V8 n'optimise pas une fonction aussi longue que creerVille.
-    (() => { for (let k = 0; k < P.batiments.length; k++) {
-      const b = P.batiments[k];
-      if (b.contour) continue;
-      const p = b.points;
-      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-      for (let q = 0; q < p.length; q += 2) {
-        if (p[q] < x0) x0 = p[q]; if (p[q] > x1) x1 = p[q]; if (p[q + 1] < z0) z0 = p[q + 1]; if (p[q + 1] > z1) z1 = p[q + 1];
+    (() => {
+      const NB = P.batiments.length, bb = new Float32Array(NB * 4), aires = new Float32Array(NB);
+      for (let k = 0; k < NB; k++) {
+        const p = P.batiments[k].points;
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        for (let q = 0; q < p.length; q += 2) {
+          if (p[q] < x0) x0 = p[q]; if (p[q] > x1) x1 = p[q]; if (p[q + 1] < z0) z0 = p[q + 1]; if (p[q + 1] > z1) z1 = p[q + 1];
+        }
+        bb[4 * k] = x0; bb[4 * k + 1] = z0; bb[4 * k + 2] = x1; bb[4 * k + 3] = z1;
+        aires[k] = aire(p);
+        for (const m of monuments) {
+          if (m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1 && aires[k] > m.aire && dansAnneau(p, m.x, m.z)) { m.aire = aires[k]; m.hote = k; }
+        }
       }
-      if (x1 < -D || x0 > D || z1 < -D || z0 > D) continue;
-      const A = aire(p);
-      if (A < 3) continue;
-      const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-      if (repOmbriere && !ombriere && dansAnneau(p, repOmbriere.x, repOmbriere.z)) { ombriere = boiteMinimale(p); continue; }
-      const detail = enDetail(cx, cz);
-      let liste;
-      if (b.trous.length && A > 60) liste = decomposerTrame(p, b.trous, detail ? 6 : 3);
-      else if (!detail || A < 40) { const m = morceau(p); const bx = m.plein > 0.97 ? boiteMinimale(p) : boiteDe(m); liste = bx ? [bx] : []; }
-      else liste = decomposer(p, A > 1500 ? 6 : 4).map(boiteDe).filter(Boolean);
-      const [dAxe, pierre] = pres(cx, cz);
-      const axe = dAxe < 24, t = hacher(k, 11);
-      const auPanier = longueur(cx - panier.x, cz - panier.z) < 300 && cz < -60 && cx < -170;
-      let h;
-      if (b.connue) h = Math.max(b.hauteur, b.base + 2.5);
-      else if (A < 18) h = 3 + 1.5 * t;
-      else if (A < 45) h = 5 + 4 * t;
-      else {
-        const et = axe ? 6 + Math.floor(t * 2.2) : auPanier ? 3 + Math.floor(t * 3.6) : 4 + Math.floor(t * 3);
-        h = 4.4 + (et - 1) * 3.15;
+      const hotes = new Map();
+      monuments.forEach((m, q) => { if (m.hote >= 0 && !hotes.has(m.hote)) hotes.set(m.hote, q); });
+      /** Le repère dont ce bâtiment suit le style : son hôte, une partie logée dans un hôte plein, ou un voisin. */
+      const reperDe = (k, cx, cz) => {
+        if (hotes.has(k)) return hotes.get(k);
+        for (let q = 0; q < monuments.length; q++) {
+          const m = monuments[q];
+          if (m.hote < 0) continue;
+          if (m.rayon && longueur(cx - m.x, cz - m.z) <= m.rayon) return q;
+          const h4 = 4 * m.hote;
+          if (cx >= bb[h4] && cx <= bb[h4 + 2] && cz >= bb[h4 + 1] && cz <= bb[h4 + 3] && dansAnneau(P.batiments[m.hote].points, cx, cz)) return q;
+        }
+        return -1;
+      };
+      for (let k = 0; k < NB; k++) {
+        const b = P.batiments[k], p = b.points, x0 = bb[4 * k], z0 = bb[4 * k + 1], x1 = bb[4 * k + 2], z1 = bb[4 * k + 3];
+        if (x1 < -D || x0 > D || z1 < -D || z0 > D) continue;
+        const A = aires[k];
+        if (A < 3) continue;
+        const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+        if (repOmbriere && !ombriere && dansAnneau(p, repOmbriere.x, repOmbriere.z)) { ombriere = boiteMinimale(p); continue; }
+        const im = reperDe(k, cx, cz), mon = im >= 0 ? monuments[im] : null, style = mon ? STYLES[mon.modele] : null;
+        const hote = mon !== null && mon.hote === k;
+        // L'emprise d'un bâtiment décrit par ses parties ne s'élève pas, sauf si elle porte un modèle plein (une église) ;
+        // les parties logées dans un hôte plein lui laissent la place.
+        if (b.contour && !(hote && style.plein)) continue;
+        if (mon && style.plein && !hote) continue;
+        const detail = enDetail(cx, cz);
+        let liste;
+        if (b.trous.length && A > 60) liste = decomposerTrame(p, b.trous, detail ? 6 : 3);
+        else if (!detail || A < 40) { const m = morceau(p); const bx = m.plein > 0.97 ? boiteMinimale(p) : boiteDe(m); liste = bx ? [bx] : []; }
+        else liste = decomposer(p, A > 1500 ? 6 : 4).map(boiteDe).filter(Boolean);
+        const [dAxe, pierre] = pres(cx, cz);
+        const axe = dAxe < 24, t = hacher(k, 11);
+        const auPanier = auPanierEn(cx, cz);
+        // Au bord de l'eau, un bâtiment sans hauteur connue est un kiosque ou un abri du quai.
+        const kiosque = !b.connue && !style && A < 400 && (surEau(cx + 9, cz) || surEau(cx - 9, cz) || surEau(cx, cz + 9) || surEau(cx, cz - 9));
+        let h;
+        if (b.connue && !(hote && style.plein)) h = Math.max(b.hauteur, b.base + 2.5);
+        else if (style) h = style.hauteur + (hote ? 0 : 2 * t - 1);
+        else if (kiosque) h = 3.3 + 0.9 * t;
+        else if (A < 18) h = 3 + 1.5 * t;
+        else if (A < 45) h = 5 + 4 * t;
+        else {
+          // Étages : le gabarit de l'îlot, un immeuble sur trois qui dépasse ou qui manque d'un étage, des corniches
+          // jamais tout à fait alignées.
+          const g = gabarit(cx, cz), e = hacher(k, 13);
+          let et = axe ? 6 + (g > 0.5 ? 1 : 0) : auPanier ? 3 + Math.floor(g * 2.5) : 4 + Math.floor(g * 2.7);
+          if (e < 0.16) et--; else if (e > 0.84) et++;
+          if (A > 1500) et = Math.min(et, 5);
+          h = 4.4 + (et - 1) * 3.15 + (hacher(k, 17) - 0.5) * 0.9;
+        }
+        const base = b.base >= 2.5 ? b.base : 0;
+        // Une partie mince posée haut (OSM décrit ainsi les toits et les corniches) est un morceau de toit.
+        const toiture = base >= 6 && h - base <= 4.6;
+        const t2 = hacher(k, 23);
+        let couleur = b.couleur ? b.couleur.slice() : style ? style.couleur : axe && pierre ? PIERRE[Math.floor(t2 * PIERRE.length)]
+          : auPanier ? ENDUITS_PANIER[Math.floor(t2 * ENDUITS_PANIER.length)] : ENDUITS[Math.floor(t2 * ENDUITS.length)];
+        couleur = couleur.map((v, q) => borner(v + (hacher(k, 31 + q) - 0.5) * (style ? 0.025 : 0.05), 0, 1));
+        let toit;
+        if ((base > 0 && !toiture) || A < 30 || kiosque) toit = 'terrasse';
+        else if (style) toit = style.toit;
+        else if (hacher(k, 41) < (auPanier ? 0.06 : 0.11)) toit = 'terrasse';
+        else if (axe && pierre && hacher(k, 43) < 0.6) toit = 'zinc';
+        else if (!auPanier && A > 120 && hacher(k, 43) > 0.94) toit = 'zinc';
+        else toit = 'tuiles';
+        const bat = { k, A, h, base, couleur, toit, toiture, detail, souleve: base > 0, tuile: TUILES[Math.floor(hacher(k, 47) * TUILES.length)],
+          mat: style ? style.mat : MAT.FACADE - 0.45 + hacher(k, 53) * 0.9, monument: im, hote, boites: [] };
+        for (const bx of liste) {
+          if (bx.a < 0.5 || bx.b < 0.5) continue;
+          if (bx.a > 1 && bx.b > 1) { bx.a += GONFLE; bx.b += GONFLE; }
+          bx.bat = bat;
+          bat.boites.push(bx);
+        }
+        if (bat.boites.length) { bats.push(bat); if (hote) mon.bat = bat; }
       }
-      const base = b.base >= 2.5 ? b.base : 0;
-      const t2 = hacher(k, 23);
-      let couleur = b.couleur ? b.couleur.slice() : axe && pierre ? PIERRE[Math.floor(t2 * PIERRE.length)] : ENDUITS[Math.floor(t2 * ENDUITS.length)];
-      couleur = couleur.map((v, q) => borner(v + (hacher(k, 31 + q) - 0.5) * 0.05, 0, 1));
-      const toit = base > 0 || A < 30 ? 'terrasse' : (A > 2500 && !b.connue) || hacher(k, 41) < 0.12 ? 'terrasse'
-        : axe && pierre && hacher(k, 43) < 0.55 ? 'zinc' : 'tuiles';
-      const bat = { k, A, h, base, couleur, toit, detail, souleve: base > 0, tuile: TUILES[Math.floor(hacher(k, 47) * TUILES.length)],
-        mat: MAT.FACADE - 0.45 + hacher(k, 53) * 0.9, boites: [] };
-      for (const bx of liste) {
-        if (bx.a < 0.5 || bx.b < 0.5) continue;
-        if (bx.a > 1 && bx.b > 1) { bx.a += GONFLE; bx.b += GONFLE; }
-        bx.bat = bat;
-        bat.boites.push(bx);
-      }
-      if (bat.boites.length) bats.push(bat);
-    } })();
+    })();
     chrono('batiments');
 
     // ---- 3. Dégagements : ruelles élargies, terrains des QG et des chantiers. ----
@@ -980,8 +1081,10 @@
         }
       }
       if (!def) continue;
-      const mat = def[2] === 'asphalte' ? MAT.ASPHALTE : def[2] === 'gravier' ? MAT.ROCHE : MAT.PAVE;
-      const teinte = def[2] === 'asphalte' ? [0.24, 0.24, 0.25] : def[2] === 'gravier' ? [0.72, 0.66, 0.54] : def[2] === 'marches' ? [0.86, 0.83, 0.76] : [0.84, 0.80, 0.71];
+      // Les rues et dessertes du Panier sont pavées (elles restent des chaussées pour la simulation).
+      const pavee = (sorte === 'rue' || sorte === 'desserte') && auPanierEn((p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2);
+      const mat = pavee ? MAT.PAVE : def[2] === 'asphalte' ? MAT.ASPHALTE : def[2] === 'gravier' ? MAT.ROCHE : MAT.PAVE;
+      const teinte = pavee ? [0.66, 0.62, 0.56] : def[2] === 'asphalte' ? [0.24, 0.24, 0.25] : def[2] === 'gravier' ? [0.72, 0.66, 0.54] : def[2] === 'marches' ? [0.86, 0.83, 0.76] : [0.84, 0.80, 0.71];
       const yv = def[2] === 'asphalte' ? Y_VOIE : Y_VOIE - 0.006;
       const loin = !enDetail((p[0] + p[p.length - 2]) / 2, (p[1] + p[p.length - 1]) / 2);
       for (let k = 1; k < m; k++) {
@@ -1135,44 +1238,7 @@
         const x0 = -Dc + q.i0 * C8, x1 = Math.min(Dc, -Dc + (q.i1 + 1) * C8), z0 = -Dc + q.j0 * C8, z1 = Math.min(Dc, -Dc + (q.j1 + 1) * C8);
         poser('box', (x0 + x1) / 2, -0.015, (z0 + z1) / 2, x1 - x0, 0.03, z1 - z0, 0, 0, 0, MAT.PAVE, SOL);
       }
-      // Au-delà du décor : un sol uni, ouvert là où l'eau touche le bord (le chenal du Vieux-Port, vers le large).
-      const B = 4000, bord = Dc, solLoin = fois(SOL, 0.93);
-      const chenaux = cote => {
-        // Tronçons d'eau le long d'un bord : cote 0 ouest, 1 est, 2 nord, 3 sud.
-        const liste = [];
-        let debut = null;
-        for (let t = -Dc; t <= Dc + 1; t++) {
-          let eau = false;
-          if (t <= Dc) {
-            const x = cote === 0 ? -Dc : cote === 1 ? Dc : t, z = cote === 2 ? -Dc : cote === 3 ? Dc : t;
-            eau = !terre[(x + L) + (z + L) * TD.n];
-          }
-          if (eau && debut === null) debut = t;
-          if (!eau && debut !== null) { liste.push([debut - 0.5, t - 0.5]); debut = null; }
-        }
-        return liste;
-      };
-      const bande = (cote, t0, t1) => {
-        if (t1 - t0 < 0.01) return;
-        const c = (t0 + t1) / 2, l = t1 - t0, e = cote === 0 || cote === 2 ? -bord - B / 2 : bord + B / 2;
-        if (cote < 2) poser('box', e, -0.03, c, B, 0.03, l, 0, 0, 0, MAT.PAVE, solLoin);
-        else poser('box', c, -0.03, e, l, 0.03, B, 0, 0, 0, MAT.PAVE, solLoin);
-      };
-      for (let cote = 0; cote < 4; cote++) {
-        const lim = cote < 2 ? bord : bord + B;
-        let t = -lim;
-        for (const [a, b] of chenaux(cote)) {
-          bande(cote, t, a);
-          // Les murs du chenal, de la mer jusqu'au sol, jusqu'au bout de la bande.
-          for (const y of [a, b]) {
-            const e = cote === 0 || cote === 2 ? -bord - B / 2 : bord + B / 2, hm = -NIVEAU_EAU + 0.3;
-            if (cote < 2) poser('box', e, NIVEAU_EAU - 0.3 + hm / 2, y, B, hm, 1.2, 0, 0, 0, MAT.ROCHE, PIERRE_QUAI);
-            else poser('box', y, NIVEAU_EAU - 0.3 + hm / 2, e, 1.2, hm, B, 0, 0, 0, MAT.ROCHE, PIERRE_QUAI);
-          }
-          t = b;
-        }
-        bande(cote, t, lim);
-      }
+      // Au-delà du décor : le sol du lointain (section 14).
     })();
     // Quais : une dalle de pierre de 14 m le long de chaque bord d'eau, posée du fond jusqu'au-dessus de la terre. Le
     // bord côté eau est exact ; aux coins rentrants de la terre, la dalle se prolonge pour fermer l'angle.
@@ -1296,6 +1362,77 @@
       poser('box', o.x, 6.1, o.z, 2 * o.a, 0.3, 2 * o.b, 0, lacet, 0, MAT.METAL, [1.0, 1.0, 1.0]);
       for (const su of [-0.82, -0.27, 0.27, 0.82]) for (const sv of [-0.6, 0.6]) {
         poser('box', o.x + su * o.a * o.ux + sv * o.b * vx, 3.0, o.z + su * o.a * o.uz + sv * o.b * vz, 0.22, 6.0, 0.22, 0, lacet, 0, MAT.METAL, [0.9, 0.9, 0.92], true);
+      }
+    }
+    // ---- 9 bis. Les monuments du carré : chaque modèle de STYLES habille son bâtiment hôte (la plus grande boîte). ----
+    let nbMonuments = 0;
+    for (const m of monuments) {
+      const bat = m.bat;
+      if (!bat || !bat.boites.length || !enDecor(m.x, m.z)) continue;
+      let bx = bat.boites[0];
+      for (const c of bat.boites) if (c.a * c.b > bx.a * bx.b) bx = c;
+      let { a, b, ux, uz } = bx;
+      if (b > a) { const t = a; a = b; b = t; const wx = -uz; uz = ux; ux = wx; }
+      const vx = -uz, vz = ux, h = bat.h, lacet = lacetDe(ux, uz), p = repere(bx.x, bx.z, lacet), st = STYLES[m.modele];
+      const clair = fois(st.couleur, 1.06), sombre = fois(st.couleur, 0.82);
+      // Le côté qui regarde « face » (ou la rue la plus proche) : su, sv ∈ {-1, 0, 1}, demi-largeur de ce côté.
+      const f = m.face || accrocher(bx.x, bx.z, 1);
+      const du = (f[0] - bx.x) * ux + (f[1] - bx.z) * uz, dv = (f[0] - bx.x) * vx + (f[1] - bx.z) * vz;
+      const longSide = Math.abs(dv) / b >= Math.abs(du) / a;           // la façade est un grand côté
+      const sgn = longSide ? (dv >= 0 ? 1 : -1) : (du >= 0 ? 1 : -1);
+      const enFace = (t, d) => (longSide ? [t, sgn * (b + d)] : [sgn * (a + d), t]);   // (u, v) d'un point devant la façade
+      const largeurFace = longSide ? a : b;
+      if (m.modele === 'hotel-de-ville') {
+        // Rez-de-chaussée à refends, corniche, balustrade, avant-corps central couronné d'un fronton.
+        objets.push(p('box', 0, 0, 0, 2 * a + 0.3, 4.6, 2 * b + 0.3, sombre, MAT.BETON, null, false));
+        objets.push(p('box', 0, 0, h - 1.4, 2 * a + 0.6, 0.5, 2 * b + 0.6, clair, MAT.BETON, null, false));
+        objets.push(p('box', 0, 0, h, 2 * a - 0.4, 0.9, 2 * b - 0.4, clair, MAT.BETON, null, false));
+        const [cu, cv] = enFace(0, -0.3);
+        objets.push(p('box', cu, cv, 0, longSide ? largeurFace * 0.36 : 1.4, h + 1.2, longSide ? 1.4 : largeurFace * 0.36, st.couleur, MAT.FACADE + 0.1, null, false));
+        objets.push(p('cone', cu, cv, h + 1.2, longSide ? largeurFace * 0.38 : 1.2, 1.6, longSide ? 1.2 : largeurFace * 0.38, clair, MAT.BETON));
+        nbMonuments++;
+      } else if (m.modele === 'eglise') {
+        // Le clocher : une tour carrée sur la façade, une flèche de pierre.
+        const cote = Math.min(2 * b, 7.5), hc = h * (1 + (m.clocher || 0.75)), [cu, cv] = enFace(0, -cote / 2);
+        objets.push(p('box', cu, cv, 0, cote, hc, cote, st.couleur, MAT.PAVE, null, false));
+        objets.push(p('box', cu, cv, hc, cote + 0.5, 0.5, cote + 0.5, sombre, MAT.BETON, null, false));
+        objets.push(p('cone', cu, cv, hc + 0.5, cote * 0.92, cote * 1.3, cote * 0.92, sombre, MAT.BETON));
+        // La nef : un toit plus sombre, une rosace.
+        const [ru, rv] = enFace(0, 0.08);
+        objets.push(p('cylinder', ru, rv, h * 0.55, 2.4, 0.15, 2.4, [0.20, 0.24, 0.34], MAT.LAQUE, longSide ? [DEMI_PI, 0, 0] : [0, 0, DEMI_PI]));
+        nbMonuments++;
+      } else if (m.modele === 'clocher') {
+        // Le clocher des Accoules : une flèche de pierre sur la tour, à pans, et sa galerie.
+        objets.push(p('box', 0, 0, h, 2 * a + 0.6, 0.7, 2 * b + 0.6, sombre, MAT.BETON, null, false));
+        objets.push(p('cone', 0, 0, h + 0.7, 2 * a * 0.95, 2 * Math.max(a, b) * 1.9, 2 * b * 0.95, st.couleur, MAT.BETON));
+        nbMonuments++;
+      } else if (m.modele === 'halle') {
+        // La halle Puget : un lanternon le long du faîtage.
+        objets.push(p('box', 0, 0, h + b * TAN_P - 0.2, 2 * a * 0.7, 1.4, Math.min(2 * b * 0.3, 3), [0.82, 0.80, 0.74], MAT.FACADE, null, false));
+        objets.push(p('box', 0, 0, h + b * TAN_P + 1.2, 2 * a * 0.72, 0.18, Math.min(2 * b * 0.36, 3.6), bat.tuile, MAT.MAT));
+        nbMonuments++;
+      } else if (m.modele === 'palais') {
+        // Colonnade sur la façade (le palais de la Bourse : fronton ; l'Opéra : cage de scène derrière).
+        const nb = Math.max(4, Math.min(12, Math.floor(largeurFace * 1.4 / 3.2))), pas = largeurFace * 1.4 / nb, hc = Math.min(h * 0.72, 15);
+        for (let k = 0; k < nb; k++) {
+          const [cu, cv] = enFace((k - (nb - 1) / 2) * pas, 1.8);
+          objets.push(p('cylinder', cu, cv, 1.2, 1.05, hc, 1.05, clair, MAT.BETON, null, false));
+        }
+        const [eu, ev] = enFace(0, 1.8), lf = largeurFace * 1.4 + 2.4;
+        objets.push(p('box', eu, ev, 0, longSide ? lf : 4.6, 1.2, longSide ? 4.6 : lf, sombre, MAT.BETON, null, false));
+        objets.push(p('box', eu, ev, 1.2 + hc, longSide ? lf : 4.4, 1.8, longSide ? 4.4 : lf, clair, MAT.BETON, null, false));
+        if (m.scene) {
+          const [su, sv] = enFace(0, -(longSide ? b : a) * 1.25);
+          objets.push(p('box', su, sv, 0, longSide ? a * 1.1 : b * 0.9, h + 7, longSide ? b * 0.9 : a * 1.1, st.couleur, MAT.FACADE, null, false));
+        } else objets.push(p('cone', eu, ev, 3 + hc, longSide ? lf * 0.6 : 4.4, 2.6, longSide ? 4.4 : lf * 0.6, clair, MAT.BETON));
+        nbMonuments++;
+      } else if (m.modele === 'charite') {
+        // La chapelle de la Vieille Charité : coupole ovale sur un tambour, lanterne.
+        const r0 = Math.min(a, b) * 0.85;
+        objets.push(p('cylinder', 0, 0, h, 2 * r0, 3.2, 2 * r0 * 1.3, st.couleur, MAT.FACADE - 0.3, null, false));
+        objets.push(p('sphere', 0, 0, h + 3.2 - r0 * 0.15, 2 * r0, 2 * r0 * 0.9, 2 * r0 * 1.3, fois(st.couleur, 0.95), MAT.BETON, null, false));
+        objets.push(p('cylinder', 0, 0, h + 3.2 + r0 * 0.7, 2.2, 3.2, 2.2, clair, MAT.BETON, null, false));
+        nbMonuments++;
       }
     }
     marquer('batis');
@@ -1514,13 +1651,20 @@
       for (const s of [-1, 1]) {
         let t = 1.5 + r() * 2;
         while (t < L - 1.5 && nbBateaux < maxBateaux) {
-          const lb = r.entre(6.5, 11.5), bb = lb * r.entre(0.30, 0.36), voile = r() < 0.6;
+          // Un bateau sur cinq est une barque (le pointu marseillais) : courte, peinte, sans cabine ni mât.
+          const barque = r() < 0.2, lb = barque ? r.entre(4.5, 6) : r.entre(6.5, 11.5), bb = lb * (barque ? 0.36 : r.entre(0.30, 0.36)), voile = !barque && r() < 0.6;
           const d = 1.3 + lb / 2 + 0.3, x = ax + ux * t + s * vx * d, z = az + uz * t + s * vz * d;
           if (!enDecor(x, z) || !libreEau(x, z, vx * s, vz * s, lb / 2, bb / 2)) { t += 2; continue; }
           if (r() < 0.12) { t += bb + 1; continue; }
           remplirBoite(TD, occupe, x, z, vx, vz, lb / 2 + 0.2, bb / 2 + 0.2, 1);
           const lacet = lacetDe(vx * s, vz * s), coque = r.choix(COQUES), loin = !enDetail(x, z);
           poser('bevel', x, NIVEAU_EAU + 0.3, z, lb, 1.1, bb, 0, lacet, 0, MAT.LAQUE, nuance(r, coque, 0.03), true);
+          if (barque) {
+            if (!loin) poser('box', x, NIVEAU_EAU + 0.88, z, lb * 0.9, 0.12, bb * 1.02, 0, lacet, 0, MAT.LAQUE, r.choix(BANDES_BARQUE), true);
+            nbBateaux++;
+            t += bb + r.entre(0.5, 1.2);
+            continue;
+          }
           if (!loin || r() < 0.5) poser('box', x + s * vx * lb * 0.08, NIVEAU_EAU + 1.05, z + s * vz * lb * 0.08, lb * 0.38, 0.75, bb * 0.62, 0, lacet, 0, MAT.MAT, [0.94, 0.94, 0.92], true);
           if (voile) {
             const hm = lb * 1.35;
@@ -1650,6 +1794,112 @@
         }
       }
     }
+    // Le mobilier d'OpenStreetMap (P.mobilier) : chaque point est ramené sur le praticable le plus proche (12 m au plus).
+    // Dans le carré de jeu, ce qui brûle est cassable (terrasses, corbeilles, conteneurs, abris, kiosques, deux-roues) ;
+    // le reste est un décor fixe, posé seulement dans la zone de détail.
+    const conteneur = (x, z, lacet) => {
+      const p = repere(x, z, lacet), c = rc() < 0.6 ? [0.22, 0.36, 0.26] : rc() < 0.5 ? [0.40, 0.42, 0.44] : [0.62, 0.50, 0.20];
+      casser('conteneur', x, z, lacet, [p('box', 0, 0, 0.12, 1.36, 1.05, 1.0, c, MAT.LAQUE), p('box', 0, 0, 1.17, 1.42, 0.08, 1.06, fois(c, 0.7), MAT.MAT),
+        p('box', 0, 0, 0, 1.2, 0.12, 0.9, [0.12, 0.12, 0.13], MAT.MAT)]);
+    };
+    const kiosque = (x, z, lacet) => {
+      const p = repere(x, z, lacet), vert = [0.16, 0.32, 0.24];
+      casser('kiosque', x, z, lacet, [p('box', 0, 0, 0, 3.0, 2.5, 2.1, vert, MAT.LAQUE), p('box', 0, 0, 2.5, 3.6, 0.22, 2.7, fois(vert, 0.8), MAT.LAQUE),
+        p('box', 0, 1.15, 0.9, 2.6, 0.9, 0.3, [0.86, 0.80, 0.62], MAT.TISSU), p('box', 0, 0, 2.72, 1.6, 0.5, 0.12, [0.90, 0.88, 0.80], MAT.LAQUE)]);
+    };
+    const TOILES = [[0.92, 0.90, 0.84], [0.80, 0.22, 0.18], [0.20, 0.30, 0.42], [0.86, 0.76, 0.52], [0.30, 0.42, 0.30]];
+    const terrasse = (x, z, lacet) => {
+      const p = repere(x, z, lacet), bois = rc() < 0.5 ? [0.40, 0.30, 0.20] : [0.30, 0.31, 0.33], toile = rc.choix(TOILES), pieces = [];
+      // Trois guéridons en ligne le long de la façade, deux chaises chacun, deux parasols.
+      for (const u of [-1.9, 0, 1.9]) {
+        pieces.push(p('cylinder', u, 0, 0.72, 0.75, 0.04, 0.75, [0.86, 0.85, 0.82], MAT.LAQUE), p('cylinder', u, 0, 0, 0.07, 0.72, 0.07, [0.2, 0.2, 0.21], MAT.METAL));
+        for (const v of [-0.62, 0.62]) pieces.push(p('box', u, v, 0, 0.42, 0.88, 0.40, bois, MAT.ECORCE));
+      }
+      for (const u of [-1.0, 1.0]) pieces.push(p('cylinder', u, 0, 0, 0.07, 2.35, 0.07, [0.85, 0.85, 0.82], MAT.METAL), p('cone', u, 0, 2.05, 2.6, 0.5, 2.4, toile, MAT.TISSU));
+      casser('terrasse', x, z, lacet, pieces);
+    };
+    const COULEURS_2R = [[0.12, 0.12, 0.13], [0.85, 0.85, 0.83], [0.55, 0.08, 0.08], [0.18, 0.28, 0.48], [0.62, 0.62, 0.64], [0.80, 0.62, 0.18]];
+    const deuxRoues = (x, z, lacet) => {
+      const p = repere(x, z, lacet), c = rc.choix(COULEURS_2R), noir = [0.08, 0.08, 0.09];
+      casser('deux-roues', x, z, lacet, [p('box', 0, 0, 0.3, 1.25, 0.42, 0.42, c, MAT.LAQUE), p('box', -0.62, 0, 0, 0.5, 0.5, 0.12, noir, MAT.MAT),
+        p('box', 0.66, 0, 0, 0.5, 0.5, 0.12, noir, MAT.MAT), p('box', 0.42, 0, 0.75, 0.12, 0.42, 0.62, fois(c, 0.6), MAT.METAL)]);
+    };
+    const corbeilles = [], places2R = [];
+    const ancrer = (x, z, marge) => {
+      const q = accrocher(x, z, marge);
+      return longueur(q[0] - x, q[1] - z) <= 12 ? q : null;
+    };
+    /** Lacet d'un objet posé le long de la façade la plus proche (8 directions, 10 m au plus) ; sinon, celui donné. */
+    const leLongDeLaFacade = (x, z, sinon) => {
+      let best = 11, lacet = sinon;
+      for (let d = 0; d < 8; d++) {
+        const a = d * PI / 4, cx = cosinus(a), sz = sinus(a);
+        for (let t = 1; t < best; t += 1) if (!ouvertEn(x + cx * t, z + sz * t)) { best = t; lacet = lacetDe(-sz, cx); break; }
+      }
+      return lacet;
+    };
+    let nbMobilier = 0;
+    (() => { for (let k = 0; k < P.mobilier.length; k++) {
+      const m = P.mobilier[k], dans = dedans(m.x, m.z, -2);
+      if (!dans && !enDetail(m.x, m.z)) continue;
+      const lacet = hacher(k, 71) * PI, s = m.sorte;
+      if (dans && (s === 'terrasse' || s === 'conteneur' || s === 'kiosque' || s === 'corbeille' || s === 'abri' || s === 'motos')) {
+        const q = ancrer(m.x, m.z, s === 'terrasse' || s === 'kiosque' ? 2.2 : 1.2);
+        if (!q || !praticable(q[0], q[1])) continue;
+        const [x, z] = q;
+        if (s === 'terrasse') terrasse(x, z, leLongDeLaFacade(x, z, lacet));
+        else if (s === 'conteneur') conteneur(x, z, lacet);
+        else if (s === 'kiosque') kiosque(x, z, lacet);
+        else if (s === 'corbeille') { if (corbeilles.some(([u, w]) => longueur(u - x, w - z) < 3)) continue; corbeilles.push([x, z]); poubelle(x, z); }
+        else if (s === 'abri') { if (abris.some(([u, w]) => longueur(u - x, w - z) < 8)) continue; abribus(x, z, lacet); abris.push([x, z]); }
+        else for (let j = -1; j <= 1; j++) {
+          const ca = cosinus(lacet), sa = sinus(lacet), px = x - j * 0.95 * sa, pz = z - j * 0.95 * ca;
+          if (praticable(px, pz)) deuxRoues(px, pz, lacet + DEMI_PI);
+        }
+        nbMobilier++;
+        continue;
+      }
+      if (!enDetail(m.x, m.z)) continue;
+      const q = ancrer(m.x, m.z, 0.8);
+      if (!q) continue;
+      const [x, z] = q, gris = [0.24, 0.25, 0.26];
+      if (s === 'potelet') pose('cylinder', x, Y_VOIE, z, 0.13, 0.9, 0.13, gris, MAT.METAL, 0, true);
+      else if (s === 'boite-lettres') { pose('box', x, Y_VOIE, z, 0.08, 0.9, 0.08, gris, MAT.METAL, lacet, true); pose('box', x, 0.9, z, 0.46, 0.62, 0.34, [0.95, 0.78, 0.12], MAT.LAQUE, lacet, true); }
+      else if (s === 'fontaine-a-boire') pose('cylinder', x, Y_VOIE, z, 0.4, 1.05, 0.4, [0.18, 0.30, 0.24], MAT.LAQUE, 0, true);
+      else if (s === 'toilettes') pose('box', x, Y_VOIE, z, 2.6, 2.6, 1.7, [0.70, 0.70, 0.66], MAT.LAQUE, lacet, true);
+      else if (s === 'oeuvre') { pose('box', x, Y_VOIE, z, 1.3, 1.5, 1.3, [0.86, 0.83, 0.76], MAT.BETON, lacet, true); pose('cone', x, 1.5, z, 0.8, 1.3, 0.8, [0.32, 0.30, 0.24], MAT.METAL, lacet); }
+      else if (s === 'panneau') { pose('box', x, Y_VOIE, z, 0.1, 2.2, 0.1, gris, MAT.METAL, lacet, true); pose('box', x, 1.1, z, 1.2, 1.6, 0.1, [0.20, 0.30, 0.40], MAT.LAQUE, lacet, true); }
+      else if (s === 'arret-bus') { pose('box', x, Y_VOIE, z, 0.1, 2.7, 0.1, gris, MAT.METAL, lacet, true); pose('box', x, 2.3, z, 0.6, 0.45, 0.08, [0.12, 0.40, 0.62], MAT.LAQUE, lacet, true); }
+      else if (s === 'velos' || s === 'velos-partage') {
+        const ca = cosinus(lacet), sa = sinus(lacet), n = s === 'velos' ? 3 : 4;
+        for (let j = 0; j < n; j++) {
+          const u = (j - (n - 1) / 2) * 0.8, px = x + u * ca, pz = z - u * sa;
+          pose('box', px, Y_VOIE, pz, 0.06, 0.8, 0.7, gris, MAT.METAL, lacet, true);
+          if (s === 'velos-partage' || hacher(k, 80 + j) < 0.5) pose('box', px + 0.1 * ca, 0.3, pz - 0.1 * sa, 0.06, 0.55, 1.7, s === 'velos-partage' ? [0.85, 0.85, 0.82] : r.choix(COULEURS_2R), MAT.LAQUE, lacet, true);
+        }
+        if (s === 'velos-partage') pose('box', x - ((n + 1) / 2) * 0.8 * ca, Y_VOIE, z + ((n + 1) / 2) * 0.8 * sa, 0.35, 1.6, 0.3, [0.85, 0.85, 0.82], MAT.LAQUE, lacet, true);
+      } else continue;
+      nbMobilier++;
+    } })();
+    // Deux-roues garés en épi au bord des trottoirs, par petits groupes : Marseille en est pleine.
+    (() => { for (const [ax, az, bx, bz, w, sorte, , loin] of segmentsVoies) {
+      if (loin || VOIES[sorte][2] !== 'asphalte' || w < 5 || sorte === 'voie-express') continue;
+      const L = longueur(bx - ax, bz - az);
+      if (L < 14) continue;
+      const ux = (bx - ax) / L, uz = (bz - az) / L, vx = -uz, vz = ux, lacet = lacetDe(vx, vz);
+      for (const cote of [-1, 1]) {
+        if (rc() > 0.16) continue;
+        const t0 = 4 + rc() * (L - 10), n = 2 + Math.floor(rc() * 4), d = w / 2 + 0.75;
+        for (let j = 0; j < n; j++) {
+          const t = t0 + j * 0.95, x = ax + ux * t + cote * vx * d, z = az + uz * t + cote * vz * d;
+          if (!dedans(x, z, -2) || !praticable(x, z) || largeurLibre(x, z) < 0.9) continue;
+          if (places2R.length && places2R.some(([u, q]) => longueur(u - x, q - z) < 0.8)) continue;
+          places2R.push([x, z]);
+          deuxRoues(x, z, lacet);
+        }
+      }
+    } })();
+    marquer('mobilier-osm');
     // Parcs et jardins : des arbres.
     for (const pq of parcs) {
       const p = pq.polygone, A = aire(p);
@@ -1667,19 +1917,238 @@
     marquer('mobilier');
     chrono('mobilier');
 
-    // ---- 14. Notre-Dame-de-la-Garde, sur sa colline au sud, hors du carré : une silhouette. ----
-    {
-      const gx = -170, gz = 1356;
-      poser('sphere', gx, 0, gz, 760, 300, 560, 0, 0.3, 0, MAT.ROCHE, [0.56, 0.55, 0.47]);
-      poser('sphere', gx + 220, -20, gz - 150, 520, 160, 420, 0, -0.2, 0, MAT.HERBE, [0.40, 0.44, 0.30]);
-      poser('box', gx, 150 + 7, gz, 46, 14, 16, 0, 0.1, 0, MAT.FACADE, [0.84, 0.80, 0.72]);
-      poser('box', gx + 20, 150 + 20, gz, 9, 40, 9, 0, 0.1, 0, MAT.FACADE, [0.86, 0.82, 0.74]);
-      poser('box', gx - 12, 150 + 17, gz, 11, 7, 11, 0, 0.1, 0, MAT.MAT, [0.78, 0.74, 0.66]);
-      poser('sphere', gx - 12, 150 + 21, gz, 10, 10, 10, 0, 0, 0, MAT.MAT, [0.80, 0.76, 0.68]);
-      poser('cylinder', gx + 20, 150 + 44, gz, 4.2, 8, 4.2, 0, 0, 0, MAT.MAT, [0.82, 0.78, 0.70]);
-      poser('cylinder', gx + 20, 150 + 52, gz, 1.6, 9, 1.6, 0, 0, 0, MAT.METAL, [1.0, 0.82, 0.36]);
-      poser('sphere', gx + 20, 150 + 57, gz, 1.8, 2.4, 1.8, 0, 0, 0, MAT.METAL, [1.0, 0.84, 0.40]);
-    }
+    // ---- 14. Le lointain : ce que l'on voit des bords du carré sans pouvoir y aller (P.lointain). ----
+    // Le sol au-delà du décor, troué par la mer et les bassins ; le bâti du plan entre le décor et le bord des données
+    // (9 îlots) ; les boîtes du bâti lointain avec un toit de tuiles ; les grands espaces verts et les grandes voies ;
+    // la colline de la Garde et les monuments nommés, habillés selon leur modèle.
+    let nbLointain = 0;
+    (() => {
+      const LZ = P.lointain, zone = LZ ? LZ.zone : P.etendue;
+      // Hauteur de la colline de la Garde (demi-ellipsoïde posé sur le sommet du plan) : le lointain s'y pose.
+      const som = LZ && LZ.sommets.length ? LZ.sommets[0] : null;
+      const HA = 430, HB = 380;   // demi-axes de la colline (m) : est-ouest, nord-sud ; ses pentes portent le bâti
+      const colline = (x, z) => {
+        if (!som) return 0;
+        const u = (x - som.x) / HA, w = (z - som.z) / HB, q = 1 - u * u - w * w;
+        return q > 0 ? som.altitude * Math.sqrt(q) : 0;
+      };
+      // Le sol : cases de 5 m de -R à R, alignées sur le bord du décor ; l'eau du lointain (et du plan) les troue.
+      const R = 1500, C = 5, nG = (2 * R) / C, eauG = new Uint8Array(nG * nG);
+      const remplir = anneaux => {
+        // Balayage par rangée : une case est d'eau si son centre est dedans (pair-impair sur les anneaux du polygone).
+        let z0 = Infinity, z1 = -Infinity;
+        for (const a of anneaux) for (let k = 1; k < a.length; k += 2) { if (a[k] < z0) z0 = a[k]; if (a[k] > z1) z1 = a[k]; }
+        const j0 = Math.max(0, Math.floor((z0 + R) / C)), j1 = Math.min(nG - 1, Math.floor((z1 + R) / C));
+        const xs = [];
+        for (let j = j0; j <= j1; j++) {
+          const zc = -R + (j + 0.5) * C;
+          xs.length = 0;
+          for (const a of anneaux) {
+            const m = a.length / 2;
+            for (let k = 0; k < m; k++) {
+              const q = (k + 1) % m, az = a[2 * k + 1], bz = a[2 * q + 1];
+              if ((az <= zc) !== (bz <= zc)) xs.push(a[2 * k] + (zc - az) * (a[2 * q] - a[2 * k]) / (bz - az));
+            }
+          }
+          xs.sort((u, v) => u - v);
+          for (let k = 0; k + 1 < xs.length; k += 2) {
+            const i0 = Math.max(0, Math.ceil((xs[k] + R) / C - 0.5)), i1 = Math.min(nG - 1, Math.floor((xs[k + 1] + R) / C - 0.5));
+            for (let i = i0; i <= i1; i++) eauG[i + j * nG] ^= 1;
+          }
+        }
+      };
+      const tampon = new Uint8Array(nG * nG);
+      const eauxLoin = LZ ? LZ.eau : P.eau;
+      for (const e of [...eauxLoin, ...(LZ ? P.eau : [])]) {
+        if (e.sorte === 'piscine') continue;
+        tampon.set(eauG); eauG.fill(0);
+        remplir([e.points, ...e.trous]);
+        for (let c = 0; c < eauG.length; c++) eauG[c] |= tampon[c];
+      }
+      const merLoin = AM.merLoin || [];
+      const plein = new Uint8Array(nG * nG), dansDecor = (x, z) => x > -D && x < D && z > -D && z < D;
+      for (let j = 0; j < nG; j++) for (let i = 0; i < nG; i++) {
+        const x = -R + (i + 0.5) * C, z = -R + (j + 0.5) * C, c = i + j * nG;
+        if (dansDecor(x, z) || eauG[c]) continue;
+        if (merLoin.some(([a0, b0, a1, b1]) => x >= a0 && x <= a1 && z >= b0 && z <= b1)) continue;
+        plein[c] = 1;
+      }
+      const SOL_LOIN = [0.68, 0.64, 0.57];
+      for (const q of rectangles(plein, nG, 0, nG - 1, 0, nG - 1, 1 << 15)) {
+        const x0 = -R + q.i0 * C, x1 = -R + (q.i1 + 1) * C, z0 = -R + q.j0 * C, z1 = -R + (q.j1 + 1) * C;
+        poser('box', (x0 + x1) / 2, -0.015, (z0 + z1) / 2, x1 - x0, 0.03, z1 - z0, 0, 0, 0, MAT.PAVE, SOL_LOIN);
+      }
+      // Au-delà : de grandes bandes, sauf sur la mer.
+      const B = 4000;
+      const bandes = [[R + B / 2, 0, B, 2 * R + 2 * B], [0, R + B / 2, 2 * R, B], [0, -R - B / 2, 2 * R, B], [-R - B / 2, 0, B, 2 * R + 2 * B]];
+      for (const [x, z, lx, lz] of bandes) {
+        // Une bande touchée par la mer est coupée là où la mer commence (côté ouest à Marseille).
+        let x0 = x - lx / 2, x1 = x + lx / 2;
+        for (const [a0, b0, a1, b1] of merLoin) if (z - lz / 2 >= b0 - 1 && z + lz / 2 <= b1 + 1 && a0 <= x0) x0 = Math.max(x0, a1);
+        if (x1 - x0 > 1) poser('box', (x0 + x1) / 2, -0.03, z, x1 - x0, 0.03, lz, 0, 0, 0, MAT.PAVE, fois(SOL_LOIN, 0.95));
+      }
+      if (!LZ) return;
+
+      const dansZone = (x, z) => x >= zone.x0 && x <= zone.x1 && z >= zone.z0 && z <= zone.z1;
+      // Les grands espaces verts et les rochers.
+      const VERTS_LOIN = { parc: [0.36, 0.48, 0.26], jardin: [0.38, 0.50, 0.26], pelouse: [0.42, 0.53, 0.28], bois: [0.28, 0.40, 0.22],
+        terrain: [0.42, 0.54, 0.32], cimetiere: [0.44, 0.48, 0.36], roche: [0.66, 0.63, 0.56], sable: [0.86, 0.80, 0.64], plage: [0.86, 0.80, 0.64] };
+      for (const e of LZ.espaces) {
+        const c = VERTS_LOIN[e.sorte];
+        if (!c) continue;
+        const A = aire(e.points);
+        for (const bx of decomposer(e.points, A > 20000 ? 6 : 3).map(boiteDe).filter(Boolean)) {
+          if (dansDecor(bx.x, bx.z) || colline(bx.x, bx.z) > 0.5) continue;
+          poser('box', bx.x, 0.005, bx.z, 2 * bx.a, 0.03, 2 * bx.b, 0, lacetDe(bx.ux, bx.uz), 0, e.sorte === 'roche' ? MAT.ROCHE : MAT.HERBE, c);
+          nbLointain++;
+        }
+      }
+      // Les grandes voies : des bandes d'asphalte (pas sur l'eau ni sur la colline).
+      const LARGEUR_LOIN = { autoroute: 16, 'voie-express': 13, primaire: 11, secondaire: 10, tertiaire: 8 };
+      for (const v of LZ.voies) {
+        const w = LARGEUR_LOIN[v.classe] || 8, p = v.points;
+        for (let k = 2; k < p.length; k += 2) {
+          const ax = p[k - 2], az = p[k - 1], bx = p[k], bz = p[k + 1], L = longueur(bx - ax, bz - az), mx = (ax + bx) / 2, mz = (az + bz) / 2;
+          if (L < 2 || dansDecor(mx, mz) || colline(mx, mz) > 0.5) continue;
+          const i = Math.floor((mx + R) / C), j = Math.floor((mz + R) / C);
+          if (i >= 0 && j >= 0 && i < nG && j < nG && !plein[i + j * nG]) continue;
+          poser('box', mx, 0.012, mz, L + w * 0.4, 0.03, w, 0, lacetDe((bx - ax) / L, (bz - az) / L), 0, MAT.ASPHALTE, [0.30, 0.30, 0.31]);
+          nbLointain++;
+        }
+      }
+      // Un bloc du lointain : corps enduit et, s'il n'est ni trop haut ni trop grand, un toit de tuiles.
+      const bloc = (x, z, a, b, lacet, h, y0, k, couleur, mat) => {
+        poser('box', x, y0 + h / 2, z, 2 * a, h, 2 * b, 0, lacet, 0, mat, couleur);
+        nbLointain++;
+        if (h < 32 && Math.max(a, b) < 45 && Math.min(a, b) > 2.5) {
+          const pente = Math.min(Math.min(a, b) * TAN_P, 3.2);
+          poser('box', x, y0 + h + pente / 2, z, 2 * a + 0.4, pente, 2 * b + 0.4, 0, lacet, 0, MAT.MAT, fois(TUILES[Math.floor(hacher(k, 47) * TUILES.length)], 0.95));
+          nbLointain++;
+        }
+      };
+      const hauteurPlausible = (k, x, z) => {
+        // De quatre à sept étages près du port et du centre, plus bas sur les collines du sud et de l'est.
+        const loin = longueur(x, z), et = 3 + Math.floor(hacher(k, 13) * (loin > 1100 ? 3 : 4.6));
+        return 4.4 + (et - 1) * 3.15 + (hacher(k, 17) - 0.5) * 1.2;
+      };
+      const couleurDe = k => fois(ENDUITS[Math.floor(hacher(k, 23) * ENDUITS.length)], 0.97);
+      // Le bâti du plan entre le bord du décor et celui des données : à 9 îlots, l'anneau de 480 à 610 m.
+      if (D < LIMITE - 1) {
+        for (let k = 0; k < P.batiments.length; k++) {
+          const b = P.batiments[k];
+          if (b.contour) continue;
+          const p = b.points;
+          let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+          for (let q = 0; q < p.length; q += 2) { if (p[q] < x0) x0 = p[q]; if (p[q] > x1) x1 = p[q]; if (p[q + 1] < z0) z0 = p[q + 1]; if (p[q + 1] > z1) z1 = p[q + 1]; }
+          if (!(x1 < -D || x0 > D || z1 < -D || z0 > D)) continue;
+          if (aire(p) < 12) continue;
+          const bx = boiteMinimale(p);
+          if (!bx) continue;
+          const h = b.connue ? b.hauteur : hauteurPlausible(k, bx.x, bx.z);
+          bloc(bx.x, bx.z, bx.a, bx.b, lacetDe(bx.ux, bx.uz), Math.max(3, h - (b.connue ? b.base : 0)), b.connue ? b.base : 0, k, b.couleur || couleurDe(k), MAT.FACADE - 0.45 + hacher(k, 53) * 0.9);
+        }
+      }
+      // Les boîtes du bâti lointain (centre, demi-côtés a ≥ b, angle de l'axe a, hauteur ; 0 si OSM ne la dit pas).
+      const Bx = LZ.boites;
+      for (let k = 0, o = 0; o < Bx.length; k++, o += 6) {
+        const x = Bx[o], z = Bx[o + 1], a = Bx[o + 2], b = Bx[o + 3], ang = Bx[o + 4];
+        if (a < 1 || b < 1 || !dansZone(x, z)) continue;
+        const h = Bx[o + 5] > 0 ? Bx[o + 5] : hauteurPlausible(k + 7000, x, z);
+        bloc(x, z, a, b, -ang, h, colline(x, z), k + 7000, couleurDe(k + 7000), MAT.FACADE - 0.45 + hacher(k, 59) * 0.9);
+      }
+      // La colline de la Garde : roche et garrigue.
+      if (som) {
+        poser('sphere', som.x, 0, som.z, 2 * HA, 2 * som.altitude, 2 * HB, 0, 0, 0, MAT.ROCHE, [0.58, 0.56, 0.48]);
+        poser('sphere', som.x + 60, -6, som.z + 40, 2 * HA * 0.55, 2 * som.altitude * 0.96, 2 * HB * 0.5, 0, -0.3, 0, MAT.HERBE, [0.40, 0.44, 0.30]);
+        poser('sphere', som.x - 70, -6, som.z - 30, 2 * HA * 0.45, 2 * som.altitude * 0.94, 2 * HB * 0.45, 0, 0.4, 0, MAT.HERBE, [0.38, 0.42, 0.29]);
+        nbLointain += 3;
+      }
+      // Les monuments nommés du lointain : leurs bâtiments gardent leur emprise ; le modèle les habille.
+      const MODELES = {
+        major: { couleur: [0.86, 0.82, 0.72], bande: [0.36, 0.44, 0.38], h: 22, coupoles: 5 },
+        'fort-saint-jean': { couleur: PIERRE_FORT, h: 14, merlons: true },
+        'fort-saint-nicolas': { couleur: PIERRE_FORT, h: 12, merlons: true },
+        'saint-laurent': { couleur: PIERRE_BLONDE, h: 11, fleche: 1 },
+        'saint-victor': { couleur: [0.80, 0.70, 0.58], h: 16, merlons: true },
+        garde: { couleur: [0.88, 0.85, 0.78], bande: [0.40, 0.46, 0.40], h: 8, statue: true },
+        'villa-mediterranee': { couleur: [0.92, 0.92, 0.90], h: 19 },
+        mucem: { couleur: [0.30, 0.30, 0.31], h: 18, toit: [0.66, 0.66, 0.64] },
+        'porte-aix': { couleur: [0.90, 0.84, 0.72], h: 18, arc: true },
+        reformes: { couleur: [0.80, 0.78, 0.74], h: 18, fleche: 2 },
+      };
+      const parRepere = LZ.reperes.map(() => []);
+      for (const b of LZ.batiments) if (!b.contour && b.repere >= 0 && b.repere < parRepere.length) parRepere[b.repere].push(b);
+      LZ.reperes.forEach((rp, ir) => {
+        const md = MODELES[rp.modele] || { couleur: PIERRE_BLONDE, h: 12 };
+        let haut = null;            // la boîte la plus haute : le clocher, la tour, la statue
+        for (const b of parRepere[ir]) {
+          const p = b.points, A = aire(p);
+          if (A < 6) continue;
+          const liste = A > 600 ? decomposer(p, 4).map(boiteDe).filter(Boolean) : [boiteMinimale(p)].filter(Boolean);
+          const h = b.connue ? b.hauteur : md.h, y0 = (b.connue ? b.base : 0) + colline(rp.x, rp.z);
+          for (const bx of liste) {
+            let { a, b: bb, ux, uz } = bx;
+            if (bb > a) { const t = a; a = bb; bb = t; const wx = -uz; uz = ux; ux = wx; }
+            const lacet = lacetDe(ux, uz), hh = Math.max(2.5, h - (b.connue ? b.base : 0));
+            if (md.arc) {
+              // La porte d'Aix : deux piles, l'arc, l'attique.
+              const p2 = repere(bx.x, bx.z, lacet);
+              for (const s of [-1, 1]) objets.push(p2('box', s * a * 0.68, 0, y0, a * 0.64, hh * 0.72, 2 * bb, md.couleur, MAT.BETON, null, false));
+              objets.push(p2('box', 0, 0, y0 + hh * 0.56, 2 * a * 0.4, hh * 0.16, 2 * bb, md.couleur, MAT.BETON, null, false));
+              objets.push(p2('box', 0, 0, y0 + hh * 0.72, 2 * a + 0.4, hh * 0.28, 2 * bb + 0.4, fois(md.couleur, 0.96), MAT.BETON, null, false));
+              nbLointain += 4;
+              continue;
+            }
+            poser('box', bx.x, y0 + hh / 2, bx.z, 2 * a, hh, 2 * bb, 0, lacet, 0, MAT.PAVE, b.couleur || md.couleur);
+            nbLointain++;
+            if (md.bande && hh > 8) for (const t of [0.42, 0.74]) {
+              poser('box', bx.x, y0 + hh * t, bx.z, 2 * a + 0.3, Math.min(1.4, hh * 0.06), 2 * bb + 0.3, 0, lacet, 0, MAT.MAT, md.bande);
+              nbLointain++;
+            }
+            if (md.toit) { poser('box', bx.x, y0 + hh + 0.3, bx.z, 2 * a - 1, 0.6, 2 * bb - 1, 0, lacet, 0, MAT.MAT, md.toit); nbLointain++; }
+            if (md.merlons && hh > 6) {
+              // Créneaux : un merlon tous les 4 m sur les deux grands côtés.
+              const p2 = repere(bx.x, bx.z, lacet), n = Math.min(14, Math.floor(2 * a / 4));
+              for (let q = 0; q < n; q++) for (const s of [-1, 1]) objets.push(p2('box', -a + 2 + q * 4, s * (bb - 0.5), y0 + hh, 1.8, 1.4, 1.0, fois(md.couleur, 0.9), MAT.BETON));
+              nbLointain += 2 * n;
+            }
+            if (!haut || y0 + hh > haut.y) haut = { x: bx.x, z: bx.z, a, b: bb, lacet, y: y0 + hh, aire: a * bb };
+          }
+        }
+        if (!haut) return;
+        const p2 = repere(haut.x, haut.z, haut.lacet);
+        if (md.coupoles) {
+          // La Major : coupoles sur les plus grandes boîtes, avec leur lanterne.
+          const boites = [];
+          for (const b of parRepere[ir]) if (aire(b.points) > 150) { const bx = boiteMinimale(b.points); if (bx) boites.push([bx, b]); }
+          boites.sort((u, v) => v[0].a * v[0].b - u[0].a * u[0].b);
+          for (const [bx, b] of boites.slice(0, md.coupoles)) {
+            const r0 = Math.min(bx.a, bx.b) * 0.8, y = (b.connue ? b.hauteur : md.h);
+            poser('cylinder', bx.x, y + 1.5, bx.z, 2 * r0, 3, 2 * r0, 0, 0, 0, MAT.PAVE, md.couleur);
+            poser('sphere', bx.x, y + 3 + r0 * 0.1, bx.z, 2 * r0, 2 * r0 * 1.05, 2 * r0, 0, 0, 0, MAT.BETON, [0.42, 0.50, 0.44]);
+            poser('cylinder', bx.x, y + 3 + r0 * 1.15, bx.z, 1.8, 3.2, 1.8, 0, 0, 0, MAT.PAVE, md.couleur);
+            nbLointain += 3;
+          }
+        }
+        if (md.fleche) {
+          // Clochers à flèche : un (Saint-Laurent) ou deux (les Réformés) sur la plus haute boîte.
+          const cote = Math.min(2 * haut.b, 6);
+          for (let q = 0; q < md.fleche; q++) {
+            const u = md.fleche === 2 ? (q ? 1 : -1) * Math.max(haut.a - cote / 2, 0) : 0;
+            objets.push(p2('box', u, 0, haut.y, cote, md.fleche === 2 ? 12 : 6, cote, md.couleur, MAT.PAVE, null, false));
+            objets.push(p2('cone', u, 0, haut.y + (md.fleche === 2 ? 12 : 6), cote * 0.95, md.fleche === 2 ? 22 : 9, cote * 0.95, fois(md.couleur, 0.85), MAT.BETON));
+            nbLointain += 2;
+          }
+        }
+        if (md.statue) {
+          // Notre-Dame de la Garde : la Bonne Mère dorée au sommet du clocher, sur son socle.
+          objets.push(p2('cylinder', 0, 0, haut.y, 4.4, 5, 4.4, md.couleur, MAT.PAVE, null, false));
+          objets.push(p2('cone', 0, 0, haut.y + 5 + 5.5, 2.6, 5.5, 2.6, [1.0, 0.80, 0.34], MAT.METAL));
+          objets.push(p2('sphere', 0, 0, haut.y + 5 + 10.2, 1.7, 2.2, 1.7, [1.0, 0.82, 0.38], MAT.METAL));
+          nbLointain += 3;
+        }
+      });
+    })();
     marquer('lointain');
 
     // ---- 15. Circulation : départs, points au hasard, itinéraires, carrefours ; grille praticable. ----
@@ -1810,7 +2279,7 @@
     chrono('fin');
     const nbPrat = prat.reduce((s, v) => s + v, 0);
     const comptes = { batiments: bats.length, boites: boites.length, retaillees, otees, corps: nbCorps, pans: nbPans, pignons: nbPignons, genoises: nbGenoises,
-      acroteres: nbAcroteres, bateaux: nbBateaux, reverberes: nbReverberes, arbres: nbArbres, abribus: abris.length, objets: objets.length,
+      acroteres: nbAcroteres, bateaux: nbBateaux, reverberes: nbReverberes, mobilier: nbMobilier, deuxRoues: places2R.length, monuments: nbMonuments, lointain: nbLointain, arbres: nbArbres, abribus: abris.length, objets: objets.length,
       cassables: cassables.length, navLibres: navPiece.taille, praticable: nbPrat, parSection };
     ms.total = Math.round((maintenant() - t00) * 10) / 10;
 
@@ -1827,6 +2296,6 @@
   }
 
   const villes = () => Object.keys(AMENAGEMENTS).filter(k => PDR.plans && PDR.plans[k]);
-  PDR.villeReelle = Object.freeze({ creerVille, villes, hasard, MAT, CASSABLES, STOCK, AMENAGEMENTS,
+  PDR.villeReelle = Object.freeze({ creerVille, villes, hasard, MAT, CASSABLES, SORTES_CASSABLES, STOCK, AMENAGEMENTS,
     outils: Object.freeze({ sinus, cosinus, angle, aire, dansAnneau, rectangleMinimal, decomposer, boiteDe, decomposerTrame, distSegRect, retailler, distance2 }) });
 })(globalThis.PDR = globalThis.PDR || {});

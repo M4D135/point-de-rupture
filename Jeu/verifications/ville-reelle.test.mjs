@@ -172,7 +172,9 @@ verifier('lieux, gisements, cassables : nombres du damier, nommés, dans le carr
     assert.ok(gisements.some(g => g.sorte === 'moyens') && gisements.some(g => g.sorte === 'materiaux'));
     cassables.forEach((c, k) => {
       assert.equal(c.id, k);
-      assert.ok(SORTES_CASSABLES.includes(c.sorte), 'sorte ' + c.sorte);
+      // Les sortes du protocole, ou les sortes propres à la ville réelle (même format, feu tiré des points de structure).
+      assert.ok(SORTES_CASSABLES.includes(c.sorte) || VR.SORTES_CASSABLES.includes(c.sorte), 'sorte ' + c.sorte);
+      assert.equal(c.pv, VR.CASSABLES[c.sorte].pv, 'pv de ' + c.sorte);
       assert.ok(c.pv > 0 && c.rendement >= 0 && c.pieces.length > 0 && dedans(v.etendue, c.x, c.z, 4));
     });
   }

@@ -54,7 +54,7 @@ OUVERTURE = {
     'partage': '<script data-travailleur>',
     'simulation': '<script type="text/plain" data-travailleur>',
 }
-VERSION = 'essai-0.2'
+VERSION = 'essai-0.3a'
 BUDGET = 3_000_000      # octets : la page reste bien sous la limite des artefacts (16 Mo)
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
 POLICES = re.compile(r'^<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">\n', re.M)
