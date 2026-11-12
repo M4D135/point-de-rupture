@@ -27,6 +27,10 @@ export const RENDERER = Object.freeze({
   'metal-0.6': { sha256: '45c1b17014fb5310f89ea6ca982d91a9a9158f71472eaf82c5eadeae817df0a4', octets: 104386, quoi: 'METAL 0.6, base de la copie d’avant' },
 });
 
+/** La copie du jeu d'avant le passage à cette version, dans l'historique du jeu : rendu.test.mjs compare les deux copies. */
+export const COPIE_AVANT = Object.freeze({ commit: '5ac0066', sha256: '4207b9df5373ef7585229ff3aa717ad5c115c7da75eddeaa951b1d19699917a7',
+  quoi: 'le renderer de METAL 0.6 et 17 retouches' });
+
 const git = (depot, ...args) => execFileSync('git', ['-C', depot, ...args], { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 });
 
 /** Le clone de FERRO, s'il est là : FERRO_DEPOT, sinon ~/Projects/ferro. Rend son chemin, ou null. */

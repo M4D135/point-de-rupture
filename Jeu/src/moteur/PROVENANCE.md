@@ -1,55 +1,139 @@
 # Provenance du moteur de rendu
 
-`renderer.js` vient de FERRO (`github.com/M4D135/FERRO`, dépôt privé), version METAL 0.6, commit
-`950f743` du 12 novembre 2026, fichier `src/renderer.js` (sha256 `45c1b17014fb5310…eadeae817df0a4`).
-Le fichier de la branche `campagne-18-mondes` (commit `4ce2271`, même jour) est identique à celui-ci.
+`renderer.js` est une copie du renderer de FERRO, le moteur commun aux jeux de David (`github.com/M4D135/FERRO`, dépôt
+privé), à sa version 0.2 :
 
-Le fichier est repris tel quel, puis adapté à la vue RTS. Les retouches commencent par un commentaire « PDR ».
-Quelques lignes qui en dépendent ne portent pas la marque : elles sont rangées sous la retouche dont elles font partie.
-Rien d'autre de FERRO n'est copié. `motion.js` ne l'est pas : `camera.js` reprend seulement sa formule
-d'amortissement, avec mention.
+| | Fichier | Taille | sha256 |
+|---|---|---|---|
+| Original | `src/renderer.js` de FERRO à l'étiquette `v0.2`, commit `248043a674e5353724731a7322ae932487c236b7` du 12 novembre 2026 | 120 863 octets | `d57dae38eed729f6ba72b6673a2174e82869c8ab85670dd7c6a71628504a85a1` |
+| Copie du jeu | `Jeu/src/moteur/renderer.js` | 137 113 octets | `4b1fcc5317b645bda9272a575c270d801c6fb58d02d79f71927529442bfc3398` |
 
-Retouches, dans l'ordre du fichier :
+La copie est l'original plus les retouches du jeu, et rien d'autre : 14 blocs, 212 lignes ajoutées et 2 lignes de FERRO
+remplacées. Chaque bloc commence par un commentaire « PDR (nom) », où le nom est celui d'une des retouches décrites plus
+bas. Les lignes marquées « PDR : » ou « BITUME : », sans nom entre parenthèses, sont à FERRO : il les a reprises des jeux
+en gardant leur marque. `verifications/ferro.test.mjs` tient ce paragraphe à jour : il recalcule le sha256 de la copie,
+compare la copie à l'original ligne à ligne et recompte les blocs.
 
-1. **En-tête** : origine et renvoi à ce fichier.
-2. **Ombre du soleil sur tout l'atlas** (`uShadowSettings.w > 1,5`) : en vue de haut, un seul soleil couvre le sol visible.
-3. **Matériaux urbains 13 à 18**. Façade d'immeuble : étages, fenêtres en retrait, vitrines du rez-de-chaussée,
-   toit de gravier ; le rythme des baies dépend de la fraction de la matière. Asphalte, avec granulat, reprises et fissures.
-   Dallage de pierre à joints décalés. Laque des véhicules et des boucliers. Tissu et peau des figurines.
-   Le relief de ces surfaces (`urbanHeight`) passe par `reliefNormal`.
-   La couleur d'instance ne remplace la teinte de base que pour les matières de FERRO (`m < 12,5`).
-4. **Atmosphère** : la densité minimale du brouillard descend à 0,0001, pour une ville vue de 900 m.
-5. **Vignettage adouci** : 0,84 au lieu de 0,59, pour que les unités au bord de l'écran restent lisibles.
-6. **Seuil du bloom relevé** : 0,86 à 0,98 au lieu de 0,56 à 0,86. Un toit clair en plein jour ne voile plus l'image.
-7. **Anticrénelage MSAA ×4** de la scène, avant le bloom, avec copie vers la cible de post-traitement. `fx.msaa === false` le coupe
-   sans recréer les cibles (réglage « Anticrénelage » du jeu).
-8. **Atlas d'ombre doublé** : 2 048 en qualité auto, 4 096 en haute qualité, borné par `MAX_TEXTURE_SIZE`.
-9. **Foule empaquetée par le jeu** (`fx.instances`). Un tampon dédié, partagé par l'ombre du soleil et la passe couleur.
-10. **Soleil réglé par la caméra RTS**. `camera.sun` donne le centre, l'emprise et la profondeur visibles au sol.
-    Avec `fx.sunOnly`, le soleil prend tout l'atlas : ni lampes ni torche ne projettent d'ombre.
-    Le volume du soleil suit la même emprise, y compris pour `actorFilter`.
-11. **Décor en un seul lot stable** (`camera.allStatic`). Tout le décor part au GPU d'un bloc, sans tri ni nouvel envoi
-    quand la caméra bouge ; le découpage au champ se fait au clip. Les ombres du soleil suivent la même règle.
-12. **Plans proche et lointain** : `camera.near` et `camera.far` sont pris en compte par `draw` et `actorFilter`.
-13. **Sans lampe torche** (`fx.torch === false`), sa source est renvoyée assez loin pour ne plus rien éclairer.
-14. **Voile du brouillard** (`fx.voile = { texture, origine, taille, force }`). Une texture R8 de visibilité, posée sur
-    l'unité de texture 4, assombrit et ternit le dehors hors de la vue du joueur, après le gamma et avant le vignettage.
-    Sans `fx.voile`, ou à force nulle, le shader du monde rend exactement l'image de FERRO.
-15. **Bibliothèque d'éclairage pour le jeu** (`PDR_GLSL`, `PDR_INDOOR`, `PDR_UNIFORMS`). Les formules du shader du
-    monde (ombre du soleil filtrée, lumière ambiante du ciel, lampes, reflets, brouillard, tonemap, gamma, vignettage),
-    réécrites en fonctions `pdrOmbreSoleil`, `pdrEclairer` et `pdrFinir` pour les shaders de la foule. Le shader du monde
-    lui-même n'en dépend pas.
-16. **Lots du jeu** (`fx.lots = [{ values, groups, version }]`, au format de `pack`). Chaque lot a son tampon GPU, renvoyé
-    seulement quand l'objet ou sa `version` change ; il entre dans l'ombre du soleil et dans la passe couleur, après la
-    foule empaquetée (`fx.instances`). C'est le décor du jeu : bâtiments du joueur, barricades, tas, marques.
-17. **Points d'accroche de la foule sur le GPU** (`fx.foule = { ombre(gl, lumiere), couleur(gl, vue) }`). `ombre` est
-    appelé dans la passe d'ombre du soleil, cadre de l'atlas lié et biais actif ; `couleur` dans la passe couleur, dans
-    la cible MSAA, avant les particules et la copie vers le post-traitement. Le moteur leur passe deux objets réutilisés
-    d'une image à l'autre (matrices, soleil, ciel, brouillard, lampes, atlas d'ombre sur l'unité 2) et rétablit son
-    état GL au retour ; ce qu'ils rendent (`{ appels, triangles, instances }`) entre dans `stats`.
-    Le moteur expose `renderer.gl` (le contexte WebGL 2) et `renderer.pdr` : `glsl`, `uniformes`, `generation`
-    (change à chaque (ré)initialisation du contexte), `programme(vertex, fragment)` et `lier(programme)`.
-    Le rendu logiciel (Canvas 2D) n'a ni l'un ni l'autre.
+Rien d'autre de FERRO n'est copié ici. `camera.js` reprend seulement la formule d'amortissement de `src/motion.js`, avec
+mention. Le son est décrit dans `PROVENANCE-SON.md`, et la vue d'ensemble dans `FERRO.md`.
 
-Sans `fx.voile`, `fx.lots` ni `fx.foule`, `draw` suit le chemin de FERRO à l'identique (vérifié par
-`verifications/rendu.test.mjs` contre le fichier d'origine, sur un contexte WebGL simulé).
+## Avant la 0.2
+
+Jusqu'à l'essai 0.2 du jeu (commit `5ac0066`), la copie partait du renderer de METAL 0.6 et portait 17 retouches. Ce
+fichier citait alors « `github.com/M4D135/FERRO`, commit `950f743` » : c'était le dépôt du jeu METAL, qui portait ce nom
+avant d'être renommé `M4D135/METAL`. Le moteur a maintenant son propre dépôt, `M4D135/FERRO`, où cet état est l'étiquette
+`metal-0.6` (commit `c863bd4`, `src/renderer.js` de sha256
+`45c1b17014fb5310f89ea6ca982d91a9a9158f71472eaf82c5eadeae817df0a4`).
+
+FERRO 0.2 a récolté les retouches génériques du jeu, prises à son commit `b695b51`, et l'évolution de METAL jusqu'à sa
+version 0.8. Ce que le jeu retouchait et que FERRO fait maintenant lui-même :
+
+| Ce que le jeu avait retouché | Dans FERRO 0.2 |
+|---|---|
+| Ombre du soleil sur tout l'atlas ; ni lampe ni torche ne projettent d'ombre | `fx.sunOnly` |
+| Matières urbaines 13 à 18 : façade, asphalte, dallage, laque, tissu et peau | dans le shader du monde |
+| Densité minimale du brouillard à 0,0001 | dans `environmentInfo` |
+| Vignettage adouci, 0,84 au lieu de 0,59 | réglage de création `vignette: 0.84` |
+| Seuil du bloom relevé, 0,86 à 0,98 | réglage de création `bloomThreshold: [0.86, 0.98]` |
+| Anticrénelage MSAA ×4 de la scène, avant le bloom | réglage de création `msaa: 4` |
+| Atlas d'ombre doublé, borné par `MAX_TEXTURE_SIZE` | réglage de création `shadowMapScale: 2` |
+| Foule empaquetée par le jeu, tampon partagé par l'ombre et la couleur | `fx.instances` ; son tampon naît au premier usage |
+| Soleil réglé par la caméra : centre, emprise, profondeur | `camera.sun` |
+| Décor en un seul lot stable | `camera.allStatic` |
+| Plans proche et lointain | `camera.near`, `camera.far` |
+| Sans lampe torche | `fx.torch === false` |
+
+`jeu.js` passe les quatre réglages de création (`REGLAGES_MOTEUR`) ; la caméra et `fx` gardent les mêmes champs, aux
+mêmes noms et au même sens.
+
+## Méthode du passage
+
+Fusion à trois, comme le demande `VERSIONS.md` de FERRO : `git merge-file --diff3` entre la base (`metal-0.6`), FERRO
+(`v0.2`) et la copie du jeu (commit `5ac0066`). Treize conflits : les huit que FERRO annonçait pour la copie du commit `b695b51`
+(anti-scintillement, MSAA, atlas d'ombre, tampon de la foule, champ de vision, plans), et cinq autres là où le jeu avait
+ajouté depuis ses lots, sa foule et son interrupteur du MSAA. Dans chacun, la version de FERRO est gardée ; les retouches
+du jeu sont ensuite reposées autour, en blocs marqués.
+
+La fusion gardait aussi, sans conflit, deux lignes du jeu que FERRO n'avait pas touchées : le vignettage à 0,84 et le
+seuil du bloom à 0,86, écrits en dur dans les shaders. Elles sont rendues à FERRO : ses réglages de création remplacent
+ces constantes dans le texte du shader, et ne les trouveraient pas si elles avaient déjà changé. C'est le point à relire
+à chaque passage : ce que la fusion garde du jeu sans rien signaler.
+
+## Retouches du jeu, dans l'ordre du fichier
+
+1. **origine** — L'en-tête : d'où vient la copie, et le renvoi à ce fichier.
+2. **voile** — Le voile du brouillard de guerre : `fx.voile = { texture, origine, taille, force }`. Une texture R8 de
+   visibilité, posée sur l'unité de texture 4, assombrit et ternit le dehors hors de la vue du joueur, après le gamma et
+   avant le vignettage. Sans `fx.voile`, ou à force nulle, le shader du monde rend l'image de FERRO. L'échantillonneur
+   est placé sur l'unité 4 une fois, à la création du contexte, avec une texture blanche : tant qu'aucun voile n'est
+   passé, `draw` n'envoie pas une commande de plus que FERRO ; quand le voile cesse, il est retiré une fois (texture
+   blanche, force 0). Propre au RTS : il reste au jeu.
+3. **éclairage** — La bibliothèque d'éclairage pour les shaders du jeu : `PDR_GLSL`, `PDR_INDOOR`, `PDR_UNIFORMS`. Les
+   formules du shader du monde pour une surface du dehors (ombre du soleil filtrée, lumière ambiante du ciel, lampes,
+   reflets, brouillard, tonemap, gamma, vignettage), réécrites en fonctions `pdrOmbreSoleil`, `pdrEclairer` et
+   `pdrFinir`. Le shader du monde n'en dépend pas. Son vignettage suit le réglage de création, comme celui du monde.
+   Deux apports de METAL 0.8 au shader du monde n'y sont pas, pour que la foule garde son image et son coût : la
+   rugosité élargie là où la normale varie d'un pixel à l'autre, et le reflet des nuages sur les surfaces lisses. Un jeu
+   qui dessine lui-même dans les passes du moteur a besoin de ces formules : générique dans son principe, à récolter
+   avec les points d'accroche de la retouche « foule », sous des noms neutres.
+4. **lots** — Les lots du jeu : `fx.lots = [{ values, groups, version }]`, au format de `pack`. Chaque lot a son tampon
+   GPU, renvoyé seulement quand l'objet ou sa `version` change ; il entre dans l'ombre du soleil et dans la passe
+   couleur, après la foule empaquetée (`fx.instances`). C'est le décor vivant du jeu : bâtiments du joueur, barricades,
+   tas, marques. FERRO 0.2 a `setLots` pour le même besoin et le note « à unifier ». Les deux ne se recouvrent pas
+   encore : `setLots` prend des objets de scène, les empaquette lui-même, les découpe au champ et les recharge après une
+   perte du contexte ; `fx.lots` prend des paquets que le jeu a déjà remplis et ne renvoie que ceux dont la version
+   change, ce qu'il faut à un décor qui change vingt fois par seconde. `fx.lots` est donc gardé tel quel pour l'instant.
+   Dans la passe d'ombre, la copie rétablit le biais de profondeur que FERRO vient de couper : deux commandes par image.
+5. **foule** — Les points d'accroche de la foule sur le GPU : `fx.foule = { ombre(gl, lumiere), couleur(gl, vue) }`.
+   `ombre` est appelé dans la passe d'ombre du soleil, cadre de l'atlas lié et biais actif ; `couleur` dans la passe
+   couleur, dans la cible de la scène (MSAA), avant les particules et la copie vers le post-traitement. Le moteur leur
+   passe deux objets réutilisés d'une image à l'autre (matrices, soleil, ciel, brouillard, lampes, atlas d'ombre sur
+   l'unité 2) et rétablit son état GL au retour ; ce qu'ils rendent (`{ appels, triangles, instances }`) entre dans
+   `stats`. Le moteur expose `renderer.gl` (le contexte WebGL 2) et `renderer.pdr` : `glsl`, `uniformes`, `generation`
+   (change à chaque création du contexte, donc après une perte), `programme(vertex, fragment)` et `lier(programme)`.
+   Le rendu logiciel (Canvas 2D) n'a ni l'un ni l'autre. La foule elle-même est propre au jeu ; le point d'accroche,
+   lui, servirait à d'autres : générique dans son principe, à récolter sous des noms neutres.
+6. **msaa** — L'interrupteur de l'anticrénelage : `fx.msaa === false` dessine la scène droit dans la cible du
+   post-traitement, sans recréer une seule cible (réglage « Anticrénelage » du jeu). Sans ce champ, rien ne change.
+   FERRO 0.2 n'a que le réglage de création : générique, à récolter.
+
+## Ce que le passage change à l'image
+
+Rien du fait du jeu : sur des images du jeu, la nouvelle copie envoie au GPU les commandes de l'ancienne, à quatre
+écarts près, sans effet sur l'image (`verifications/rendu.test.mjs` les compte) : le voile n'est plus posé à chaque
+image quand il n'y en a pas ; ses uniformes sont cherchées plus tard dans la création ; le tampon de `fx.instances`
+naît au premier usage ; le biais de l'ombre est coupé puis rétabli avant les lots et la foule.
+
+Le reste vient de FERRO, qui a suivi METAL de la 0.6 à la 0.8. Seul le texte de cinq shaders change, des 46 lignes que
+METAL a changées :
+
+- **Métal brossé (matière 0)** : le brossage est filtré quand il devient plus fin qu'un pixel. De loin, plus de bandes
+  claires sur les mâts et les grilles. Mieux pour un jeu vu de 300 à 900 m.
+- **Arêtes usées** des pièces en métal (matières 0 à 2, pièces `surface: 'object'`) : un liseré clair sur les arêtes des
+  lampadaires, des grilles, des barrières. Visible seulement de près (D 60 m). Neutre.
+- **Rugosité élargie** là où la normale varie d'un pixel à l'autre : les reflets s'étalent au lieu de scintiller. Aucun
+  pixel ne change sur les façades, l'asphalte et le dallage, dont les reflets sont déjà mats. Neutre.
+- **Reflet des nuages et du soleil** sur les surfaces lisses du dehors (rugosité sous 0,65 et métal au-dessus de 0,25) :
+  l'eau, la laque des véhicules, le métal, les vitres vues de près. Le plan d'eau du Vieux-Port prend un reflet doux,
+  qui dérive très lentement avec le vent. Mieux.
+- **Effets** : la fumée (`fxSmoke`) et les étincelles (`fxSpark`) deviennent des sortes de particules à part. Le décor
+  du jeu ne s'en sert pas encore : rien ne change aujourd'hui.
+
+Mesuré le 12 novembre 2026 dans Chrome 157 sans écran (ANGLE sur Metal), 1 440 × 900, sur seize vues figées des deux
+villes, de 60 à 900 m, ombres, bloom et MSAA coupés tour à tour, l'ancienne et la nouvelle copie dessinant la même
+image : de 0,5 à 3,3 % des pixels diffèrent, 8 % sur Marseille entière et 25 % quand le port occupe un quart de l'image ;
+moins de 0,01 % diffèrent de plus de 24 sur 255, aucun de plus de 64 ; l'écart moyen reste sous 0,2 sur 255 (1,2 avec le
+port). Deux rendus de la même copie ne diffèrent d'aucun pixel.
+
+## Vérifications
+
+- `verifications/ferro.test.mjs` : version, commit et sha256 écrits ici et dans `FERRO.md` ; chaque « PDR (nom) » de
+  la copie décrite ici, et l'inverse ; la copie comparée à l'original ligne à ligne.
+- `verifications/rendu.test.mjs`, sur un contexte WebGL 2 simulé qui note chaque appel : sans réglage ni champ du jeu,
+  puis avec les réglages du jeu, la copie envoie exactement les commandes GPU de l'original, image après image, sur une
+  scène à hauteur d'homme et sur la ville vue de haut (seul s'ajoute le voile, déclaré une fois à la création) ; le
+  rendu logiciel aussi, appel pour appel ; le passage depuis la copie d'avant, écart par écart ; les retouches du jeu.
+- Les originaux de FERRO se lisent de son clone (`verifications/originaux-ferro.mjs`) ; sans lui, les comparaisons avec
+  eux sont sautées, et les suites le disent.
+- `verifications/banc-rendu.py` mesure le rendu dans un vrai navigateur ; `--moteur` y met une autre copie, pour
+  comparer l'avant et l'après sous la même charge.

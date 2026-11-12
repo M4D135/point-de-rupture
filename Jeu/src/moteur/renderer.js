@@ -1,7 +1,7 @@
 /* FERRO — original WebGL2 renderer. All surfaces and meshes are mathematical. */
 /* PDR (origine) : copie de FERRO 0.2 pour Point de rupture (github.com/M4D135/FERRO, étiquette v0.2, commit 248043a).
-   Les retouches du jeu sont marquées « PDR (nom) » et décrites, sous ce nom, dans Jeu/src/moteur/PROVENANCE.md ; tout le
-   reste est le fichier de FERRO, y compris ses lignes marquées « PDR : » ou « BITUME : », qu'il a reprises des jeux. */
+   Chaque retouche du jeu commence par « PDR » et son nom entre parenthèses ; Jeu/src/moteur/PROVENANCE.md la décrit sous
+   ce nom. Tout le reste est le fichier de FERRO, y compris ses lignes « PDR : » ou « BITUME : », reprises des jeux. */
 (function () {
   'use strict';
   // BITUME : champ de vision admis de 10 à 110° (FERRO : 40 à 110°), pour la caméra de télévision au téléobjectif.

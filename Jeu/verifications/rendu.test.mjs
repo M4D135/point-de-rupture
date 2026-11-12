@@ -20,7 +20,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { original, ABSENT, ecart, sha256 } from './originaux-ferro.mjs';
+import { original, ABSENT, ecart, sha256, COPIE_AVANT as AVANT } from './originaux-ferro.mjs';
 
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(ici, '..', 'src');
@@ -298,8 +298,8 @@ function jouerVille({ FRender, c, etape, options }) {
 }
 function jouer(source, scenario, options, contexte) {
   const FRender = chargerMoteur(source), c = creerContexte(contexte), etapes = [];
-  const r = scenario({ FRender, c, options, etape: nom => etapes.push([nom, c.journal.length]) });
-  return { r, etapes, ...c };
+  const rendu = scenario({ FRender, c, options, etape: nom => etapes.push([nom, c.journal.length]) });
+  return { ...(rendu.r ? rendu : { r: rendu }), etapes, ...c };
 }
 
 // ---- Le moteur : la copie de FERRO 0.2 et ses retouches. ----
@@ -515,7 +515,6 @@ verifier('retouche du jeu : fx.msaa === false dessine sans anticrénelage, sans 
 });
 
 // ---- Le passage de la copie d'avant à celle-ci, sur des images du jeu. ----
-const AVANT = { commit: '5ac0066', sha256: '4207b9df5373ef7585229ff3aa717ad5c115c7da75eddeaa951b1d19699917a7' };
 let avant = null;
 try {
   const octets = execFileSync('git', ['show', AVANT.commit + ':Jeu/src/moteur/renderer.js'], { cwd: path.join(ici, '..', '..'), stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 });
@@ -560,22 +559,29 @@ function jouerJeu({ FRender, c, etape, options }) {
   c.ecoutes.webglcontextlost({ preventDefault() {} });
   c.ecoutes.webglcontextrestored(); tex.voile = null; image(); image(); image({ voile: null });
   etape('libération'); r.dispose();
-  return r;
+  return { r, instances: s.instances.values };
 }
 /**
  * Ce qui sépare les deux copies sur ces images, retiré de chaque flux, compté et vérifié à son motif. Le reste doit être
  * identique, les objets étant pris dans l'ordre où ils servent.
  */
-function sansEcartsConnus(journal, nouvelle) {
+function sansEcartsConnus(journal, nouvelle, instances) {
   const sortie = [], compte = {};
   const noter = (nom, n = 1) => { compte[nom] = (compte[nom] || 0) + n; };
   for (let i = 0; i < journal.length; i++) {
     const [k, a] = journal[i];
     // 1. Le texte des shaders : comparé à part, ligne à ligne.
     if (k === 'shaderSource') { sortie.push([k, [a[0], '(texte comparé à part)']]); continue; }
-    // 2. Le tampon de la foule empaquetée (fx.instances) : créé d'office avant, au premier usage maintenant.
-    if (k === 'createBuffer') { noter('createBuffer'); continue; }
-    if (k === 'deleteBuffer') { noter('deleteBuffer'); continue; }
+    // 2. Le tampon de la foule empaquetée (fx.instances). Avant : créé d'office, cinquième des huit tampons que la
+    //    création demande d'affilée. Maintenant : créé à la première image qui passe fx.instances, juste avant son envoi.
+    if (k === 'createBuffer' && !nouvelle && (i === 0 || journal[i - 1][0] !== 'createBuffer')) {
+      let n = 1;
+      while (journal[i + n] && journal[i + n][0] === 'createBuffer') n++;
+      if (n === 8) { for (let q = 0; q < 7; q++) sortie.push(journal[i]); noter('tampon de fx.instances créé d’office'); i += 7; continue; }
+    }
+    if (k === 'createBuffer' && nouvelle && journal[i + 2] && journal[i + 1][0] === 'bindBuffer' && journal[i + 2][0] === 'bufferData' && journal[i + 2][1][1] === instances) {
+      noter('tampon de fx.instances créé au premier usage'); continue;
+    }
     // 3. Le voile : ses trois uniformes sont cherchées plus tard dans la création ; la nouvelle copie y pose une fois
     //    l'échantillonneur sur l'unité 4, l'ancienne le posait à chaque image, voile ou pas.
     if (k === 'getUniformLocation' && /^uVoile/.test(a[1])) { noter('uniformes du voile cherchées'); continue; }
@@ -607,12 +613,12 @@ if (!avant) {
 } else {
   verifier('passage : sur des images du jeu, les commandes GPU de la copie d’avant (' + AVANT.commit + '), aux écarts connus près', () => {
     const a = jouer(avant, jouerJeu, undefined), b = jouer(SOURCE, jouerJeu, REGLAGES);
-    const ca = sansEcartsConnus(a.journal, false), cb = sansEcartsConnus(b.journal, true);
+    const ca = sansEcartsConnus(a.journal, false), cb = sansEcartsConnus(b.journal, true, b.instances);
     memeFlux(enTexte(ca.sortie, true), enTexte(cb.sortie, true), 'passage', ['avant', 'après']);
     // Les écarts, un par un.
     const images = a.etapes.length - 1, creations = 2;
-    assert.equal(ca.compte.createBuffer, cb.compte.createBuffer, 'autant de tampons de part et d’autre : celui de la foule empaquetée naît plus tard');
-    assert.equal(ca.compte.deleteBuffer, cb.compte.deleteBuffer);
+    assert.equal(ca.compte['tampon de fx.instances créé d’office'], creations);
+    assert.equal(cb.compte['tampon de fx.instances créé au premier usage'], creations, 'le même tampon, né plus tard');
     assert.equal(ca.compte['uniformes du voile cherchées'], 3 * creations);
     assert.equal(cb.compte['uniformes du voile cherchées'], 3 * creations);
     assert.equal(cb.compte['voile déclaré à la création'], creations);
@@ -860,4 +866,4 @@ verifier('caméra : au plus près, l’œil reste au-dessus des toits (la visée
     + recul.toFixed(1) + ' m ; plus grand pas en glissant ' + saut.toFixed(2) + ' m)');
 });
 
-console.log(ok + ' vérifications du rendu réussies');
+console.log(ok + ' vérifications du rendu réussies' + (sautees ? ', ' + sautees + ' sautée(s)' : ''));
