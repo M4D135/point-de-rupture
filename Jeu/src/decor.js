@@ -75,6 +75,24 @@
   // Lots et puits.
   // ---------------------------------------------------------------------------------------------------------------
 
+  /** Lignes [debut, debut + n) d'un tableau de pack passées au feu : 2 roussies (teinte assombrie), 3 calcinées (noir de
+   *  suie, rouille sur les tôles, matière mate, sans émission). Sans couleur d'instance, la matière est supposée grise. */
+  function bruler(f, debut, n, brule) {
+    for (let i = debut; i < debut + n; i++) {
+      const o = i * 16, avec = f[o + 15] > 0.5;
+      const r = avec ? f[o + 12] : 0.5, g = avec ? f[o + 13] : 0.5, b = avec ? f[o + 14] : 0.5;
+      if (brule === 2) {
+        f[o + 12] = r * 0.42 + 0.02; f[o + 13] = g * 0.38 + 0.012; f[o + 14] = b * 0.36 + 0.008;
+      } else {
+        const tole = f[o + 3] === MAT.LAQUE || f[o + 3] === MAT.METAL, l = (r + g + b) / 3;
+        const rouille = tole ? (((i * 2654435761) >>> 0) % 7) / 6 : 0;
+        f[o + 12] = 0.045 + l * 0.05 + rouille * 0.13; f[o + 13] = 0.04 + l * 0.045 + rouille * 0.06; f[o + 14] = 0.036 + l * 0.04 + rouille * 0.025;
+        f[o + 3] = MAT.MAT; f[o + 7] = 0;
+      }
+      f[o + 15] = 1;
+    }
+  }
+
   /** Lot au format de pack : { values (16 nombres par instance), groups [{ name, offset (octets), count }], version }. */
   function creerLot(nom) {
     const parForme = NOMS.map(() => ({ f: new Float32Array(16 * 64), n: 0 }));
@@ -96,12 +114,14 @@
         f[o + 12] = avec ? r : 0; f[o + 13] = avec ? g : 0; f[o + 14] = avec ? b : 0; f[o + 15] = avec ? 1 : 0;
         t.n++;
       },
-      /** Recopie n lignes déjà empaquetées (source : Float32Array, à partir de la ligne debut). */
-      copier(forme, source, debut, n) {
+      /** Recopie n lignes déjà empaquetées (source : Float32Array, à partir de la ligne debut). brule : 0 telles quelles,
+       *  2 roussies par le feu, 3 calcinées (teintes noires et rouille, matière mate, plus d'émission). */
+      copier(forme, source, debut, n, brule = 0) {
         if (n <= 0) return;
         const t = parForme[forme];
         place(t, n);
         t.f.set(source.subarray(debut * 16, (debut + n) * 16), t.n * 16);
+        if (brule) bruler(t.f, t.n, n, brule);
         t.n += n;
       },
       fin() {
@@ -379,7 +399,11 @@
     }
     const x = fini(s.x) ? s.x : 0, z = fini(s.z) ? s.z : 0, y = sol(x, z);
     const lacet = (((s.id | 0) % 4) + 4) % 4 * (PI / 2) + (options.lacet || 0);
-    const R = repere(puits, x, y, z, lacet), rd = alea(0x51ED27 ^ Math.imul((s.id | 0) + 7, 0x85EBCA6B));
+    // Un avant-poste qui brûle est noirci (un foyer de etat.feux le désigne).
+    const p2 = s.feu ? { mettre(forme, px, py, pz, sx, sy, sz, rx, ry, rz, mat, r, g, b, em) {
+      puits.mettre(forme, px, py, pz, sx, sy, sz, rx, ry, rz, mat, r < 0 ? r : r * 0.38 + 0.02, g * 0.34 + 0.015, b * 0.32 + 0.01, em * 0.3);
+    } } : puits;
+    const R = repere(p2, x, y, z, lacet), rd = alea(0x51ED27 ^ Math.imul((s.id | 0) + 7, 0x85EBCA6B));
     const k = s.chantier ? Math.max(0.04, progression(s)) : 1, f = s.faction, c = couleurCamp(f);
     let lampes = [];
     if (f === 0) relais(R, rd, k, c, !!s.chantier);
@@ -421,7 +445,8 @@
   }
   const estVerre = m => m.mat === MAT.LAQUE && m.color && m.color[2] > m.color[0] + 0.05 && Math.min(m.s[0], m.s[1], m.s[2]) < 0.12;
 
-  function formeIndex(shape) { const i = NOMS.indexOf(shape || 'box'); return i < 0 ? BOITE : i; }
+  // Le moteur n'a pas de cône : le parasol d'une terrasse ('cone' dans ville-reelle.js) devient un octaèdre aplati.
+  function formeIndex(shape) { if (shape === 'cone') return OCTA; const i = NOMS.indexOf(shape || 'box'); return i < 0 ? BOITE : i; }
   function mettreMaillage(puits, m, couleur) {
     const p = m.p || [0, 0, 0], s = m.s || [1, 1, 1], r = m.r || [0, 0, 0], c = couleur || m.color;
     puits.mettre(formeIndex(m.shape), p[0], p[1], p[2], s[0], s[1], s[2], r[0], r[1], r[2], m.mat || 0, c ? c[0] : -1, c ? c[1] : 0, c ? c[2] : 0, m.emissive || 0);
@@ -439,7 +464,8 @@
     const rd = alea(0xCA55E ^ Math.imul((cas.id | 0) + 3, 0x27D4EB2F));
     // Axe u de l'objet dans le monde, et réglages par sorte : angle, appui en travers (v0), teinte.
     const reglage = { voiture: [1.45, 0.92, 0.72], poubelle: [1.48, 0.3, 0.95], banc: [-1.5, -0.25, 0.9], barriere: [1.5, 0.32, 0.92],
-      abribus: [0, 0, 0.92], vitrine: [0, 0, 0.9] }[cas.sorte] || [0.6, 0.3, 0.85];
+      abribus: [0, 0, 0.92], vitrine: [0, 0, 0.9], 'deux-roues': [1.52, 0.22, 0.82], conteneur: [1.47, 0.52, 0.9], kiosque: [0, 0, 0.86],
+      terrasse: [0, 0, 0.88] }[cas.sorte] || [0.6, 0.3, 0.85];
     const [angle, v0, teinte] = reglage;
     const Q = rodrigues(ca, 0, -sa, angle), pivot = [x + v0 * sa, base, z + v0 * ca];
     const eclats = [];
@@ -448,7 +474,16 @@
       if (estVerre(m)) { eclats.push(m); continue; }
       const p = m.p || [0, 0, 0], s = m.s || [1, 1, 1], r = m.r || [0, 0, 0];
       let np = p, nr = r;
-      if (angle) {
+      if (cas.sorte === 'terrasse') {
+        // Terrasse renversée : chaque groupe (guéridon et son pied, parasol et son mât, chaise) tombe sur son propre
+        // pied, dans un sens tiré de sa place, et glisse un peu.
+        const cle = Math.round(p[0] * 3) * 73856093 ^ Math.round(p[2] * 3) * 19349663;
+        const rg = alea(cle ^ Math.imul((cas.id | 0) + 5, 0x9E3779B1));
+        const a = rg() * PI * 2, ang = 1.2 + rg() * 0.4, Qg = rodrigues(Math.cos(a), 0, Math.sin(a), ang);
+        const dx = (rg() - 0.5) * 1.4, dz = (rg() - 0.5) * 1.4, dy = p[1] - base;
+        np = [p[0] + dx + Qg[1] * dy, base + Math.max(Math.min(s[0], s[1], s[2]) / 2, Qg[4] * dy), p[2] + dz + Qg[7] * dy];
+        nr = euler(produit(Qg, matrice(r)));
+      } else if (angle) {
         const d = [p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2]];
         np = [pivot[0] + Q[0] * d[0] + Q[1] * d[1] + Q[2] * d[2], pivot[1] + Q[3] * d[0] + Q[4] * d[1] + Q[5] * d[2], pivot[2] + Q[6] * d[0] + Q[7] * d[1] + Q[8] * d[2]];
         nr = euler(produit(Q, matrice(r)));
@@ -456,6 +491,11 @@
         np = [p[0], p[1] - 0.35, p[2]]; nr = [r[0] + 0.22, r[1], r[2]];
       } else if (cas.sorte === 'vitrine' && m.mat === MAT.TISSU) {
         np = [p[0], p[1] - 0.25, p[2]]; nr = [r[0] * 2.6, r[1], r[2]];
+      } else if (cas.sorte === 'kiosque' && i > 0) {
+        // Kiosque forcé : auvent affaissé, rideau de journaux arraché, panneau du toit tombé devant.
+        if (m.mat === MAT.TISSU) { np = [p[0], p[1] - 0.6, p[2]]; nr = [r[0] + 0.55, r[1], r[2]]; }
+        else if (i === 1) { np = [p[0], p[1] - 0.18, p[2]]; nr = [r[0] + 0.12, r[1], r[2] + 0.06]; }
+        else { np = [p[0] + 1.6 * sa, base + 0.07, p[2] + 1.6 * ca]; nr = [r[0] + 1.5, r[1], r[2]]; }
       }
       const c = m.color ? fois(m.color, teinte) : null;
       puits.mettre(formeIndex(m.shape), np[0], np[1], np[2], s[0], s[1], s[2], nr[0], nr[1], nr[2], m.mat || 0,
@@ -471,6 +511,12 @@
         puits.mettre(BOITE, m.p[0] + Math.cos(a) * d + (rd() - 0.5) * m.s[0] * 0.6, base + 0.012, m.p[2] + Math.sin(a) * d + (rd() - 0.5) * m.s[2] * 0.6,
           t, 0.014, t * (0.5 + rd() * 0.6), (rd() - 0.5) * 0.12, rd() * PI * 2, 0, MAT.LAQUE, c[0], c[1], c[2], 0.05);
       }
+    }
+    // Journaux d'un kiosque, sacs d'un conteneur : jetés au sol.
+    if (cas.sorte === 'kiosque' || cas.sorte === 'conteneur') for (let j = 0; j < 7; j++) {
+      const a = rd() * PI * 2, d = 1.2 + rd() * 1.8, t = 0.3 + rd() * 0.25, k = cas.sorte === 'kiosque';
+      puits.mettre(k ? BOITE : SPHERE, x + Math.cos(a) * d, base + (k ? 0.02 : t * 0.3), z + Math.sin(a) * d, t, k ? 0.03 : t * 0.6, t * 0.8, 0,
+        rd() * PI, 0, k ? MAT.TISSU : MAT.MAT, k ? 0.86 : 0.1, k ? 0.84 : 0.1, k ? 0.78 : 0.11, 0);
     }
     // Ce qui roule d'une poubelle renversée.
     if (cas.sorte === 'poubelle') for (let j = 0; j < 4; j++) {
@@ -571,9 +617,20 @@
   // Le décor.
   // ---------------------------------------------------------------------------------------------------------------
 
+  // 0.3 : projectiles en vol (bouteille, grenade, pierre), souffle d'un cocktail à l'arrivée, impact d'une grenade ou
+  // d'une pierre, vapeur d'un feu éteint à l'eau, fumée qui traîne après un foyer éteint.
   const E = Object.freeze({ POUSSIERE: 1, ECLATS: 2, ANNONCE: 3, SALVE: 4, JET: 5, ORDRE: 6, PRISE: 7, LEVEE: 8, FINI: 9, SOIN: 10,
-    PRODUCTION: 11 });
-  const PLAFONDS = Object.freeze({ 1: 64, 2: 24, 3: 24, 4: 16, 5: 24, 6: 8, 7: 12, 8: 16, 9: 16, 10: 24, 11: 12 });
+    PRODUCTION: 11, VOL_MOLOTOV: 12, VOL_LACRYMO: 13, VOL_PIERRE: 14, SOUFFLE: 15, IMPACT: 16, VAPEUR: 17, FUMEROLLE: 18 });
+  const PLAFONDS = Object.freeze({ 1: 64, 2: 24, 3: 24, 4: 16, 5: 24, 6: 8, 7: 12, 8: 16, 9: 16, 10: 24, 11: 12, 12: 48, 13: 32, 14: 64,
+    15: 24, 16: 48, 17: 24, 18: 48 });
+  // Le feu. Vent constant (le même que la fumée des barricades de la 0.2) ; chaque sorte de cassable : hauteur de ses
+  // flammes (m) et de sa colonne de fumée (m) ; sortes de foyer (SORTES_FEU) : sol, objet, barricade, avant-poste.
+  const VENT_X = 0.89, VENT_Z = 0.45;
+  const FEU_CASSABLE = Object.freeze({ voiture: [3.6, 72], 'deux-roues': [1.9, 40], conteneur: [3.0, 55], kiosque: [4.0, 66],
+    terrasse: [2.0, 42], poubelle: [2.0, 36], abribus: [2.4, 42], vitrine: [3.0, 55], banc: [1.5, 30], barriere: [1.1, 24] });
+  const FEU_DEFAUT = Object.freeze([1.8, 44]);
+  const PRES = 420;                               // au-delà (m de la caméra), un foyer n'est plus que lueur et fumée
+  const TRACES_MAX = 512;
   const ORDRES = Object.freeze({ deplacer: [0.45, 1, 0.55], attaquer: [1, 0.36, 0.3], capacite: [1, 0.86, 0.4], ralliement: [1, 0.9, 0.4],
     refus: [0.95, 0.95, 0.95] });
 
@@ -588,11 +645,12 @@
     const carte = options.carte || null;
 
     const lotCassables = creerLot('cassables'), lotTas = creerLot('tas'), lotStructures = creerLot('structures'),
-      lotAutres = creerLot('structures hors alliance'), lotMarques = creerLot('marques');
-    const lots = [lotCassables, lotTas, lotStructures, lotAutres, lotMarques];
+      lotAutres = creerLot('structures hors alliance'), lotMarques = creerLot('marques'), lotTraces = creerLot('traces');
+    const lots = [lotCassables, lotTas, lotStructures, lotAutres, lotMarques, lotTraces];
     const dynamique = [], lumieres = [];
     const sortie = { lots, dynamique, lumieres };
-    const mesure = { instances: 0, effets: 0, particules: 0, solides: 0, lumieres: 0, reconstructions: 0, msEtat: 0, msCadre: 0 };
+    const mesure = { instances: 0, effets: 0, particules: 0, solides: 0, lumieres: 0, reconstructions: 0, msEtat: 0, msCadre: 0,
+      feux: 0, feuxPres: 0, nuages: 0, vols: 0, traces: 0 };
     let horloge = 0;
 
     // ---- Cassables : lignes empaquetées d'avance, intactes et cassées, recopiées à chaque changement. ----
@@ -613,15 +671,37 @@
     }
     // Lignes de chaque forme dans le stock : la forme f commence à la ligne debutForme[v][f].
     const debutForme = stock.map(l => { const d = new Int32Array(NOMS.length).fill(0); for (const g of l.groups) d[NOMS.indexOf(g.name)] = g.offset / 64; return d; });
+    // États (etat.cassables) : 0 intact, 1 cassé, 2 en feu (cassé et roussi), 3 calciné (cassé, noir de suie).
     function refaireCassables() {
       lotCassables.debut();
       for (let f = 0; f < NOMS.length; f++) for (let i = 0; i < nC; i++) {
-        const v = etatC[i] ? 1 : 0, o = (i * NOMS.length + f) * 2, n = index[v][o + 1];
-        if (n) lotCassables.copier(f, stock[v].values, debutForme[v][f] + index[v][o], n);
+        const etatI = etatC[i], v = etatI ? 1 : 0, o = (i * NOMS.length + f) * 2, n = index[v][o + 1];
+        if (n) lotCassables.copier(f, stock[v].values, debutForme[v][f] + index[v][o], n, etatI >= 2 ? etatI : 0);
       }
       lotCassables.fin(); mesure.reconstructions++;
     }
     if (nC) refaireCassables();
+    // Emprise de chaque cassable pour son feu, prise sur son dessin cassé (une voiture renversée n'est plus où elle était
+    // garée) : demi-longueur et demi-largeur dans son repère, hauteur, lacet, bas, décalage du centre (u, v).
+    const emprise = new Float32Array(nC * 7);
+    for (let i = 0; i < nC; i++) {
+      const c = cassables[i], l = fini(c.lacet) ? c.lacet : 0, ca = Math.cos(l), sa = Math.sin(l), x = fini(c.x) ? c.x : 0, z = fini(c.z) ? c.z : 0;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity, bas = Infinity, haut = -Infinity;
+      const V = stock[1].values;
+      for (let f = 0; f < NOMS.length; f++) {
+        const o = (i * NOMS.length + f) * 2, d0 = debutForme[1][f] + index[1][o], n = index[1][o + 1];
+        for (let r = d0; r < d0 + n; r++) {
+          const q = r * 16, dx = V[q] - x, dz = V[q + 2] - z, u = dx * ca - dz * sa, v = dx * sa + dz * ca;
+          // Pièce tournée : on prend sa plus grande demi-taille dans toutes les directions (borne large, sans rotation).
+          const m = Math.max(V[q + 4], V[q + 6]) / 2, h = Math.max(V[q + 4], V[q + 5], V[q + 6]) / 2;
+          if (V[q + 4] * V[q + 5] * V[q + 6] < 0.004) continue;          // éclats, journaux : pas l'objet qui brûle
+          u0 = Math.min(u0, u - m); u1 = Math.max(u1, u + m); v0 = Math.min(v0, v - m); v1 = Math.max(v1, v + m);
+          bas = Math.min(bas, V[q + 1] - h); haut = Math.max(haut, V[q + 1] + h);
+        }
+      }
+      if (!fini(u0)) { u0 = v0 = -0.5; u1 = v1 = 0.5; bas = sol(x, z); haut = bas + 0.6; }
+      emprise.set([borner((u1 - u0) / 2, 0.3, 5), borner((v1 - v0) / 2, 0.3, 5), borner(haut - bas, 0.3, 4), l, bas, (u0 + u1) / 2, (v0 + v1) / 2], i * 7);
+    }
 
     // ---- Tas des gisements. ----
     const gisements = Array.isArray(sites.gisements) ? sites.gisements : [];
@@ -715,9 +795,9 @@
     refaireMarques();
 
     // ---- Effets : tableau fixe, sans allocation ; maillages pris dans deux réserves. ----
-    const MAX_EFFETS = 320, effets = [];
-    for (let i = 0; i < MAX_EFFETS; i++) effets.push({ actif: false, sorte: 0, t0: 0, duree: 1, x: 0, y: 0, z: 0, a: 0, b: 0, f: -1, g: 0 });
-    const actifs = new Int32Array(16);
+    const MAX_EFFETS = 480, effets = [];
+    for (let i = 0; i < MAX_EFFETS; i++) effets.push({ actif: false, sorte: 0, t0: 0, duree: 1, x: 0, y: 0, z: 0, a: 0, b: 0, f: -1, g: 0, h: 0 });
+    const actifs = new Int32Array(24);
     function lancer(sorte, x, z, f, a, b, duree, y) {
       if (!fini(x) || !fini(z) || actifs[sorte] >= PLAFONDS[sorte]) return null;
       let libre = null, ancien = null;
@@ -728,7 +808,7 @@
       const e = libre || ancien;
       if (e.actif) actifs[e.sorte]--;
       e.actif = true; e.sorte = sorte; e.t0 = horloge; e.duree = duree; e.x = x; e.z = z; e.y = fini(y) ? y : sol(x, z);
-      e.a = fini(a) ? a : 0; e.b = fini(b) ? b : 0; e.f = fini(f) ? f | 0 : -1; e.g = Math.random();
+      e.a = fini(a) ? a : 0; e.b = fini(b) ? b : 0; e.f = fini(f) ? f | 0 : -1; e.g = Math.random(); e.h = e.y;
       actifs[sorte]++;
       return e;
     }
@@ -740,7 +820,7 @@
           let m = objets[n];
           if (!m) {
             m = { shape: 'sphere', p: [0, 0, 0], s: [1, 1, 1], r: [0, 0, 0], mat: MAT.MAT, color: [1, 1, 1], emissive: 0, alpha: 1, fx,
-              fxFire: false, fxPriority: '', innerRatio: NaN, outdoor: true, surface: 'object' };
+              fxFire: false, fxSmoke: false, fxSpark: false, fxPriority: '', innerRatio: NaN, outdoor: true, surface: 'object' };
             objets.push(m);
           }
           n++;
@@ -752,12 +832,14 @@
     }
     const reserveP = reserve(true), reserveS = reserve(false), reserveL = [];
     for (let i = 0; i < 8; i++) reserveL.push({ p: [0, 0, 0], color: [1, 1, 1], power: 1, range: 10 });
-    /** Particule translucide (fumée, poussière, eau, anneau au sol, feu). */
+    /** Particule translucide (fumée, poussière, eau, anneau au sol, feu). quoi : 'feu' (matière de flamme du moteur),
+     *  'fumee' (volutes), 'etincelle', 'danger' (anneau au sol toujours lisible), '' (volume simple). */
     function particule(shape, x, y, z, sx, sy, sz, c, alpha, em, quoi = '', interieur = NaN, rx = 0, ry = 0) {
       const m = reserveP.prendre();
       m.shape = shape; m.p[0] = x; m.p[1] = y; m.p[2] = z; m.s[0] = sx; m.s[1] = sy; m.s[2] = sz; m.r[0] = rx; m.r[1] = ry; m.r[2] = 0;
       m.color[0] = c[0]; m.color[1] = c[1]; m.color[2] = c[2]; m.alpha = alpha; m.emissive = em;
-      m.fxFire = quoi === 'feu'; m.fxPriority = quoi === 'danger' ? 'hazard' : ''; m.innerRatio = interieur;
+      m.fxFire = quoi === 'feu'; m.fxSmoke = quoi === 'fumee'; m.fxSpark = quoi === 'etincelle';
+      m.fxPriority = quoi === 'danger' ? 'hazard' : ''; m.innerRatio = interieur;
       dynamique.push(m);
       return m;
     }
@@ -787,6 +869,64 @@
     }
     const distanceOeil = (x, y, z) => (oeil ? Math.hypot(x - oeil[0], y - oeil[1], z - oeil[2]) : 0);
 
+    // ---- Le feu (0.3) : foyers de etat.feux, nuages de etat.nuages, traces de brûlé au sol. ----
+    const FT = (P && P.FEU_TAILLE) || 8, NT = (P && P.NUAGE_TAILLE) || 6;
+    const feux = new Float32Array(128 * FT), nuages = new Float32Array(64 * NT);
+    let nFeux = 0, nNuages = 0, feuxRecus = false, vitesseJeu = 1;
+    // Traces : x, z, rayon, graine ; anneau de TRACES_MAX, lot refait seulement quand la liste (ou ce qu'on en voit) change.
+    const traces = new Float32Array(TRACES_MAX * 4);
+    let nTraces = 0, prochaineTrace = 0, tracesChange = false, tracesVues = -1;
+    function feuParId(id) { for (let k = 0; k < nFeux; k++) if (feux[k * FT] === id) return k; return -1; }
+    /** Emprise du foyer k dans EMP : centre x, z, sol, demi-longueur, demi-largeur, lacet, hauteur de l'objet, hauteur des
+     *  flammes, hauteur de la colonne de fumée, largeur de la colonne. */
+    const EMP = new Float64Array(10);
+    function empriseFeu(k) {
+      const o = k * FT, x = feux[o + 1], z = feux[o + 2], r = borner(fini(feux[o + 3]) ? feux[o + 3] : 3, 0.5, 12);
+      const sorte = feux[o + 6] | 0, cible = feux[o + 7];
+      EMP[0] = x; EMP[1] = z; EMP[2] = sol(x, z); EMP[3] = EMP[4] = r * 0.7; EMP[5] = 0; EMP[6] = 0; EMP[7] = 1.4; EMP[8] = 30; EMP[9] = 11;
+      if (sorte === 1 && cible >= 0 && cible < nC) {
+        const i = cible | 0, c = cassables[i], q = FEU_CASSABLE[c.sorte] || FEU_DEFAUT, o7 = i * 7;
+        const l = emprise[o7 + 3], du = emprise[o7 + 5], dv = emprise[o7 + 6];
+        EMP[0] = (fini(c.x) ? c.x : x) + du * Math.cos(l) + dv * Math.sin(l); EMP[1] = (fini(c.z) ? c.z : z) - du * Math.sin(l) + dv * Math.cos(l);
+        EMP[2] = emprise[o7 + 4]; EMP[3] = emprise[o7]; EMP[4] = emprise[o7 + 1]; EMP[5] = l;
+        EMP[6] = Math.min(emprise[o7 + 2], 1.8) * 0.4; EMP[7] = q[0]; EMP[8] = q[1]; EMP[9] = 9 + q[1] * 0.1;
+      } else if (sorte === 1) { EMP[3] = EMP[4] = Math.min(2, r * 0.5); EMP[6] = 0.4; EMP[7] = FEU_DEFAUT[0]; EMP[8] = FEU_DEFAUT[1]; EMP[9] = 13; }
+      else if (sorte === 2) {
+        const s = parId.get(cible);
+        const L = s && fini(s.x2) ? Math.hypot(s.x2 - s.x, s.z2 - s.z) : 6;
+        EMP[3] = borner(L / 2, 1.2, 3.6); EMP[4] = 0.9; EMP[5] = s && L > 0.01 ? Math.atan2(-(s.z2 - s.z), s.x2 - s.x) : 0;
+        EMP[6] = 0.5; EMP[7] = 2.8; EMP[8] = 62; EMP[9] = 16;
+      } else if (sorte === 3) { EMP[3] = EMP[4] = 3.6; EMP[6] = 1.2; EMP[7] = 4.4; EMP[8] = 82; EMP[9] = 22; }
+    }
+    function ajouterTrace(x, z, r) {
+      if (!fini(x) || !fini(z)) return;
+      const o = prochaineTrace * 4;
+      traces[o] = x; traces[o + 1] = z; traces[o + 2] = borner(r, 1, 8); traces[o + 3] = ((x * 7.31 + z * 3.17) % 1 + 1) % 1;
+      prochaineTrace = (prochaineTrace + 1) % TRACES_MAX; nTraces = Math.min(TRACES_MAX, nTraces + 1); tracesChange = true;
+    }
+    function signatureTraces() {
+      let h = 0x811C9DC5;
+      for (let i = 0; i < nTraces; i++) if (vu(traces[i * 4], traces[i * 4 + 1])) h = Math.imul(h ^ (i + 1), 0x01000193);
+      return (h ^ nTraces) >>> 0;
+    }
+    /** Disque de suie irrégulier : un disque, trois taches, un liseré de cendre. */
+    function refaireTraces() {
+      lotTraces.debut();
+      for (let i = 0; i < nTraces; i++) {
+        const o = i * 4, x = traces[o], z = traces[o + 1], r = traces[o + 2];
+        if (!vu(x, z)) continue;
+        const rd = alea(Math.floor(traces[o + 3] * 4294967295)), y = sol(x, z) + 0.014 + (i & 7) * 0.0012;
+        lotTraces.mettre(CYL, x, y + 0.002, z, 2 * r * 1.08, 0.02, 2 * r * 1.08, 0, rd() * PI, 0, MAT.ASPHALTE, 0.2, 0.19, 0.18, 0);
+        lotTraces.mettre(CYL, x, y + 0.004, z, 2 * r * 0.95, 0.02, 2 * r * 0.88, 0, rd() * PI, 0, MAT.ASPHALTE, 0.035, 0.032, 0.03, 0);
+        for (let j = 0; j < 3; j++) {
+          const a = rd() * PI * 2, d = r * (0.35 + 0.4 * rd()), s = r * (0.45 + 0.35 * rd()), g = 0.02 + rd() * 0.05;
+          lotTraces.mettre(CYL, x + Math.cos(a) * d, y + 0.006, z + Math.sin(a) * d, 2 * s, 0.02, 2 * s * (0.6 + 0.4 * rd()), 0, rd() * PI, 0,
+            MAT.ASPHALTE, g, g * 0.92, g * 0.85, 0);
+        }
+      }
+      lotTraces.fin(); mesure.reconstructions++; tracesChange = false; tracesVues = signatureTraces();
+    }
+
     // ---- État reçu. ----
     function etat(e) {
       if (!e) return;
@@ -809,7 +949,7 @@
       if (e.cassables && e.cassables.length && nC) {
         let change = false;
         const n = Math.min(nC, e.cassables.length);
-        for (let i = 0; i < n; i++) { const v = e.cassables[i] ? 1 : 0; if (v !== etatC[i]) { etatC[i] = v; change = true; } }
+        for (let i = 0; i < n; i++) { const v = Math.min(3, e.cassables[i] | 0); if (v !== etatC[i]) { etatC[i] = v; change = true; } }
         if (change) refaireCassables();
       }
       if (e.gisements && e.gisements.length && gisements.length) {
@@ -841,7 +981,18 @@
         }
       }
       if (Array.isArray(e.eco)) for (let f = 0; f < 3; f++) if (e.eco[f] && fini(e.eco[f].qgOccupe) && !parId.has(f)) occupation[f] = e.eco[f].qgOccupe;
+      if (fini(e.vitesse)) vitesseJeu = e.vitesse;
+      // Les évènements d'abord : FEU_ETEINT lit encore le foyer dans la liste d'avant.
       if (e.evenements && e.evenements.length) evenements(e.evenements);
+      if (e.feux && fini(e.feux.length)) {
+        feuxRecus = true; nFeux = Math.min(128, (e.feux.length / FT) | 0);
+        for (let i = 0; i < nFeux * FT; i++) feux[i] = e.feux[i];
+      }
+      if (e.nuages && fini(e.nuages.length)) {
+        nNuages = Math.min(64, (e.nuages.length / NT) | 0);
+        for (let i = 0; i < nNuages * NT; i++) nuages[i] = e.nuages[i];
+      }
+      if (tracesChange) refaireTraces();
       // Les marques ne repartent au GPU que si ce qu'elles montrent change.
       let sig = '';
       for (const m of marques) sig += m.proprietaire + ':' + Math.round(Math.abs(m.progression) * 36) + ':' + (m.conteste ? 1 : 0) + ':' + m.preneur + ';';
@@ -861,7 +1012,40 @@
           case EV.CASSE: if (!loin) { lancer(E.ECLATS, x, z, f, a, b, 1.2); lancer(E.POUSSIERE, x, z, f, 0, 0, 1.4); } break;
           case EV.SALVE_ANNONCE: lancer(E.ANNONCE, x, z, f, a, b, Math.max(0.3, fini(b) ? b : 1.5)); break;
           case EV.SALVE: lancer(E.SALVE, x, z, f, a, b, 1.3); break;
-          case EV.JET: lancer(E.JET, x, z, f, a, b, 0.65); break;
+          case EV.JET: {
+            lancer(E.JET, x, z, f, a, b, 0.65);
+            // Le jet qui tombe sur un foyer : de la vapeur.
+            const px = x + Math.sin(a) * (b || 18), pz = z + Math.cos(a) * (b || 18);
+            for (let q = 0; q < nFeux; q++) {
+              const dx = feux[q * FT + 1] - px, dz = feux[q * FT + 2] - pz, r = feux[q * FT + 3] + 3;
+              if (dx * dx + dz * dz < r * r) { lancer(E.VAPEUR, feux[q * FT + 1], feux[q * FT + 2], f, feux[q * FT + 3], 0, 1.4); break; }
+            }
+            break;
+          }
+          case EV.MOLOTOV: case EV.LACRYMO: case EV.PIERRE: {
+            if (t === EV.PIERRE && loin) break;
+            const d = Math.hypot(a, b), nom = t === EV.MOLOTOV ? 'molotov' : t === EV.LACRYMO ? 'lacrymo' : 'pierre';
+            const vol = RG && typeof RG.dureeVol === 'function' ? RG.dureeVol(nom, d) : 0.6 + d / 20;
+            const v = lancer(t === EV.MOLOTOV ? E.VOL_MOLOTOV : t === EV.LACRYMO ? E.VOL_LACRYMO : E.VOL_PIERRE, x, z, f, a, b,
+              Math.max(0.15, vol / borner(vitesseJeu, 0.25, 8)));
+            if (v) v.h = sol(x + a, z + b);
+            break;
+          }
+          case EV.FEU_ETEINT: {
+            // Une trace de brûlé, la fumée qui traîne, et la vapeur si c'est l'eau qui l'a éteint.
+            const q = feuParId(a);
+            let r = 2.5, hc = 30, lc = 11, cx = x, cz = z;
+            if (q >= 0) {
+              empriseFeu(q);
+              cx = EMP[0]; cz = EMP[1]; hc = EMP[8]; lc = EMP[9];
+              r = (feux[q * FT + 6] | 0) === 0 ? feux[q * FT + 3] * 0.8 : Math.max(EMP[3], EMP[4]) + 0.9;
+            }
+            ajouterTrace(cx, cz, r);
+            lancer(E.FUMEROLLE, cx, cz, f, hc, lc, b === 1 ? 5 : 11);
+            if (b === 1) lancer(E.VAPEUR, cx, cz, f, r, 0, 2.8);
+            break;
+          }
+          case EV.A_TERRE: if (!loin) lancer(E.POUSSIERE, x, z, f, a, b, 0.9); break;
           case EV.LIEU_PRIS: case EV.LIEU_NEUTRALISE: {
             const l = lieux[a | 0];
             lancer(E.PRISE, l ? l.x : x, l ? l.z : z, t === EV.LIEU_PRIS ? f : -1, l ? l.rayon : 12, 0, 1.6);
@@ -897,6 +1081,100 @@
     const T_LAMPE_FEU = [1, 0.52, 0.2];
     const T_MAT_FANION = [0.7, 0.7, 0.72];
     const FEUX_MAX = 16, FEUX_VUS = new Int32Array(FEUX_MAX), DISTANCES_FEUX = new Float64Array(FEUX_MAX);
+    const T_GAZ = [0.9, 0.94, 0.8];
+    const T_VAPEUR = [0.95, 0.96, 0.98];
+    const T_BOUTEILLE = [0.1, 0.24, 0.12];
+    const T_GRENADE = [0.36, 0.38, 0.4];
+    const T_PIERRE = [0.47, 0.45, 0.42];
+    const TC = [0, 0, 0], PT = [0, 0, 0], FLAMME = 'sphere';
+    const frac = v => v - Math.floor(v);
+
+    /** Colonne de fumée : n volumes qui montent sans fin le long de la colonne, s'élargissent, penchent avec le vent de
+     *  plus en plus haut. noir : 1 fumée d'incendie (noire en bas, gris sombre en haut), 0 fumerolle grise. */
+    function colonne(x, y, z, hauteur, largeur, force, graine, noir, n) {
+      if (!(force > 0.01) || !(hauteur > 1)) return;
+      const periode = 4 + hauteur / 5, base = Math.max(2.4, largeur * 0.28), amax = 0.97 - 0.3 * (1 - noir);
+      // De loin, la colonne grossit un peu : elle reste lisible d'un bout à l'autre de la carte.
+      const loin = oeil ? borner((distanceOeil(x, y + hauteur * 0.5, z) - 350) / 500, 0, 1) : 0, gros = 1 + 0.35 * loin;
+      for (let j = 0; j < n; j++) {
+        const ph = frac(horloge / periode + j / n + graine), h = Math.pow(ph, 1.5) * hauteur;
+        const derive = hauteur * 0.45 * Math.pow(ph, 1.7) + Math.sin(horloge * 0.31 + j * 1.7 + graine * 9) * largeur * 0.07 * ph;
+        const w = (base + (largeur - base) * Math.pow(ph, 0.7)) * gros;
+        const g = (1 - noir) * 0.36 + noir * 0.012 + (0.05 + 0.18 * (1 - noir)) * ph;
+        TC[0] = g; TC[1] = g * 0.97; TC[2] = g * 0.94;
+        const px = x + VENT_X * derive, py = y + h + w * 0.3, pz = z + VENT_Z * derive;
+        // Une volute qui frôle la caméra s'efface : la vue de près ne passe pas dans un mur de fumée.
+        const pres = oeil ? borner((distanceOeil(px, py, pz) - w * 0.7) / (w * 1.6), 0, 1) : 1;
+        const alpha = force * amax * pres * Math.min(1, ph / 0.04) * (1 - ph * ph * ph);
+        if (alpha > 0.01) particule('sphere', px, py, pz, w, w * 0.8, w, TC, alpha, 0, 'fumee', NaN, 0, j * 1.3);
+      }
+    }
+    /** Flammes d'un foyer posé sur un rectangle (demi-côtés hu, hv, tourné de lacet), du sol cy, hautes de haut. */
+    function flammes(cx, cy, cz, hu, hv, lacet, haut, n, force, graine, d) {
+      const ca = Math.cos(lacet), sa = Math.sin(lacet), echelle = 0.35 + 0.65 * force;
+      const w0 = borner(Math.min(hu, hv) * 1.15 + 0.3, 0.6, 1.6);
+      for (let j = 0; j < n; j++) {
+        const fu = frac(j * 0.618034 + graine) * 2 - 1, fv = frac(j * 0.754877 + graine * 1.7) * 2 - 1;
+        const u = fu * hu * 0.75, v = fv * hv * 0.65, x = cx + u * ca + v * sa, z = cz - u * sa + v * ca;
+        const s1 = Math.sin(horloge * (6.3 + (j % 3) * 1.3) + j * 2.3 + graine * 17), s2 = Math.sin(horloge * 10.7 + j * 1.3 + graine * 5);
+        const h = haut * echelle * (0.66 + 0.22 * s1 + 0.1 * s2) * (1 - 0.3 * Math.abs(fu * fv));
+        const w = w0 * (0.86 + 0.14 * s2) * (0.7 + 0.3 * echelle);
+        particule(FLAMME, x + VENT_X * h * 0.13, cy + h * 0.45, z + VENT_Z * h * 0.13, w, h, w, T_FLAMME, 1, 1.6, 'feu', NaN, 0.12 * s1, horloge * 0.5 + j);
+        if (d < 180) particule(FLAMME, x + VENT_X * h * 0.05, cy + h * 0.3, z + VENT_Z * h * 0.05, w * 0.6, h * 0.62, w * 0.6, T_FLAMME, 1, 2.4, 'feu', NaN, 0, j);
+      }
+      // Lueur du brasier, à la base. Flammes, lueur, étincelles et fumée sont des sphères : le moteur les trie de la plus
+      // lointaine à la plus proche et fait un appel de dessin par suite de même forme ; une seule forme, peu d'appels.
+      particule(FLAMME, cx, cy + 0.15, cz, hu * 1.6 + 0.5, 0.35 + 0.3 * echelle, hv * 1.6 + 0.5, T_BRAISE, 0.55, 0.5, 'feu', NaN, 0, lacet);
+      // Étincelles qui montent, de près.
+      if (d < 230) for (let j = 0; j < 5; j++) {
+        const ph = frac(horloge * 0.75 + j / 5 + graine), a = graine * 40 + j * 2.4 + ph * 3;
+        particule(FLAMME, cx + Math.cos(a) * hu * 0.6 + VENT_X * ph * 4, cy + haut * echelle * (0.5 + ph * 2), cz + Math.sin(a) * hv * 0.6 + VENT_Z * ph * 4,
+          0.14, 0.14, 0.14, T_BRAISE, 0.95 * (1 - ph), 2, 'etincelle');
+      }
+    }
+    /** Cocktail au sol : flaque de feu, couronne de flammes basses, quelques flammes au milieu. */
+    function flaque(cx, cy, cz, r, force, graine, d) {
+      const e = 0.35 + 0.65 * force, rf = r * 0.55;
+      particule('cylinder', cx, cy + 0.05, cz, 2 * rf, 0.06, 2 * rf, T_FLAMME, 0.7, 0.3, 'feu', NaN, 0, graine * 6);
+      const n = 9;
+      for (let j = 0; j < n; j++) {
+        const a = graine * 6.28 + j * (2 * PI / n) + Math.sin(horloge * 0.7 + j) * 0.08, rr = rf * (0.62 + 0.3 * ((j * 5) % 3) / 2);
+        const s1 = Math.sin(horloge * (7.1 + (j % 3)) + j * 2.1 + graine * 11), h = (0.95 + 0.4 * s1) * e;
+        particule(FLAMME, cx + Math.cos(a) * rr + VENT_X * h * 0.1, cy + h * 0.45, cz + Math.sin(a) * rr + VENT_Z * h * 0.1, 0.8, h, 0.8, T_FLAMME, 1, 1.5, 'feu', NaN, 0.1 * s1, j);
+      }
+      for (let j = 0; j < 3; j++) {
+        const a = graine * 9 + j * 2.1, s1 = Math.sin(horloge * 8.3 + j * 1.7 + graine * 3), h = (1.7 + 0.5 * s1) * e;
+        particule(FLAMME, cx + Math.cos(a) * rf * 0.25, cy + h * 0.45, cz + Math.sin(a) * rf * 0.25, 1.0, h, 1.0, T_FLAMME, 1, 2, 'feu', NaN, 0.08 * s1, j);
+      }
+      if (d < 230) for (let j = 0; j < 4; j++) {
+        const ph = frac(horloge * 0.9 + j / 4 + graine), a = graine * 30 + j * 1.9;
+        particule(FLAMME, cx + Math.cos(a) * rf * 0.5 + VENT_X * ph * 3, cy + 0.8 + ph * 3.5, cz + Math.sin(a) * rf * 0.5 + VENT_Z * ph * 3,
+          0.12, 0.12, 0.12, T_BRAISE, 0.95 * (1 - ph), 2, 'etincelle');
+      }
+    }
+    /** Nuage de gaz : amas de volumes pâles qui s'écartent, rapetissent et pâlissent quand la densité baisse ; de près,
+     *  le filet blanc qui sort encore de la grenade. */
+    function nuage(x, y, z, r, densite, graine, d) {
+      const de = borner(densite, 0, 1), n = d < PRES ? 9 : 5, ecart = 1 + (1 - de) * 0.5;
+      for (let j = 0; j < n; j++) {
+        const a = graine * 6.28 + j * 2.399 + horloge * 0.04, q = frac(j * 0.618 + graine);
+        const dist = r * (0.1 + 0.55 * Math.sqrt(q)) * ecart;
+        const s = r * (0.62 + 0.22 * ((j * 3) % 4) / 3) * (0.6 + 0.4 * de) * (n === 5 ? 1.25 : 1);
+        const w = Math.sin(horloge * 0.5 + j * 1.9 + graine * 7);
+        particule('sphere', x + Math.cos(a) * dist + VENT_X * (1 - de) * r * 0.6, y + 0.3 + s * 0.26 + q * 1.1, z + Math.sin(a) * dist + VENT_Z * (1 - de) * r * 0.6,
+          s * (1 + 0.06 * w), s * 0.55, s, T_GAZ, 0.8 * Math.pow(de, 0.7), 0.8, 'fumee', NaN, 0, a);
+      }
+      if (de > 0.3 && d < PRES) for (let j = 0; j < 3; j++) {
+        const ph = frac(horloge * 0.6 + j / 3 + graine), s = 0.35 + ph * 1.4;
+        particule('sphere', x + VENT_X * ph * 2, y + 0.25 + ph * 2.6, z + VENT_Z * ph * 2, s, s, s, T_VAPEUR, 0.7 * (1 - ph) * de, 0.1, 'fumee');
+      }
+    }
+    /** Position d'un projectile en vol à l'avancement k (0..1) : départ à l'épaule, arrivée au sol, en cloche. */
+    function pointVol(e, k) {
+      const d = Math.hypot(e.a, e.b), fleche = e.sorte === E.VOL_MOLOTOV ? Math.max(2, 0.35 * d) : e.sorte === E.VOL_LACRYMO ? Math.max(2, 0.3 * d) : Math.max(1, 0.22 * d);
+      PT[0] = e.x + e.a * k; PT[2] = e.z + e.b * k; PT[1] = (e.y + 1.6) * (1 - k) + (e.h + 0.1) * k + 4 * fleche * k * (1 - k);
+      return PT;
+    }
     function dessinerEffet(e, age) {
       const k = borner(age / e.duree, 0, 1), y = e.y, c = couleurCamp(e.f);
       switch (e.sorte) {
@@ -991,8 +1269,164 @@
           }
           break;
         }
+        case E.VOL_MOLOTOV: {
+          // La bouteille qui tourne, sa mèche allumée, une traînée de flammes derrière elle.
+          const ry = Math.atan2(e.a, e.b);
+          for (let j = 10; j >= 1; j--) {
+            const kk = k - j * 0.016;
+            if (kk < 0) continue;
+            pointVol(e, kk);
+            const s = 0.8 - j * 0.05;
+            particule('sphere', PT[0], PT[1], PT[2], s, s, s, T_FLAMME, 1 - j / 11, 1.8, 'feu');
+          }
+          pointVol(e, k);
+          solide('cylinder', PT[0], PT[1], PT[2], 0.1, 0.32, 0.1, age * 13, ry, 0, MAT.LAQUE, T_BOUTEILLE, 0.1);
+          particule('octa', PT[0], PT[1] + 0.25, PT[2], 0.32, 0.6, 0.32, T_FLAMME, 0.95, 1.8, 'feu', NaN, 0, age * 4);
+          break;
+        }
+        case E.VOL_LACRYMO: {
+          // La grenade et son filet de fumée blanche qui s'élargit derrière elle.
+          for (let j = 7; j >= 1; j--) {
+            const kk = k - j * 0.04;
+            if (kk < 0) continue;
+            pointVol(e, kk);
+            const s = 0.3 + j * 0.2;
+            particule('sphere', PT[0], PT[1], PT[2], s, s, s, T_VAPEUR, 0.62 * (1 - j / 8.5), 0.1, 'fumee');
+          }
+          pointVol(e, k);
+          solide('cylinder', PT[0], PT[1], PT[2], 0.09, 0.22, 0.09, age * 9, Math.atan2(e.a, e.b), 0, MAT.METAL, T_GRENADE, 0);
+          break;
+        }
+        case E.VOL_PIERRE: {
+          pointVol(e, k);
+          solide('box', PT[0], PT[1], PT[2], 0.2, 0.16, 0.18, age * 11, e.g * 6, age * 7, MAT.BETON, T_PIERRE, 0);
+          pointVol(e, Math.max(0, k - 0.07));
+          solide('box', PT[0] + 0.3, PT[1] - 0.1, PT[2] - 0.2, 0.14, 0.12, 0.15, -age * 9, e.g * 4, age * 5, MAT.BETON, T_GRAVATS, 0);
+          break;
+        }
+        case E.SOUFFLE: {
+          // Le cocktail éclate : boule de feu, verre qui vole, éclair, puis un bouillon de fumée noire.
+          for (let j = 0; j < 7; j++) {
+            const a = e.g * 6.28 + j * 0.9, d = 0.3 + 2.4 * Math.sqrt(k), s = 1.2 + 2.4 * k;
+            particule('sphere', e.x + Math.cos(a) * d, y + 0.5 + 1.4 * k + (j % 3) * 0.3, e.z + Math.sin(a) * d, s, s * 0.8, s, T_FLAMME,
+              0.92 * Math.pow(1 - k, 1.2), 1.6, 'feu');
+          }
+          const t = Math.min(age, 0.8);
+          for (let j = 0; j < 8; j++) {
+            const a = e.g * 6.28 + j * 0.785, v = 3 + (j % 3), h = Math.max(0.02, 0.4 + 2.5 * t - 4.9 * t * t), d = v * t;
+            solide('box', e.x + Math.cos(a) * d, y + h, e.z + Math.sin(a) * d, 0.14, 0.03, 0.1, t * 9 + j, a, t * 5, MAT.LAQUE, T_BOUTEILLE, 0.2);
+          }
+          if (k > 0.35) for (let j = 0; j < 3; j++) {
+            const a = e.g * 9 + j * 2.1, s = 1.6 + 3 * k;
+            particule('sphere', e.x + Math.cos(a) * 1.2, y + 1.2 + 3 * k + j * 0.6, e.z + Math.sin(a) * 1.2, s, s * 0.8, s, T_FUMEE,
+              0.75 * (k - 0.35) / 0.65 * (1.2 - k), 0, 'fumee');
+          }
+          if (k < 0.4) lampe(e.x, y + 1.6, e.z, T_LAMPE_FEU, 6 * (1 - k / 0.4), 22);
+          break;
+        }
+        case E.IMPACT: {
+          if (e.a === 1) {
+            // Grenade : un claquement, une bouffée blanche (le nuage suit, dans etat.nuages), un éclair bref.
+            for (let j = 0; j < 4; j++) {
+              const a = e.g * 6.28 + j * 1.57, d = 0.3 + 1.2 * k, s = 0.6 + 2.6 * k;
+              particule('sphere', e.x + Math.cos(a) * d, y + 0.4 + 0.8 * k, e.z + Math.sin(a) * d, s, s * 0.8, s, T_VAPEUR, 0.7 * (1 - k), 0.1, 'fumee');
+            }
+            if (k < 0.3) lampe(e.x, y + 1, e.z, T_LUEUR, 2.2 * (1 - k / 0.3), 9);
+          } else {
+            // Pierre : poussière et deux éclats.
+            for (let j = 0; j < 2; j++) {
+              const a = e.g * 6.28 + j * 3.1, s = 0.35 + 0.8 * k;
+              particule('sphere', e.x + Math.cos(a) * 0.3, y + 0.2 + 0.3 * k, e.z + Math.sin(a) * 0.3, s, s * 0.7, s, T_POUSSIERE, 0.45 * (1 - k), 0);
+            }
+          }
+          break;
+        }
+        case E.VAPEUR: {
+          // L'eau sur le feu : un panache blanc qui monte vite et se défait.
+          const r = Math.max(1.5, e.a);
+          for (let j = 0; j < 9; j++) {
+            const a = e.g * 6.28 + j * 0.7, d = r * 0.5 * (0.3 + (j % 3) / 3) + k * 1.5, s = (1.4 + (j % 3) * 0.5) * (1 + 2.6 * k);
+            particule('sphere', e.x + Math.cos(a) * d + VENT_X * k * 3, y + 0.8 + k * (6 + (j % 4) * 2.2), e.z + Math.sin(a) * d + VENT_Z * k * 3,
+              s, s * 0.85, s, T_VAPEUR, 0.78 * Math.pow(1 - k, 1.1) * Math.min(1, age / 0.15), 0.15, 'fumee');
+          }
+          break;
+        }
+        case E.FUMEROLLE:
+          // Après le feu : la colonne s'amincit, grisaille et se défait.
+          colonne(e.x, y, e.z, e.a * (0.45 + 0.55 * (1 - k)), e.b * 0.8, 0.8 * Math.pow(1 - k, 1.3), frac(e.g * 7), 0.45 * (1 - k), 7);
+          break;
         default: break;
       }
+    }
+
+    // Foyers et nuages de chaque image. Les huit foyers les plus proches du point visé éclairent, en vacillant.
+    const LAMPES_K = new Int32Array(8), LAMPES_D = new Float64Array(8), TETES = new Float32Array(128 * 2);
+    let viseeX = 0, viseeZ = 0;
+    function dessinerFeux() {
+      let nl = 0, nt = 0, dessines = 0, pres = 0;
+      // Charge : d'après l'image d'avant, beaucoup de foyers en vue ou de près allègent chaque colonne et chaque brasier
+      // (le coût est surtout celui des pixels recouverts par la fumée).
+      const nombreux = mesure.feux > 40 || mesure.feuxPres > 24, serres = mesure.feux > 16 || mesure.feuxPres > 10;
+      for (let k = 0; k < nFeux; k++) {
+        const o = k * FT, x = feux[o + 1], z = feux[o + 2];
+        if (!fini(x) || !fini(z) || !vu(x, z)) continue;
+        empriseFeu(k);
+        const cx = EMP[0], cz = EMP[1], y = EMP[2], sorte = feux[o + 6] | 0, id = feux[o + 0];
+        const force = borner(feux[o + 4], 0, 1) * borner((feux[o + 5] + 0.4) / 3, 0.15, 1), graine = frac(id * 0.6180339 + 0.13);
+        // Colonne : une seule pleine pour des foyers serrés (barricade, propagation), les autres plus courtes.
+        let voisine = false;
+        for (let q = 0; q < nt; q++) { const dx = TETES[q * 2] - cx, dz = TETES[q * 2 + 1] - cz; if (dx * dx + dz * dz < 81) { voisine = true; break; } }
+        if (!voisine && nt < 128) { TETES[nt * 2] = cx; TETES[nt * 2 + 1] = cz; nt++; }
+        const hc = EMP[8] * (0.45 + 0.55 * force) * (voisine ? 0.45 : 1), lc = EMP[9] * (voisine ? 0.6 : 1);
+        // La fumée part du haut des flammes.
+        const yf = y + EMP[6] + EMP[7] * (0.35 + 0.4 * force);
+        // De près, la colonne a plus de volumes : elle reste épaisse quand on la regarde de côté.
+        const nv = voisine ? 4 : nombreux ? 6 : serres ? 8 : distanceOeil(cx, yf, cz) < 260 ? 14 : 10;
+        if (dansVue(cx + VENT_X * hc * 0.22, yf + hc * 0.5, cz + VENT_Z * hc * 0.22, hc * 0.6 + lc)) colonne(cx, yf, cz, hc, lc, 0.35 + 0.65 * force, graine, 1, nv);
+        const base = dansVue(cx, y + 2, cz, 10);
+        if (base) {
+          dessines++;
+          const d = distanceOeil(cx, y, cz);
+          if (d < (nombreux ? PRES * 0.6 : PRES)) {
+            pres++;
+            if (sorte === 0) flaque(cx, y, cz, borner(feux[o + 3], 1, 6), force, graine, d);
+            else {
+              const nfl = borner(Math.round(EMP[3] * EMP[4] * 2.4) + 3, 3, sorte === 3 ? 11 : 8);
+              flammes(cx, y + EMP[6], cz, EMP[3], EMP[4], EMP[5], EMP[7], nombreux ? Math.min(nfl, 4) : nfl, force, graine, nombreux ? d + 200 : d);
+            }
+          } else {
+            // De loin : la lueur seule, un peu grossie pour rester lisible.
+            const e = 0.35 + 0.65 * force;
+            particule(FLAMME, cx, y + EMP[6] + EMP[7] * 0.4 * e, cz, (EMP[3] * 2 + 1.2) * 1.3, EMP[7] * e + 0.8, (EMP[4] * 2 + 1.2) * 1.3,
+              T_FLAMME, 0.92, 1.6, 'feu', NaN, 0, EMP[5]);
+          }
+        }
+        if (dansVue(cx, y + 2, cz, 24)) {
+          const dv = (cx - viseeX) * (cx - viseeX) + (cz - viseeZ) * (cz - viseeZ);
+          if (nl < 8 || dv < LAMPES_D[7]) {
+            let j = nl < 8 ? nl++ : 7;
+            while (j > 0 && LAMPES_D[j - 1] > dv) { LAMPES_D[j] = LAMPES_D[j - 1]; LAMPES_K[j] = LAMPES_K[j - 1]; j--; }
+            LAMPES_D[j] = dv; LAMPES_K[j] = k;
+          }
+        }
+      }
+      for (let j = 0; j < nl; j++) {
+        const k = LAMPES_K[j], o = k * FT;
+        empriseFeu(k);
+        const force = borner(feux[o + 4], 0, 1), g = feux[o] * 1.7;
+        const vacille = 0.8 + 0.12 * Math.sin(horloge * 13 + g) + 0.08 * Math.sin(horloge * 23.7 + g * 3);
+        lampe(EMP[0], EMP[2] + EMP[6] + 1.2 + EMP[7] * 0.4, EMP[1], T_LAMPE_FEU, (1.6 + 1.8 * force) * vacille, borner(10 + EMP[7] * 3 + EMP[3] * 2, 10, 30));
+      }
+      let nn = 0;
+      for (let k = 0; k < nNuages; k++) {
+        const o = k * NT, x = nuages[o + 1], z = nuages[o + 2], r = borner(nuages[o + 3], 0.5, 20);
+        if (!fini(x) || !fini(z) || !vu(x, z)) continue;
+        const y = sol(x, z);
+        if (!dansVue(x, y + 2, z, r + 4)) continue;
+        nn++;
+        nuage(x, y, z, r, nuages[o + 4], frac(nuages[o] * 0.6180339 + 0.37), mesure.nuages > 24 ? PRES + 1 : distanceOeil(x, y, z));
+      }
+      mesure.feux = dessines; mesure.feuxPres = pres; mesure.nuages = nn; mesure.traces = lotTraces.instances;
     }
 
     function cadre(vue, temps) {
@@ -1002,35 +1436,50 @@
       if (vue && vue.pos && vue.axes) {
         oeil = vue.pos; avant = vue.axes.forward; droite = vue.axes.right; haut = vue.axes.up;
         tanV = Math.tan(((vue.fov || 42) * PI) / 360) * 1.08; tanH = tanV * (vue.aspect || 1.8);
+        viseeX = vue.cible && fini(vue.cible[0]) ? vue.cible[0] : oeil[0]; viseeZ = vue.cible && fini(vue.cible[1]) ? vue.cible[1] : oeil[2];
       }
       // Le voile a pu changer depuis la dernière image : les structures ennemies qui entrent en vue ou en sortent.
       if (voileChange && brouillard && joueur >= 0 && structures.length) {
         const sig = signatureVisibles();
         if (sig !== visibles) refaireStructures(true);
       }
+      if (tracesChange || (voileChange && brouillard && joueur >= 0 && nTraces && signatureTraces() !== tracesVues)) refaireTraces();
       voileChange = false;
-      let n = 0;
+      let n = 0, vols = 0;
       for (const e of effets) {
         if (!e.actif) continue;
         const age = horloge - e.t0;
-        if (age >= e.duree || age < -1) { e.actif = false; actifs[e.sorte]--; continue; }
+        if (age >= e.duree || age < -1) {
+          e.actif = false; actifs[e.sorte]--;
+          // Le projectile arrive : l'éclat au point de chute.
+          if (e.sorte === E.VOL_MOLOTOV) { const s = lancer(E.SOUFFLE, e.x + e.a, e.z + e.b, e.f, 0, 0, 0.9, e.h); if (s) s.h = e.h; }
+          else if (e.sorte === E.VOL_LACRYMO) lancer(E.IMPACT, e.x + e.a, e.z + e.b, e.f, 1, 0, 0.6, e.h);
+          else if (e.sorte === E.VOL_PIERRE) lancer(E.IMPACT, e.x + e.a, e.z + e.b, e.f, 0, 0, 0.35, e.h);
+          continue;
+        }
         n++;
+        const vol = e.sorte === E.VOL_MOLOTOV || e.sorte === E.VOL_LACRYMO || e.sorte === E.VOL_PIERRE;
+        if (vol) vols++;
         if (e.sorte !== E.ORDRE && !vu(e.x, e.z)) continue;
-        if (!dansVue(e.x, e.y + 2, e.z, e.sorte === E.JET ? 40 : Math.max(8, e.a + 4))) continue;
+        const rayon = e.sorte === E.JET ? 40 : vol ? Math.hypot(e.a, e.b) / 2 + 8 : e.sorte === E.FUMEROLLE ? e.a : Math.max(8, e.a + 4);
+        if (!dansVue(vol ? e.x + e.a / 2 : e.x, e.y + 2, vol ? e.z + e.b / 2 : e.z, rayon)) continue;
         dessinerEffet(e, Math.max(0, age));
       }
-      // Feux des barricades en vue, du plus proche au plus loin de la caméra : 16 au plus, les 3 plus proches éclairent.
-      let feux = 0;
-      for (let i = 0; i < infos.length; i++) {
+      mesure.vols = vols;
+      dessinerFeux();
+      // Feux des barricades en vue (protocole 1, sans etat.feux), du plus proche au plus loin de la caméra : 16 au plus,
+      // les 3 plus proches éclairent. Avec etat.feux, les foyers des barricades sont dessinés par dessinerFeux.
+      let nbFeux = 0;
+      for (let i = 0; i < infos.length && !feuxRecus; i++) {
         const f = infos[i].r.feu;
         if (!f || !dansVue(f[0], f[1] + 3, f[2], f[3] / 2 + 6) || (!infos[i].ami && !vu(f[0], f[2]))) continue;
         const d = distanceOeil(f[0], f[1], f[2]);
-        if (feux === FEUX_MAX && d >= DISTANCES_FEUX[FEUX_MAX - 1]) continue;
-        let j = feux < FEUX_MAX ? feux++ : FEUX_MAX - 1;
+        if (nbFeux === FEUX_MAX && d >= DISTANCES_FEUX[FEUX_MAX - 1]) continue;
+        let j = nbFeux < FEUX_MAX ? nbFeux++ : FEUX_MAX - 1;
         while (j > 0 && DISTANCES_FEUX[j - 1] > d) { DISTANCES_FEUX[j] = DISTANCES_FEUX[j - 1]; FEUX_VUS[j] = FEUX_VUS[j - 1]; j--; }
         DISTANCES_FEUX[j] = d; FEUX_VUS[j] = i;
       }
-      for (let k = 0; k < feux; k++) {
+      for (let k = 0; k < nbFeux; k++) {
         const info = infos[FEUX_VUS[k]], cx = info.r.feu[0], cy = info.r.feu[1], cz = info.r.feu[2], L = info.r.feu[3], lacet = info.r.feu[4];
         const ca = Math.cos(lacet), sa = Math.sin(lacet), nf = borner(Math.round(L / 2.2), 2, 7), graine = (info.s.id | 0) * 1.37;
         for (let j = 0; j < nf; j++) {
@@ -1100,9 +1549,10 @@
       if (o.allie !== undefined) { const a = o.allie === null ? -1 : o.allie | 0; if (a !== allie) { allie = a; refaire = true; } }
       if (o.brouillard !== undefined && !!o.brouillard !== brouillard) { brouillard = !!o.brouillard; refaire = true; }
       if (refaire && structures.length) refaireStructures(false);
+      if (refaire && nTraces) tracesChange = true;
     }
     function voile(u8, geo) {
-      if (!u8 || !geo) { voileCpu = null; voileGeo = null; return; }
+      if (!u8 || !geo) { if (voileCpu && nTraces) tracesChange = true; voileCpu = null; voileGeo = null; return; }
       if (!voileCpu || voileCpu.length !== u8.length) voileCpu = new Uint8Array(u8.length);
       voileCpu.set(u8);
       voileGeo = { nx: geo.nx | 0, nz: geo.nz | 0, x0: +geo.x0, z0: +geo.z0, cellule: +geo.cellule || 8 };

@@ -461,7 +461,10 @@
       float inner=clamp(iPosition.w-20.,0.,.999);
       particlePosition.xz*=mix(inner*.5,.5,side)/max(radial,.0001);
     }
-    vWorld=rotation*(particlePosition*iScale.xyz)+iPosition.xyz;`);
+    vWorld=rotation*(particlePosition*iScale.xyz)+iPosition.xyz;`)
+    // PDR (grain) : le grain des fumées et des flammes est pris à l'échelle d'une particule de 2,6 m au plus ; au-delà
+    // (colonnes de fumée, nuages de gaz vus de 300 à 900 m), il ne tombe plus sous le pixel en semis de points.
+    .replace('vSurface=vObject>.5?aPosition*iScale.xyz:vWorld;','vSurface=(vObject>.5?aPosition*iScale.xyz:vWorld)*min(1.,2.6/max(max(abs(iScale.x),abs(iScale.y)),max(abs(iScale.z),.001)));');
   const FX_FRAG=`#version 300 es
   precision highp float;
   in vec3 vWorld;
@@ -1864,7 +1867,7 @@
       stats.staticVisible=shown.length;stats.staticCulled=world.length-shown.length;
       const planned=actorLightPlan&&actorLightPlan.previous===shadowLight&&eye.every((v,k)=>v===actorLightPlan.eye[k])?actorLightPlan.plan:lightPlan(eye);actorLightPlan=null;
       const {sorted,distanceTo,chosen,shadowLights}=planned;shadowLight=chosen;
-      const transient=transientLights(fx.lights,eye,quality==='low'?2:3);stats.dynamicLights=transient.length;
+      const transient=transientLights(fx.lights,eye,quality==='low'?4:8);stats.dynamicLights=transient.length;
       const selected=shadowLights.map(light=>({light,d:distanceTo(light)})).concat(transient.map(light=>({light,d:distanceTo(light)})),sorted.filter(entry=>!shadowLights.includes(entry.light)).slice(0,(quality==='low'?6:12)-shadowLights.length-transient.length));
       const blackout=horrorLights(fx.horror,lights);stats.blackoutLights=blackout?.size||0;
       lightPositions.fill(0);lightColors.fill(0);lightRanges.fill(0);
