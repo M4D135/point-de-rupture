@@ -170,6 +170,18 @@ rendement, et la simulation en tire son feu (`regles.feuObjet`). Le lot L2 peut 
 donne des valeurs par défaut à une sorte inconnue, et le décor (L5) doit la dessiner intacte, cassée, en feu, calcinée.
 L2 remet donc à L5 la liste des sortes et leur dessin.
 
+Remis par L2 (commit `ce67c66`) : quatre sortes nouvelles, `'deux-roues'`, `'conteneur'`, `'terrasse'`, `'kiosque'`
+(`casser(...)` dans `ville-reelle.js`), à ajouter en fin de `SORTES_CASSABLES` (`protocole.js`) par L4 : sur `main`, une
+sorte inconnue donne 255 dans l'évènement CASSE et le son retombe sur « metal ». Comptes pour 9 / 13 / 15 îlots :
+
+| Sorte | 9 | 13 | 15 | | Sorte | 9 | 13 | 15 |
+|---|---|---|---|---|---|---|---|---|
+| voiture | 552 | 1 491 | 2 113 | | deux-roues | 154 | 270 | 339 |
+| vitrine | 220 | 678 | 932 | | terrasse | 150 | 317 | 383 |
+| poubelle | 267 | 553 | 774 | | conteneur | 16 | 34 | 40 |
+| banc | 75 | 104 | 122 | | kiosque | 3 | 3 | 5 |
+| abribus | 27 | 43 | 46 | | barrière | 24 | 24 | 24 |
+
 ### 5.4 Le son
 
 L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préchauffage) et les façades `PDR.son` et
@@ -338,13 +350,15 @@ l'export rend un module « M.K. » valide).
 
 ### IA — Intégration A, et mise en ligne intermédiaire
 
-Dans `integration-a` : fusionner `main`, `ferro-rendu`, `v03-marseille`, `v03-musique` ; finir L1 ; mettre à jour le
+Dans `integration-a` : fusionner `main`, `ferro-rendu`, `v03-marseille` (`v03-musique` n'est pas prêt : la musique
+s'intègre plus tard, dans une intégration à part ou dans IB) ; finir L1 ; mettre à jour le
 README (section « Essai 0.3, en cours ») et les paragraphes moteur, plan réel et musique de la conception ; ranger dans
 le dépôt les outils encore dehors ; construire ; toutes les suites ; trois essais Chrome (Marseille 100 000, damier
 100 000, téléphone 20 000) comparés aux captures de la 0.2 ; vérifier dans la page le son, les réglages, l'export ;
 committer avec la page construite et contrôler qu'une seconde construction ne change rien.
 Puis la session principale vérifie, avance `main`, pousse, met en ligne (`Jeu/deposer.sh`), republie l'aperçu. David
-voit alors la nouvelle Marseille et la nouvelle musique ; la rue garde ses anciens bruitages jusqu'à L8, à lui dire.
+voit alors la nouvelle Marseille ; la musique reste celle de la 0.2 jusqu'à l'intégration de L3, et la rue garde ses
+anciens bruitages jusqu'à L8, à lui dire.
 
 ### L4 — Simulation : finir
 
@@ -373,6 +387,7 @@ une limite de lancers par itération.
 6. Coût : millisecondes par itération à 100 000 unités avant et après (`banc-sim.mjs`), 10 % de plus au maximum.
 7. `CONCEPTION.md` : les demandes 2, 3 et 4 du § 1 mot pour mot avec leur date ; les règles et les chiffres ; le ton (D1).
 8. Corriger le § 5.1 de ce plan si un format a changé.
+9. Ajouter à `SORTES_CASSABLES` les quatre sortes de L2 (§ 5.3), avec leurs valeurs de feu.
 
 **Le Spark** : la fiche existe (`spark/sim.fiche.md`) ; relecture finale du diff de `monde.js` par morceaux ; premier
 jet des contrôles à ajouter à `sim.test.mjs` (un par mécanique).
@@ -404,7 +419,7 @@ braises en `sphere`, trois sphères de fumée, une lampe pour les trois plus pro
    cloche, de l'évènement au point de chute, pendant `dureeVol` ; à l'arrivée, un éclat et un éclair de lampe.
 5. **Nuages de gaz** de `etat.nuages` : amas de volumes pâles qui grossit deux secondes puis se délite avec la densité.
 6. **Cassables** : état 2, l'objet et ses flammes ; état 3, la carcasse noircie. Les sortes nouvelles de L2 se
-   dessinent dans les quatre états.
+   dessinent dans les quatre états : deux-roues, conteneur, terrasse, kiosque (§ 5.3), à dessiner en feu et calcinés.
 7. **Traces de brûlé** : un disque sombre au sol là où un foyer s'est éteint, 512 au plus, dans un lot stable refait
    seulement quand la liste change.
 8. **Lampes** : les huit foyers les plus proches du point visé éclairent façades et foule, en vacillant.
@@ -479,6 +494,9 @@ contrôle la passe des débuts d'état ; les mesures.
 6. **Démo** : à la fin d'une partie de démo, la suivante part aussitôt, autre graine, sans passer par le titre ; le
    réalisateur va d'abord vers les foyers, les lancers, les charges.
 7. **Minicarte** : les foyers et les nuages. **Téléphone** : la préparation et les ordres tiennent en 390 points de large.
+8. **L'horizon** (remarque de L2) : l'inclinaison de la caméra (42 à 60°) ne montre jamais Notre-Dame de la Garde, et les
+   forts seulement au zoom le plus lointain, au bord ouest. Envisager une inclinaison plus basse, ou un plan large du
+   réalisateur de la démo ; en mesurer le coût.
 
 **Recette** : `interface.test.mjs` étendu (remise en forme des options, touches sans conflit, bandeau par mode) ; un
 essai Chrome par mode à 20 000 unités, mené jusqu'à l'écran de fin en vitesse 8 ; captures de la préparation, du
@@ -567,10 +585,10 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 |---|---|---|---|
 | Retrait d'Unreal | fait | `5ac0066` | Dépôt et Mac. |
 | Réparation du test du noyau | fait | `a4cfed3` | |
-| L1 Rendu | à finir dans IA | `71f99a6` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Restent les points 1 et 3. |
-| L2 Marseille | à reprendre | `de8cf76` | |
+| L1 Rendu | fait | `71f99a6`, IA | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
+| L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
 | L3 Musique | à reprendre | `2dc9248` | |
-| IA + mise en ligne | à faire | | |
+| IA + mise en ligne | fait, mise en ligne à faire | IA | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. |
 | L4 Simulation | à reprendre | `4020ac6` | |
 | IB | à faire | | |
 | L5 Feu à l'écran | à faire | | |

@@ -15,12 +15,26 @@ Décisions de David du 12 novembre 2026, dans l'ordre :
   new york », enfin « juste marseille, on verra, les autres seront pour les maj suivantes » : la 0.2 joue sur le vrai
   plan de Marseille ; la ville imaginaire en damier reste au choix ; Paris et New York viendront ensuite.
 
-**Plan réel.** Les rues, le bâti, l'eau et les parcs viennent d'OpenStreetMap, par les tuiles vectorielles
-d'OpenFreeMap (schéma OpenMapTiles, zoom 14), et non de Google Maps, dont les conditions interdisent d'extraire les
-données. Licence ODbL : le jeu affiche « © les contributeurs d'OpenStreetMap » tant que la ville vient de ces données
-(écran titre, minicarte, préparation). Outil : `outils/plans/extraire.py`, données : `src/villes/marseille.js`.
+**Plan réel.** Marseille est tirée d'OpenStreetMap (tuiles OpenFreeMap, licence ODbL) : rues, 5 274 bâtiments avec
+leur hauteur quand elle est connue, eau, places, repères, et 1 008 points de mobilier. Le générateur en fait le décor,
+de façon déterministe. Les bâtiments ont une hauteur plausible par quartier quand OSM ne la donne pas (Panier bas aux
+enduits vifs, cinq à sept étages en pierre sur la Canebière et la rue de la République), des toits de tuile canal, de
+zinc ou des terrasses. Les monuments sont dessinés d'après leur emprise : l'Hôtel de Ville, Saint-Ferréol, la Bourse,
+l'Opéra, les Accoules, la Vieille Charité. Les rues ont leurs platanes, réverbères, terrasses de café, voitures et
+deux-roues garés, et le port ses voiliers et ses barques. Au-delà du carré de jeu, le lointain reprend la ville jusqu'à
+1,25 km : la mer, le bâti, la Major, les forts Saint-Jean et Saint-Nicolas, le MuCEM, et Notre-Dame de la Garde sur sa
+colline. Ce qui peut brûler est cassable : voitures, deux-roues, terrasses, poubelles, conteneurs, abribus, kiosques.
+Les données viennent d'OpenStreetMap et non de Google Maps, dont les conditions interdisent d'extraire les données ; le
+jeu affiche « © les contributeurs d'OpenStreetMap » tant que la ville en vient (écran titre, minicarte, préparation).
+Outils : `outils/plans/` ; données : `src/villes/marseille.js` ; générateur : `src/ville-reelle.js`.
 
-**FERRO de référence.** Branche `campagne-18-mondes`, commit `4ce2271`. Son `renderer.js` est identique à celui du commit `950f743`, déjà repris dans `src/moteur/`. Ce qui a évolué depuis, et que l'on reprend : `audio.js` (sons calculés), `music.js` (musique ProTracker à quatre canaux, instruments calculés), `options.js` et le menu de réglages, `effects.js` et `destruction.js` pour les effets.
+**Moteur.** Le moteur de rendu, `src/moteur/renderer.js`, appartient au jeu. Il vient du jeu METAL et a été mis à jour
+le 12 novembre 2026 sur le dernier état du moteur commun, FERRO 0.2, avant la suppression de ce dépôt (« le moteur
+evolue selon le jeu », David, 12/11) : il n'y a plus de copie de référence ni de récolte. Six ajouts du jeu y sont
+marqués « PDR » (origine, voile, éclairage, lots, foule, MSAA) ; les anciens réglages en dur passent par
+`REGLAGES_MOTEUR` dans `jeu.js`. Tout changement du moteur prend une ligne dans `src/moteur/PROVENANCE.md` (quoi,
+pourquoi, quel coût) et garde `rendu.test.mjs` vert. Le son et la musique sont des portages en français de ceux de
+METAL (`src/moteur/PROVENANCE-SON.md`).
 
 **Ton**, repris de `CONTRE-EXPERTISE.md` §4.6 : une bagarre burlesque stylisée.
 - Personne ne meurt ni ne saigne. Une unité à bout de cohésion est « hors jeu » et quitte la partie.
@@ -193,7 +207,7 @@ foule.js        100 000 unités sur le GPU              ville.js            vill
 decor.js        structures, cassables, effets          sim/regles.js       règles communes (partagé)
 camera.js       caméra RTS et réalisateur de la démo   sim/protocole.js    messages et tampons (partagé)
 son.js          évènements et état → sons
-moteur/renderer.js  FERRO + retouches PDR
+moteur/renderer.js  moteur du jeu (FERRO 0.2 + ajouts PDR)
 moteur/audio.js     sons calculés (d'après FERRO)
 moteur/musique.js   musique MOD calculée (d'après FERRO)
 ```
