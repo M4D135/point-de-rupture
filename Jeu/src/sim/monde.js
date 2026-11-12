@@ -93,6 +93,7 @@
     charge: new Uint8Array(NT), chMin2: new Float64Array(NT), chMax2: new Float64Array(NT), chPres: new Int32Array(NT), chRech: new Int32Array(NT),
     chElan: new Int32Array(NT), chDuree: new Int32Array(NT), chRecul: new Int32Array(NT), chPerce: new Uint8Array(NT),
     molotov: new Uint8Array(NT), lacrymo: new Uint8Array(NT),
+    lance: new Uint8Array(NT), lancePortee: new Int32Array(NT), lanceDebit: new Int32Array(NT),
   };
   for (const t of R.TYPES) {
     const k = t.id, c = t.capacites;
@@ -116,6 +117,7 @@
       T.chPerce[k] = c.charge.perce ? 1 : 0;
     }
     T.molotov[k] = c.molotov ? 1 : 0; T.lacrymo[k] = c.lacrymo ? 1 : 0;
+    T.lance[k] = c.lance ? 1 : 0; T.lancePortee[k] = c.lance ? Math.round(c.lance.portee * 1000) : 0; T.lanceDebit[k] = c.lance ? Math.round(c.lance.debit * 1000) : 0;
   }
   const SALVE = R.TYPES[10].capacites.salve, JET = R.TYPES[12].capacites.jet;
   const SALVE_PORTEE = SALVE.portee * 1000, SALVE_RAYON = SALVE.rayon * 1000, SALVE_COUPS = Math.round(SALVE.pression * RYTHME * 1000);
@@ -658,11 +660,11 @@
           return;
         }
         case CMD.DIPLOMATIE: diplomatie(j, c.action, c.avec); return;
-        case CMD.CAPACITE: case CMD.MOLOTOV: {
-          // Salve et grenade (Compagnie), jet (Canon à eau), cocktail (Furets) : l'unité s'approche à portée du point,
+        case CMD.CAPACITE: case CMD.MOLOTOV: case CMD.ETEINDRE: {
+          // Salve et grenade (Compagnie), jet (Canon à eau), cocktail (Furets), arrosage (Pompiers) : l'unité s'approche à portée du point,
           // puis agit. Le cocktail coûte des Matériaux : sans de quoi en lancer un seul, l'ordre est refusé.
-          const cap = c.t === CMD.MOLOTOV ? 'molotov' : c.capacite, salve = cap === 'salve';
-          const table = salve ? T.salve : cap === 'jet' ? T.jet : cap === 'lacrymo' ? T.lacrymo : cap === 'molotov' ? T.molotov : null;
+          const cap = c.t === CMD.MOLOTOV ? 'molotov' : c.t === CMD.ETEINDRE ? 'lance' : c.capacite, salve = cap === 'salve';
+          const table = salve ? T.salve : cap === 'jet' ? T.jet : cap === 'lacrymo' ? T.lacrymo : cap === 'molotov' ? T.molotov : cap === 'lance' ? T.lance : null;
           if (!table) return;
           const k = filtrer(c, j, t => table[t] === 1);
           if (!k) { refus(j, RAISON.INTERDIT, c.t); return; }
@@ -1817,8 +1819,9 @@
           // Sur ordre : 3 cocktail (Furets), 2 grenade (Compagnie, capacité seconde), 1 salve, 0 jet.
           const dx = usx[i] - x, dz = usz[i] - z, d2 = dx * dx + dz * dz;
           const sorte = T.molotov[t] ? 3 : (umode[i] & M_SECONDE) ? 2 : T.salve[t] ? 1 : 0;
-          const portee = sorte === 3 ? MO_MAX : sorte === 2 ? LA_MAX : sorte === 1 ? SALVE_PORTEE : JET_PORTEE;
-          if (d2 <= portee * portee) {
+          const portee = sorte === 3 ? MO_MAX : sorte === 2 ? LA_MAX : sorte === 1 ? SALVE_PORTEE : T.lance[t] ? T.lancePortee[t] : JET_PORTEE;
+          const ki = T.lance[t] && IMM.enFeu > 0 ? PDR.immeubles.pres(IMM, usx[i] / 1000, usz[i] / 1000) : -1;
+          if (d2 <= portee * portee || (ki >= 0 && PDR.immeubles.distFacade(IMM, ki, x / 1000, z / 1000) * 1000 <= portee)) {
             if (sorte >= 2) {
               // À portée, le lanceur attend sa recharge s'il le faut ; sans Matériaux, l'ordre du cocktail tombe.
               if ((sorte === 3 ? urech[i] : urech2[i]) > 0 && (sorte === 2 || res[f * 2 + 1] >= MO_COUT)) uetat[i] = ET.OISIF;
