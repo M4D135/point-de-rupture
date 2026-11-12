@@ -90,6 +90,16 @@ def extrait(designation):
     return f'=== {m["p"]}, lignes {a} à {b} sur {len(lignes)} ===\n' + '\n'.join(lignes[a - 1:b]) + '\n=== fin de l\'extrait ===\n'
 
 
+def cites(texte):
+    """Les lignes du dépôt que cite une pile d'erreur (…/Jeu/verifications/x.test.mjs:297:10), trois au plus."""
+    vus = []
+    for m in re.finditer(r'(Jeu/[\w./-]+\.(?:mjs|cjs|js|py)):(\d+)', texte):
+        c = (m[1], int(m[2]))
+        if c not in vus and (RACINE / m[1]).is_file():
+            vus.append(c)
+    return vus[:3]
+
+
 def demander(demande, fichier, effort=None):
     fichier.write_text(demande, encoding='utf-8')
     commande = [KBZA, 'ask', '--prompt-file', str(fichier), '--no-memory', '--max-tokens', '0', '--timeout-seconds', '900']
@@ -187,13 +197,21 @@ def mener(fiche_chemin, a):
     if sale and not a.essai:
         dire(nom, 'arbre de travail modifié : la chaîne ne part que d\'un arbre propre')
         return False, 'arbre modifié'
-    base = REGLE + '\n## La tâche\n' + fiche['texte'] + '\n\n## Les extraits (le Spark ne voit que ceux-ci)\n' + \
-        '\n'.join(extrait(d) for d in fiche['fichiers'])
+    try:
+        extraits = '\n'.join(extrait(d) for d in fiche['fichiers'])
+    except SystemExit as e:  # motif absent : cette fiche est rouge, la chaîne continue (ou s'arrête avec --arret)
+        dire(nom, f'extrait impossible : {e}')
+        journal.write_text('\n'.join(lignes_journal + [f'- extrait impossible : {e}']) + '\n', encoding='utf-8')
+        return False, f'extrait impossible : {e}'
+    base = REGLE + '\n## La tâche\n' + fiche['texte'] + '\n\n## Les extraits (le Spark ne voit que ceux-ci)\n' + extraits
+    ajouts = []  # lignes citées par une erreur de test, montrées aux tours suivants (le Spark ne devine plus)
     reponse, echec = '', ''
     for tour in range(1, a.tours + 1):
         demande = base
+        if ajouts:
+            demande += '\n## Extraits ajoutés : les lignes que cite l\'erreur\n' + '\n'.join(extrait(d) for d in ajouts)
         if echec:
-            reste = 29000 - len(base) - len(echec) - 400
+            reste = 29000 - len(demande) - len(echec) - 400
             demande += (f'\n## Ta réponse précédente a échoué ; corrige-la (les fichiers sont revenus à l\'état des '
                         f'extraits)\n{echec}\n\n### Ta réponse précédente\n{reponse[:max(reste, 0)]}\n')
         if len(demande) > 30000:
@@ -231,6 +249,10 @@ def mener(fiche_chemin, a):
             lignes_journal.append(f'- tour {tour} : appliqué ({", ".join(touches)}), rouge : {echec.splitlines()[0]}')
             dire(nom, f'tour {tour} : rouge : {echec.splitlines()[0]}')
             remettre(touches, crees)
+            for rel, n in cites(echec):
+                d = f'{rel}:{max(1, n - 12)}-{n + 12}'
+                if d not in ajouts and len(ajouts) < 4:
+                    ajouts.append(d)
             continue
         lignes_journal.append(f'- tour {tour} : vert ({", ".join(touches)}) ; {resume}')
         dire(nom, f'tour {tour} : vert, {", ".join(touches)}')

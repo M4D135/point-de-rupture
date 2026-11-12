@@ -716,8 +716,8 @@ premier jet) pendant que DeepSeek fait les premières passes de L3 et de L4 ; L4
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
 | Version à l'écran titre | fait, en ligne | `3601ca6` | 12/11 : essai 0.3b, « 03 / MARSEILLE V0.3b » ; `construire.py` écrit version et édition dans la page. |
 | ZQSD et pancartes (D11) | fait, en ligne | `5f9c3b7` | 12/11, vers 21 h 45 : essai 0.3c en ligne (empreinte de la page servie `470ac778935bbd86` vérifiée), aperçu republié. Réglages en version 2 (migration testée, et vérifiée dans Chrome avec de vraies touches), une banderole ou pancarte sur huit (captures de près). Suites vertes. |
-| L4 Simulation | en cours | `dd1a161` | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Le reste du lot : agent Opus lancé le 12/11 vers 21 h 55 sur `v03-feu-sim`, avancée à `integration-c` (`3069e2e`). |
-| L9 Immeubles et pompiers | à faire | | Ajouté le 12/11 au soir (D9). |
+| L4 Simulation | en cours | `dd1a161`, `05714ee`, `31cc352`, `bdef367` (`v03-feu-sim`) | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Puis l'agent Opus, sur `v03-feu-sim` avancée à `integration-c` : quatre sortes cassables au protocole, démo sans cible ni limite dès « pret », foyers et nuages qui se chevauchent (`05714ee`) ; jet et gaz qui ne pèsent plus selon la densité de la foule, Convergence qui casse sans manquer de Matériaux (`31cc352`) ; CONCEPTION § 1 (`bdef367`). Agent arrêté vers 23 h (« go full spark ») ; le Spark a repris CONCEPTION et ce plan (`731a21d`, `9135e35`). Reste : voir « Reprise » plus bas. |
+| L9 Immeubles et pompiers | en cours (Spark) | `fe98ebc` (`v03-feu-sim`) | Ajouté le 12/11 au soir (D9). Constantes faites (`fe98ebc`). Le reste en seize fiches pour la chaîne du Spark (`Jeu/outils/spark/fiches/l9/`), menées sans Claude par `pilote.sh` depuis le 12/11, 23 h 30. Voir « Reprise ». |
 | IB | provisoire | `706eb9f`, puis `integration-c` | `706eb9f` : `main` + la simulation en premier jet (`a73a2dd`), la base de L5. 12/11 vers 21 h 50 : `integration-c` (`3069e2e`) = `main` (0.3c) + `dd1a161` + L5, suites vertes, essai Chrome sans erreur : la base de la fin de L4 et de l'essai 0.3d. À refaire après L4 et L9. |
 | L5 Feu à l'écran | fait | `ffa4c74`, `c8ec75f`, `717d1b5` | 12/11 : foyers, colonnes noires penchées au vent (lisibles à 900 m), flaques, vols et éclats, gaz, cassables en 4 états (dont deux-roues, conteneur, terrasse, kiosque), 512 traces, 8 lampes vacillantes, vapeur, brouillard. Banc `banc-feu.py` : 128 foyers et 64 nuages à 100 000, 60 images/s à 600 m, 58,5 à 160 m (charge 7 à 9). Moteur : ajouts « grain » et « lampes ». Manque côté sim : les 4 nouvelles sortes dans `SORTES_CASSABLES`. Fonctions à resservir pour L5b (`decor.js`, sans allocation par image) : `lampeFeu`, `colonne`, `flammes`, `flaque`, `nuage`. Défaut bénin laissé à L5b : un vol ou un effet reçu avant la première image meurt aussitôt (horloge à 0). |
 | Essai 0.3d | fait, en ligne | `55a4ddd` | 12/11 vers 22 h : `main` = `integration-c` + version 0.3d. Le feu à l'écran sur la simulation en premier jet (partie jusqu'au dernier, 40 % de manifestants, démo sans fin aux points). Suites vertes (12) ; essai Chrome Marseille à 100 000 : console vide, 0 image lente ; empreinte de la page servie `d33bbeacb3a2c70c` vérifiée ; aperçu republié. |
@@ -726,6 +726,55 @@ premier jet) pendant que DeepSeek fait les premières passes de L3 et de L4 ; L4
 | L7 Interface | à faire | | |
 | L8 Sons | à faire | | |
 | IC + mise en ligne | à faire | | |
+
+### Reprise après la pause du 12/11/2026, 23 h 30
+
+David, le 12/11 au soir : « go full spark pour economiser tes tokens », puis « finis ce que es en train de faire, puis
+commit push et fais doc suivi pour reprendre plus tard, pause token », puis « donne un maximum de boulot au spark avant
+ta pause, tu reprendras ses resultats ». Plus d'agent Opus sur ces lots : le Spark écrit le code par la chaîne
+(`Jeu/outils/spark/chaine.py`, § 6.1), Claude cadre et vérifie.
+
+**Branches.** `main` : la 0.3d en ligne (`55a4ddd`), ce plan, la chaîne et ses fiches. `v03-feu-sim` : L4 et L9, à
+`fe98ebc` au départ du pilote, qui y ajoute ses commits « Spark : … » (à pousser à la reprise). `integration-c`
+(`3069e2e`), `v03-feu-ecran` (`717d1b5`, L5), `v03-musique` (`681cac7`, L3). Les arbres de travail sont dans le dossier
+temporaire de la session : s'ils ont disparu, `git worktree prune` puis `git worktree add <dossier> v03-feu-sim`.
+
+**Le pilote du Spark** : `Jeu/outils/spark/fiches/l9/pilote.sh <arbre de v03-feu-sim>`, lancé le 12/11 à 23 h 30,
+détaché, un seul passage, sans timer. Le Spark sert aussi d'autres files ce soir-là : il peut tourner des heures.
+1. Module et protocole, arrêt au premier rouge : l9-02 Pompiers et Camion de pompiers (types 13 et 14), l9-03 et l9-04
+   le module `sim/immeubles.js`, l9-05 sa suite `immeubles.test.mjs`, l9-06 son chargement partout, l9-07 le protocole
+   (ETEINDRE 18, IMMEUBLE_FEU 38, IMMEUBLE_ETEINT 39, `etat.immeubles`, bilan).
+2. Les villes : l9-08 la ville imaginaire, l9-09 Marseille (`sites.immeubles`).
+3. Si 1 et l9-08 sont verts, la simulation, arrêt au premier rouge : l9-10 branchement, l9-11 état et empreinte, l9-12
+   et l9-13 la lance des pompiers, l9-14 le recul devant une façade en feu, l9-15 l'IA de la Préfecture, l9-16 les
+   vérifications dans `sim.test.mjs`.
+4. Une relecture du Spark sur tout le diff commité.
+
+Sorties, non suivies : `Jeu/outils/spark/fiches/l9/sorties/` (`pilote.log`, `BILAN.md`, `chaine/` avec demandes,
+réponses et journal de chaque fiche, `relectures/`). Une fiche verte est un commit sur `v03-feu-sim` ; une fiche rouge
+laisse l'arbre propre. Les contrôles de fumée `fumee-*.cjs` des fiches se lancent depuis la racine d'un arbre.
+
+**À la reprise :**
+1. Lire `sorties/BILAN.md` et `pilote.log` ; si `pilote.sh` tourne encore (`ps aux | grep pilote.sh`), attendre.
+2. Relire chaque commit « Spark : » et les constats de `relectures/` (le Spark se trompe avec assurance) ; corriger ce
+   qui est vrai ; repasser les suites.
+3. Fiche rouge : son journal et sa dernière réponse dans `sorties/chaine/` ; resserrer la fiche, relancer la chaîne
+   depuis elle (depuis l'arbre de `v03-feu-sim`, arbre propre, `--arret`).
+4. Pousser `v03-feu-sim`.
+5. Reste de L4 : le coût de la simulation (+26 à 28 % mesurés par l'agent, correction de la navigation à faire), la
+   démo de 60 min à vérifier, l'essai Chrome, une relecture du Spark sur le diff de `monde.js` de L4.
+6. Le panneau de production (`src/interface/commandes.js`, `k < 5`) ne montre que cinq types par camp : Pompiers et
+   Camion n'y sont pas encore, ni l'ordre ETEINDRE (L7).
+7. Puis IB (`main` + `v03-feu-sim` + L3), l'essai 0.3e en ligne (`VERSION` = « essai-0.3e »), puis L5b, L3, L6, L7,
+   L8, IC selon le § 8.
+
+**Équilibre mesuré à `31cc352`** (graine 1, 16 parties ; outils et tableau dans `Jeu/outils/equilibre/`,
+`tableau-31cc352.txt`) : en « jusqu'au dernier », la Convergence gagne en 34,3 min (damier, 100 000), 31,5 (damier,
+20 000) et 34,4 (Marseille, 20 000) ; Marseille à 100 000 n'est pas finie à 40 min. En « mixte » et « points », une
+alliance gagne vers 10 à 15 min ; en « temps », surtout Bastion et Préfecture alliés. À 10 min, 23 à 76 % des unités
+jouent encore. Les IA se servent des cocktails, des grenades (environ 1 400 pour la Préfecture), du Canon à eau (305
+foyers éteints) et des charges. Les parties dépassent un peu les 30 min visées : « jusqu'au dernier » reste le mode par
+défaut ; à dire à David.
 
 ## 11. Après la 0.3
 

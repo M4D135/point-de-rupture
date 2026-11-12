@@ -1,0 +1,13 @@
+Titre: L9 : pompiers et camion de pompiers, types 13 et 14 de la Préfecture (regles.js)
+Fichiers: Jeu/src/sim/regles.js:52-126 ; Jeu/verifications/regles.test.mjs:/R.TYPES.length, 13/+5 ; Jeu/verifications/regles.test.mjs:189-196 ; Jeu/verifications/interface.test.mjs:/O.typesProduits(R, qg(2))/+1
+Tests: node Jeu/verifications/regles.test.mjs ; node Jeu/verifications/sim.test.mjs ; node Jeu/verifications/interface.test.mjs ; node Jeu/verifications/foule.test.mjs
+---
+Dans Jeu/src/sim/regles.js :
+1. Dans l'objet des capacités par défaut (la ligne qui contient `interpeller: false, salve: null, jet: null`), ajoute `lance: null` : une lance à incendie, `{ portee, debit }` (mètres ; débit sans unité, voir CONSTANTES.IMMEUBLES.eteint).
+2. Dans le tableau TYPES, après le type 12 (canon-a-eau, le dernier), ajoute deux types de la Préfecture (faction 2), avec le même appel `type(id, cle, faction, nom, pluriel, role, chiffres, capacites, raccourci, description)` que les autres :
+   - `type(13, 'pompiers', 2, 'Pompiers', 'Pompiers', 'secours', …)` ; chiffres : coh 40, pression 0.3 (ils frappent à peine), portee 1.2, vitesse 3.6, vision 16, cout { moyens: 60, materiaux: 0 }, duree 12, lot 6 ; capacités `{ lance: Object.freeze({ portee: 8, debit: 1 }) }` ; raccourci 'U' ; description : « Six pompiers, lance à 8 m : éteignent les feux des objets et des immeubles. »
+   - `type(14, 'camion-pompiers', 2, 'Camion de pompiers', 'Camions de pompiers', 'secours', …)` ; véhicule comme le canon à eau (reprends ses champs rayon, vehicule, pop, vitesse et vitesseHorsChaussee s'il en a) avec : coh 400, pression 0.3, vitesse 5.0, vision 20, cout { moyens: 150, materiaux: 20 }, duree 20, lot 1, pop 6 ; capacités `{ lance: Object.freeze({ portee: 16, debit: 4.5 }) }` ; raccourci 'I' ; description : « Un camion, lance à 16 m, quatre à cinq fois le débit d’un pompier ; plus rapide sur la chaussée. »
+3. `TYPES_PAR_FACTION` : la Préfecture devient `[8, 9, 10, 11, 12, 13, 14]`.
+4. Dans Jeu/verifications/regles.test.mjs, les deux `assert.equal(R.TYPES.length, 13);` deviennent `assert.equal(R.TYPES.length, 15);` (les deux extraits de regles.test.mjs : un bloc pour chacune, avec deux ou trois lignes autour pour qu'il soit unique).
+5. Dans Jeu/verifications/interface.test.mjs, `assert.deepEqual(O.typesProduits(R, qg(2)), [8, 9, 10, 11, 12]);` devient `assert.deepEqual(O.typesProduits(R, qg(2)), [8, 9, 10, 11, 12, 13, 14]);` (le QG produit tout le camp ; le panneau de production n'en montre encore que cinq, l'interface viendra plus tard). N'y change rien d'autre.
+Garde le style des lignes voisines (Object.freeze, retrait, nombres à la française dans les commentaires seulement).

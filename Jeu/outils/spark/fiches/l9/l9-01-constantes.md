@@ -1,0 +1,8 @@
+Titre: L9 : les constantes des immeubles en feu (regles.js)
+Fichiers: Jeu/src/sim/regles.js:/Le gaz lacrymogène/+8
+Tests: node Jeu/verifications/regles.test.mjs ; node Jeu/verifications/sim.test.mjs
+---
+Dans l'objet CONSTANTES de Jeu/src/sim/regles.js, juste après la ligne `GAZ: Object.freeze({ ... }),`, ajoute un commentaire de quatre à six lignes, dans le style de celui du gaz, puis cette constante, telle quelle :
+    IMMEUBLES: Object.freeze({ chauffe: 3, prise: 15, cocktail: 2.5, montee: 40, consume: 240, propage: 0.6, voisinPrise: 25, voisinage: 3, fumee: 60, max: 48, recul: 4, refroidit: 0.5, eteint: 0.01, lances: 96 }),
+Le commentaire dit (décision de David du 12/11/2026 : les immeubles prennent feu si les pompiers ne viennent pas éteindre) : un foyer à moins de « chauffe » mètres d'une façade la chauffe ; après « prise » secondes d'un foyer à pleine intensité, l'immeuble prend ; un cocktail qui éclate à moins de « cocktail » mètres d'une façade l'allume une fois sur trois ; l'intensité monte de 0 à 1 en « montee » secondes ; à pleine intensité, l'immeuble se consume en « consume » secondes ; au-dessus de « propage », il chauffe ses voisins (à moins de « voisinage » mètres), qui prennent après « voisinPrise » secondes ; calciné, il fume encore « fumee » secondes ; pas plus de « max » immeubles en feu à la fois ; une unité à moins de « recul » mètres d'une façade en feu s'en écarte ; un immeuble qu'on ne chauffe plus perd « refroidit » point de chaleur par seconde ; une lance de débit 1 ôte « eteint » d'intensité par seconde ; « lances » : les jets d'eau rendus au dessin, au plus.
+Lignes de 120 caractères au plus (coupe la constante sur deux lignes si besoin, comme PROJECTILES). Rien d'autre ne change.
