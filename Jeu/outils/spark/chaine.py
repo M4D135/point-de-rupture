@@ -48,6 +48,8 @@ fichier neuf, laisse AVANT vide. Plusieurs blocs sont permis, un par endroit.
 Règles : ne touche qu'aux fichiers et endroits que la tâche nomme ; garde le style du fichier (retrait, noms et
 commentaires en français) ; dans la simulation, ni Math.random, ni Date.now, ni performance.now (déterminisme), pas
 d'allocation dans les boucles par unité ; ne réécris jamais un fichier entier ; aucun texte hors des blocs et du RÉSUMÉ.
+Dans une chaîne JavaScript entre apostrophes droites ('…'), écris l'apostrophe française ’ (jamais ' : elle fermerait
+la chaîne) ; garde les guillemets qu'emploient les lignes voisines.
 """
 BLOC = re.compile(r'FICHIER:\s*`?(?P<f>[^\n`]+?)`?\s*\n<<<<<<< AVANT[^\n]*\n(?P<a>.*?)^=======[^\n]*\n(?P<b>.*?)'
                   r'^>>>>>>> APR[ÈE]S', re.M | re.S)
@@ -88,10 +90,10 @@ def extrait(designation):
     return f'=== {m["p"]}, lignes {a} à {b} sur {len(lignes)} ===\n' + '\n'.join(lignes[a - 1:b]) + '\n=== fin de l\'extrait ===\n'
 
 
-def demander(demande, fichier):
+def demander(demande, fichier, effort=None):
     fichier.write_text(demande, encoding='utf-8')
-    commande = [KBZA, 'ask', '--prompt-file', str(fichier), '--no-memory', '--max-tokens', '0',
-                '--timeout-seconds', '900', '--reasoning-mode', 'direct']
+    commande = [KBZA, 'ask', '--prompt-file', str(fichier), '--no-memory', '--max-tokens', '0', '--timeout-seconds', '900']
+    commande += ['--reasoning-effort', effort] if effort else ['--reasoning-mode', 'direct']
     t0 = time.time()
     r = subprocess.run(commande, capture_output=True, text=True)
     texte = '\n'.join(l for l in r.stdout.splitlines() if not l.startswith('Spark : ')).strip()
@@ -202,7 +204,10 @@ def mener(fiche_chemin, a):
             dire(nom, f'essai : demande de {len(demande)} caractères, {len(fiche["fichiers"])} extraits, tests {fiche["tests"]}')
             (sortie / f'{nom}-1.demande.txt').write_text(demande, encoding='utf-8')
             return True, 'essai'
-        reponse, code, duree, err = demander(demande, sortie / f'{nom}-{tour}.demande.txt')
+        precedente = reponse
+        # Premier tour en mode direct (rapide) ; les corrections avec un peu de raisonnement : en mode direct, le Spark
+        # rend mot pour mot la même réponse fautive.
+        reponse, code, duree, err = demander(demande, sortie / f'{nom}-{tour}.demande.txt', 'low' if echec else None)
         (sortie / f'{nom}-{tour}.reponse.md').write_text(reponse + '\n', encoding='utf-8')
         blocs = [(m['f'].strip(), nettoyer(m['a']), nettoyer(m['b'])) for m in BLOC.finditer(reponse)]
         resume = next((l.split(':', 1)[1].strip() for l in reponse.splitlines() if l.upper().startswith(('RÉSUMÉ', 'RESUME'))), '')
@@ -219,6 +224,9 @@ def mener(fiche_chemin, a):
             dire(nom, f'tour {tour} : ' + ' ; '.join(erreurs))
             continue
         echec = verifier(touches, fiche['tests'])
+        if echec and reponse == precedente:
+            echec = ('ta réponse est mot pour mot la précédente, qui échouait déjà ainsi ; lis l\'erreur ligne par ligne '
+                     'et change ce qui la cause.\n' + echec)
         if echec:
             lignes_journal.append(f'- tour {tour} : appliqué ({", ".join(touches)}), rouge : {echec.splitlines()[0]}')
             dire(nom, f'tour {tour} : rouge : {echec.splitlines()[0]}')
