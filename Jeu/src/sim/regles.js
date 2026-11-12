@@ -163,8 +163,13 @@
     // « usure » de ses points par seconde. Avant-poste : un foyer, il ne produit plus tant qu'il brûle. Propagation :
     // une fois par foyer, après « delai » secondes, une chance sur deux d'embraser l'objet le plus proche à « rayon »
     // mètres, sur « generations » au plus. Eau : chaque impulsion du jet (0,2 s) retire « eau » secondes au foyer.
+    // Les sortes de la ville réelle (0.3) ont leur propre feu (« sortes » : durée en s, rayon en m) : un deux-roues
+    // flambe vite et fort, un conteneur à ordures et un kiosque à journaux brûlent longtemps, une terrasse s'étale.
+    // Les six sortes de la 0.2 brûlent selon leurs points de structure (voiture : 38 s et 4,5 m ; poubelle : 12 s, 2 m).
     FEU: Object.freeze({ max: 128, rayon: 4, duree: 18, pression: 8, allumage: 1.5, marge: 2.5,
-      objet: Object.freeze({ dureeMin: 12, dureeMax: 40, parPv: 0.125, rayonMin: 2, rayonMax: 4.5 }),
+      objet: Object.freeze({ dureeMin: 12, dureeMax: 40, parPv: 0.125, rayonMin: 2, rayonMax: 4.5,
+        sortes: Object.freeze({ 'deux-roues': Object.freeze({ duree: 20, rayon: 2.6 }), conteneur: Object.freeze({ duree: 34, rayon: 3 }),
+          terrasse: Object.freeze({ duree: 16, rayon: 3.2 }), kiosque: Object.freeze({ duree: 36, rayon: 3.8 }) }) }),
       barricade: Object.freeze({ rayon: 3.2, duree: 30, pas: 7, foyers: 3, usure: 0.02 }),
       poste: Object.freeze({ rayon: 6, duree: 25, usure: 0.016 }),
       propagation: Object.freeze({ rayon: 7, delai: 6, chance: 0.5, generations: 2 }), eau: 3 }),
@@ -204,14 +209,16 @@
     const p = CONSTANTES.PROJECTILES[sorte];
     return p ? p.vol + (p.vitesse > 0 ? distance / p.vitesse : 0) : 0;
   }
-  /** Le feu d'un objet cassé : { duree (s), rayon (m) }, tirés de ses points de structure, quelle que soit sa sorte
-   *  (une sorte inconnue brûle donc comme les autres). Un cassable de la ville peut porter « feu » : 0, il ne brûle
-   *  pas ; un nombre de secondes, il brûle ce temps-là. */
-  function feuObjet(pv, feu) {
+  /** Le feu d'un objet cassé : { duree (s), rayon (m) }. Un cassable de la ville peut porter « feu » : 0 (ou faux), il
+   *  ne brûle pas ; un nombre de secondes, il brûle ce temps-là (120 s au plus). Sinon, sa sorte, si FEU.objet.sortes
+   *  la connaît ; sinon, ses points de structure (une sorte inconnue brûle donc comme les autres). */
+  function feuObjet(pv, feu, sorte) {
     const O = CONSTANTES.FEU.objet, p = typeof pv === 'number' && pv > 0 ? pv : 60;
     if (feu === 0 || feu === false) return { duree: 0, rayon: 0 };
-    const duree = typeof feu === 'number' && feu > 0 ? Math.min(120, feu) : Math.max(O.dureeMin, Math.min(O.dureeMax, Math.round(p * O.parPv)));
-    return { duree, rayon: Math.max(O.rayonMin, Math.min(O.rayonMax, 1.5 + p / 100)) };
+    const s = typeof sorte === 'string' && Object.prototype.hasOwnProperty.call(O.sortes, sorte) ? O.sortes[sorte] : null;
+    const duree = typeof feu === 'number' && feu > 0 ? Math.min(120, feu)
+      : s ? s.duree : Math.max(O.dureeMin, Math.min(O.dureeMax, Math.round(p * O.parPv)));
+    return { duree, rayon: s ? s.rayon : Math.max(O.rayonMin, Math.min(O.rayonMax, 1.5 + p / 100)) };
   }
 
   const DIFFICULTES = Object.freeze([

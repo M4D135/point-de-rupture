@@ -635,7 +635,8 @@ verifier('décor : chaque cassable de la ville, intact et cassé, au format de p
     assert.equal(intact, c.pieces.length);
     memeQuePack(p => PDR.decor.construireCassable(c, true, p));
   }
-  assert.deepEqual([...sortes].sort(), [...PDR.protocole.SORTES_CASSABLES].sort());
+  // Le damier a les six sortes de la 0.2 ; les quatre de la ville réelle (fin de SORTES_CASSABLES) se dessinent aussi.
+  assert.deepEqual([...sortes].sort(), PDR.protocole.SORTES_CASSABLES.slice(0, 6).sort());
   for (const sorte of PDR.protocole.SORTES_CASSABLES) memeQuePack(p => PDR.decor.construireCassable({ id: 1, sorte, x: 0, z: 0, lacet: 0.3, pieces: [] }, true, p));
   for (const g of ville.sites.gisements) for (const part of [1, 0.5, 0.03, 0]) memeQuePack(p => PDR.decor.construireTas(g, part, sol, p));
   for (const l of ville.sites.lieux) for (const proprietaire of [-1, 0, 1, 2]) {

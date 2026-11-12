@@ -24,8 +24,8 @@
                manifestants: 'peu' | 'moyen' | 'beaucoup' (0.3 ; facultatif, 'moyen' par défaut) : la part de la
                  Convergence dans les effectifs — 34, 40 ou 50 % (regles.parts) ; le total ne change pas }
    « pret ».options rend la ville vraiment construite (villeDe(options, ilots) la refait à l'identique dans la page),
-   la victoire et les manifestants remis en forme. En démo, options.victoire est ignoré et rendu { mode: 'dernier' } :
-   une démo ne finit ni aux points ni au temps (voir VICTOIRE).
+   la victoire et les manifestants remis en forme. En démo, options.victoire est ignoré et rendu { mode: 'dernier',
+   points: 0, duree: 0 } (0 : ni cible ni limite de temps) : une démo ne finit ni aux points ni au temps (voir VICTOIRE).
 
    CARTE = { ilots, etendue: { x0, z0, x1, z1 } (m),
              nav: { nx, nz, x0, z0, cellule }, voile: { nx, nz, x0, z0, cellule },
@@ -179,9 +179,12 @@
     POSTE_REPRIS: 37,       // x, z, faction de l'avant-poste, a : id
   });
   const RAISONS = Object.freeze({ RESSOURCES: 1, PLAFOND: 2, INTERDIT: 3, EMPLACEMENT: 4, INJOIGNABLE: 5, FILE_PLEINE: 6, DELAI: 7 });
-  /** Sortes de cassables connues de la page. La simulation n'en dépend pas : pv, rendement et feu viennent de chaque
-   *  objet de ville.sites.cassables (regles.feuObjet) ; une sorte absente d'ici donne b = -1 dans CASSE. */
-  const SORTES_CASSABLES = Object.freeze(['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere']);
+  /** Sortes de cassables connues de la page : les six de la 0.2, puis, depuis la 0.3, les quatre de la ville réelle
+   *  (deux-roues, conteneur, terrasse, kiosque), dans l'ordre de ville-reelle.js. Les points de structure et le
+   *  rendement viennent de chaque objet de ville.sites.cassables ; le feu aussi, ou de sa sorte (regles.feuObjet). Une
+   *  sorte absente d'ici brûle selon ses points de structure et donne b = -1 dans CASSE. */
+  const SORTES_CASSABLES = Object.freeze(['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere',
+    'deux-roues', 'conteneur', 'terrasse', 'kiosque']);
   /** Sorte d'un foyer (etat.feux, FEU_ALLUME). */
   const SORTES_FEU = Object.freeze({ SOL: 0, OBJET: 1, BARRICADE: 2, POSTE: 3 });
   /** D'où viennent les coups d'un camp (BILAN.sources). */

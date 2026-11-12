@@ -61,6 +61,7 @@
   const HORS_JEU_IT = Math.round(K.HORS_JEU_S * IT_S), GISANT_IT = Math.round(K.GISANT_S * IT_S), GISANTS_MAX = K.GISANTS_MAX;
   const A_TERRE_IT = Math.round(K.A_TERRE_S * IT_S), IMMUNITE_IT = Math.round(K.A_TERRE_IMMUNITE_S * IT_S), LANCE_IT = 8;
   const CAUSE = P.CAUSES_A_TERRE, SF = P.SORTES_FEU;
+  const PLUSIEURS = 255;              // feuCase, gazCase : plusieurs foyers (128 au plus) ou nuages (64) s'y chevauchent
   const RECHERCHE_OISIF2 = 7000 * 7000, RECHERCHE_MVT2 = 12000 * 12000, LAISSE2 = 14000 * 14000;
   const JET_IT = 60, JET_PAS = 4;
   const PORTEE_TRAVAIL = 2600, PORTEE_POSTE = 7000;
@@ -181,8 +182,9 @@
       // Démo (joueur -1) : pas de brouillard, quoi que disent les options.
       brouillard: joueur >= 0 && o.brouillard !== false, coalitions: !!o.coalitions, enregistrer: o.enregistrer !== false, vide: !!o.vide,
       ia: Array.isArray(o.ia) ? o.ia.slice() : null,
-      // Démo : ni points ni temps, le dernier debout ou la limite de sécurité (CONCEPTION.md §1.11).
-      victoire: R.victoire(joueur < 0 ? { mode: 'dernier' } : o.victoire), manifestants: R.manifestants(o.manifestants),
+      // Démo : ni points ni temps, le dernier debout ou la limite de sécurité (CONCEPTION.md §1.11) ; points et durée à
+      // 0 disent qu'il n'y a ni cible ni limite de temps, comme dans etat.victoire.
+      victoire: joueur < 0 ? { mode: 'dernier', points: 0, duree: 0 } : R.victoire(o.victoire), manifestants: R.manifestants(o.manifestants),
     };
   }
 
@@ -307,14 +309,14 @@
     const NK = sites.cassables.length;
     const casX = new Int32Array(NK), casZ = new Int32Array(NK), casPv = new Int32Array(NK), casEtat = new Uint8Array(NK);
     const casRend = new Int32Array(NK), casSorte = new Int8Array(NK), casAppro = new Int32Array(NK);
-    // Le feu de chaque objet (durée en itérations, rayon en mm), tiré de ses points de structure : la sorte n'y fait
-    // rien, une ville peut en ajouter d'inconnues.
+    // Le feu de chaque objet (durée en itérations, rayon en mm) : le sien s'il en porte un, sinon celui de sa sorte,
+    // sinon celui de ses points de structure (regles.feuObjet) ; une ville peut ajouter des sortes inconnues.
     const casFeuDuree = new Int32Array(NK), casFeuRayon = new Int32Array(NK);
     sites.cassables.forEach((c, k) => {
       casX[k] = mm(c.x); casZ[k] = mm(c.z); casPv[k] = c.pv * 1000; casRend[k] = c.rendement * 1000 * echelle;
       casSorte[k] = P.SORTES_CASSABLES.indexOf(c.sorte);
       casAppro[k] = nav.fineProche(casX[k], casZ[k], 6);
-      const feu = R.feuObjet(c.pv, c.feu);
+      const feu = R.feuObjet(c.pv, c.feu, c.sorte);
       casFeuDuree[k] = Math.round(feu.duree * IT_S); casFeuRayon[k] = Math.round(feu.rayon * 1000);
     });
     // Les cassables par case de 8 m, pour enchaîner la casse sur l'objet voisin.
@@ -864,18 +866,37 @@
       if (eau && par >= 0) bilan[par].eteints++;
       evenement(EV.FEU_ETEINT, fX[q], fZ[q], eau ? par : -1, fId[q], eau ? 1 : 0);
     }
+    // feuCase (et gazCase plus bas) : 0 rien, q + 1 un seul foyer, PLUSIEURS des foyers qui se chevauchent : on les lit
+    // tous (liste des actifs), pour que personne ne reste dans l'un parce que sa case montre l'autre.
+    const feuxActifs = new Uint8Array(NFEUX);
+    let nFeuxListe = 0;
     function majGrilleFeux() {
       grilleFeux = false;
       feuCase.fill(0);
+      nFeuxListe = 0;
       for (let q = 0; q < NFEUX; q++) {
         if (!fActif[q]) continue;
+        feuxActifs[nFeuxListe++] = q;
         // Toute unité à moins de rayon + marge du foyer est dans une case marquée (demi-diagonale d'une case : 2,83 m).
         const r = fR[q] + FEU_MARGE + 3000, c0 = nav.caseDe(fX[q], fZ[q]), ci = c0 % nx, cj = (c0 / nx) | 0, rc = Math.ceil(r / 4000);
         for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let i = Math.max(0, ci - rc); i <= Math.min(nx - 1, ci + rc); i++) {
           const c = i + j * nx, dx = nav.centreX(c) - fX[q], dz = nav.centreZ(c) - fZ[q];
-          if (dx * dx + dz * dz <= r * r) feuCase[c] = q + 1;
+          if (dx * dx + dz * dz <= r * r) feuCase[c] = feuCase[c] === 0 ? q + 1 : PLUSIEURS;
         }
       }
+    }
+    /** Le foyer qui concerne un point (x, z) de case marquée k : celui où il est le plus avant (r² − d² le plus grand),
+     *  ou, s'il n'est dans aucun, celui dont il est le plus près d'entrer. */
+    function feuDe(k, x, z) {
+      if (k !== PLUSIEURS) return fActif[k - 1] ? k - 1 : -1;
+      let meilleur = -1, haut = -Infinity;
+      for (let n = 0; n < nFeuxListe; n++) {
+        const q = feuxActifs[n];
+        if (!fActif[q]) continue;                   // éteint pendant l'itération (la grille est refaite à la suivante)
+        const dx = x - fX[q], dz = z - fZ[q], p = fR[q] * fR[q] - (dx * dx + dz * dz);
+        if (p > haut) { haut = p; meilleur = q; }
+      }
+      return meilleur;
     }
     /** L'objet cassé (ou touché par un cocktail) s'embrase : il devient « en feu » (2), puis « calciné » (3). */
     function allumerCassable(k, camp, gen) {
@@ -997,6 +1018,8 @@
       evenement(EV.GAZ, x, z, camp, gId[q], GAZ.rayon);
       return q;
     }
+    const nuagesActifs = new Uint8Array(NNUAGES);
+    let nNuagesListe = 0;
     function avancerNuages() {
       for (let q = 0; q < NNUAGES; q++) {
         if (!gActif[q]) continue;
@@ -1007,14 +1030,28 @@
       if (!grilleGaz) return;
       grilleGaz = false;
       gazCase.fill(0);
+      nNuagesListe = 0;
       for (let q = 0; q < NNUAGES; q++) {
         if (!gActif[q]) continue;
+        nuagesActifs[nNuagesListe++] = q;
         const r = GAZ_RAYON + GAZ_MARGE + 3000, c0 = nav.caseDe(gX[q], gZ[q]), ci = c0 % nx, cj = (c0 / nx) | 0, rc = Math.ceil(r / 4000);
         for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let i = Math.max(0, ci - rc); i <= Math.min(nx - 1, ci + rc); i++) {
           const c = i + j * nx, dx = nav.centreX(c) - gX[q], dz = nav.centreZ(c) - gZ[q];
-          if (dx * dx + dz * dz <= r * r) gazCase[c] = q + 1;
+          if (dx * dx + dz * dz <= r * r) gazCase[c] = gazCase[c] === 0 ? q + 1 : PLUSIEURS;
         }
       }
+    }
+    /** Le nuage hostile au camp f qui concerne un point (x, z) de case marquée k (comme feuDe), ou -1. */
+    function gazDe(k, x, z, f) {
+      if (k !== PLUSIEURS) return hostile[gCamp[k - 1] * 4 + f] ? k - 1 : -1;
+      let meilleur = -1, haut = -Infinity;
+      for (let n = 0; n < nNuagesListe; n++) {
+        const q = nuagesActifs[n];
+        if (!hostile[gCamp[q] * 4 + f]) continue;
+        const dx = x - gX[q], dz = z - gZ[q], p = gRc[q] * gRc[q] - (dx * dx + dz * dz);
+        if (p > haut) { haut = p; meilleur = q; }
+      }
+      return meilleur;
     }
 
     // ---- 0.3 : les projectiles. Cocktails et grenades : une liste de vols ; pierres : une file à durée fixe. ----
@@ -1431,9 +1468,9 @@
       quitterOrdre(i);
       uetat[i] = ET.HORS_JEU; ucoh[i] = 0; ucharge[i] = 0; usal[i] = 0; umode[i] = 0;
       uterre[i] = 0; uimm[i] = 0; ulance[i] = 0;
-      const kf = feuCase[uc4[i]];
+      const kf = feuCase[uc4[i]], q = kf ? feuDe(kf, ux[i], uz[i]) : -1;
       let dansLeFeu = false;
-      if (kf) { const dx = ux[i] - fX[kf - 1], dz = uz[i] - fZ[kf - 1], r = fR[kf - 1]; dansLeFeu = dx * dx + dz * dz <= r * r; }
+      if (q >= 0) { const dx = ux[i] - fX[q], dz = uz[i] - fZ[q], r = fR[q]; dansLeFeu = dx * dx + dz * dz <= r * r; }
       if (dansLeFeu) uminu[i] = 2;
       else if (vite || nGisants >= GISANTS_MAX) uminu[i] = HORS_JEU_IT;
       else { uminu[i] = GISANT_IT; umode[i] = M_GISANT; nGisants++; }
@@ -1518,9 +1555,9 @@
         // ---- Feu : dans un foyer, l'unité est pressée et fuit droit dehors (un véhicule reste, et encaisse) ; près
         // d'un foyer, elle le contournera (plus bas). Une unité à terre s'en relève aussitôt. ----
         let contourX = 0, contourZ = 0, contour = false;
-        const c4 = uc4[i], kf = feuCase[c4];
-        if (kf) {
-          const q = kf - 1, dx = x - fX[q], dz = z - fZ[q], d2 = dx * dx + dz * dz, r = fR[q];
+        const c4 = uc4[i], kf = feuCase[c4], q = kf ? feuDe(kf, x, z) : -1;
+        if (q >= 0) {
+          const dx = x - fX[q], dz = z - fZ[q], d2 = dx * dx + dz * dz, r = fR[q];
           if (d2 <= r * r) {
             if (fAge[q] >= fDelai[q]) {
               const camp = fCamp[q];
@@ -1550,9 +1587,9 @@
         if (uimm[i] > 0) uimm[i]--;
         // ---- Gaz : dans un nuage hostile, l'unité suffoque, ne frappe plus et en sort au pas ; elle contourne ceux
         // dont elle s'approche. La Préfecture et ses alliés portent le masque ; un véhicule passe. ----
-        const kg = gazCase[c4];
-        if (kg && hostile[gCamp[kg - 1] * 4 + f] && !T.vehicule[t]) {
-          const q = kg - 1, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
+        const kg = gazCase[c4], g = kg && !T.vehicule[t] ? gazDe(kg, x, z, f) : -1;
+        if (g >= 0) {
+          const q = g, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
           if (d2 <= r * r) {
             const camp = gCamp[q];
             bilan[camp].infliges += GAZ_PRES; sources[camp * 8 + 7] += GAZ_PRES;
