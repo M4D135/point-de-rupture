@@ -34,8 +34,12 @@ verifier('réglages : défauts complets, sans conflit de touches', () => {
     assert.ok(Array.isArray(d.touches[a.id]) && d.touches[a.id].length >= 1, a.id);
     for (const c of d.touches[a.id]) assert.equal(REGL.conflit(d.touches, a.id, c), null, a.id + ' ' + c);
   }
-  // Les touches de production suivent les raccourcis des règles (Q W E R T).
-  assert.deepEqual(['produire1', 'produire2', 'produire3', 'produire4', 'produire5'].map(id => d.touches[id][0]), ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT']);
+  // Les touches de production suivent les raccourcis des règles (A W E R T).
+  assert.deepEqual(['produire1', 'produire2', 'produire3', 'produire4', 'produire5'].map(id => d.touches[id][0]), ['KeyA', 'KeyW', 'KeyE', 'KeyR', 'KeyT']);
+  // Z Q S D font défiler la vue, en plus des flèches (David, 12/11/2026) ; Arrêt passe sur F.
+  assert.deepEqual(['vueAvant', 'vueGauche', 'vueArriere', 'vueDroite'].map(id => d.touches[id]),
+    [['ArrowUp', 'KeyZ'], ['ArrowLeft', 'KeyQ'], ['ArrowDown', 'KeyS'], ['ArrowRight', 'KeyD']]);
+  assert.deepEqual(d.touches.arret, ['KeyF']);
   assert.equal(REGL.defaults(true).defilementBord, false, 'tactile : pas de défilement au bord');
   assert.equal(REGL.defaults(true).infobulles, false);
 });
@@ -65,34 +69,59 @@ verifier('réglages : normalisation (types, bornes, alliance, touches invalides 
   assert.deepEqual(REGL.normalize({ touches: { ...d.touches, attaque: ['Escape'] } }).touches, d.touches);
   assert.deepEqual(REGL.normalize({ touches: { ...d.touches, attaque: ['KeyZ', 'KeyZ'] } }).touches, d.touches);
   // Un choix valide est gardé ; une action apparue depuis prend ses défauts, sauf ceux déjà pris.
-  const perso = { ...d.touches, attaque: ['KeyZ'] };
+  const perso = { ...d.touches, attaque: ['KeyK'] };
   delete perso.jet;
   perso.recolter = ['KeyJ'];
   const t = REGL.normalize({ touches: perso }).touches;
-  assert.deepEqual(t.attaque, ['KeyZ']);
+  assert.deepEqual(t.attaque, ['KeyK']);
   assert.deepEqual(t.recolter, ['KeyJ']);
   assert.deepEqual(t.jet, [], 'J déjà pris par Récolter : Jet reste sans touche');
 });
 
+verifier('réglages : ceux de la version 1 reçoivent Z Q S D, sans perdre les choix du joueur', () => {
+  const d = REGL.defaults();
+  // Tels que la 0.3b les enregistrait : la vue aux flèches seules, Arrêt sur S, la première production sur Q.
+  const v1 = { ...d.touches, vueAvant: ['ArrowUp'], vueArriere: ['ArrowDown'], vueGauche: ['ArrowLeft'], vueDroite: ['ArrowRight'],
+    arret: ['KeyS'], produire1: ['KeyQ'] };
+  assert.deepEqual(REGL.normalize({ version: 1, touches: v1 }).touches, d.touches);
+  assert.deepEqual(REGL.normalize({ touches: v1 }).touches, d.touches, 'sans numéro de version : comme la version 1');
+  // Arrêt changé par le joueur : il le garde, et S passe à la vue ; Z donné à Casser y reste, la vue ne le prend pas.
+  let t = REGL.normalize({ version: 1, touches: { ...v1, arret: ['KeyK'], casser: ['KeyZ'] } }).touches;
+  assert.deepEqual(t.arret, ['KeyK']);
+  assert.deepEqual(t.vueArriere, ['ArrowDown', 'KeyS']);
+  assert.deepEqual(t.casser, ['KeyZ']);
+  assert.deepEqual(t.vueAvant, ['ArrowUp'], 'Z déjà pris par Casser');
+  // F déjà pris par le joueur : Arrêt reste sur S, et la vue ne prend pas S.
+  t = REGL.normalize({ version: 1, touches: { ...v1, recolter: ['KeyF'] } }).touches;
+  assert.deepEqual(t.arret, ['KeyS']);
+  assert.deepEqual(t.vueArriere, ['ArrowDown']);
+  assert.deepEqual(t.vueGauche, ['ArrowLeft', 'KeyQ']);
+  for (const a of REGL.ACTIONS) for (const c of t[a.id]) assert.equal(REGL.conflit(t, a.id, c), null, a.id + ' ' + c);
+  // Version 2 : ce qui est enregistré reste tel quel (un joueur a pu effacer Z).
+  assert.deepEqual(REGL.normalize({ version: 2, touches: v1 }).touches.vueAvant, ['ArrowUp']);
+  assert.equal(REGL.normalize({ version: 1, touches: v1 }).version, 2);
+});
+
 verifier('réglages : assigner, conflits croisés, touches réservées, seconde touche', () => {
   const d = REGL.defaults().touches;
-  let r = REGL.assign(d, 'attaque', 'KeyS');
+  let r = REGL.assign(d, 'attaque', 'KeyF');
   assert.equal(r.ok, false);
   assert.equal(r.conflit, 'arret');
   assert.equal(r.raison, 'Déjà utilisée : Arrêt (ordres aux unités).');
+  assert.equal(REGL.assign(d, 'attaque', 'KeyS').conflit, 'vueArriere', 'S fait défiler la vue');
   // « ordres » et « production » ne servent jamais ensemble : la même touche peut servir aux deux.
-  r = REGL.assign(d, 'produire1', 'KeyA');
+  r = REGL.assign(d, 'produire1', 'KeyF');
   assert.equal(r.ok, true);
-  assert.deepEqual(r.touches.produire1, ['KeyA']);
+  assert.deepEqual(r.touches.produire1, ['KeyF']);
   // « vue » et « general » valent partout.
   assert.equal(REGL.assign(d, 'attaque', 'ArrowUp').conflit, 'vueAvant');
   assert.equal(REGL.assign(d, 'produire1', 'KeyP').conflit, 'pause');
   for (const c of ['Escape', 'Tab', 'Digit3', 'ShiftLeft', 'F5', 'Backspace', 'SigneM']) assert.equal(REGL.assign(d, 'attaque', c).ok, false, c);
-  r = REGL.assign(d, 'attaque', 'KeyZ', 1);
-  assert.deepEqual(r.touches.attaque, ['KeyA', 'KeyZ']);
-  r = REGL.assign(r.touches, 'attaque', 'KeyZ', 0);
-  assert.deepEqual(r.touches.attaque, ['KeyZ'], 'la même touche ne se double pas');
-  assert.deepEqual(REGL.effacer({ ...d, attaque: ['KeyA', 'KeyZ'] }, 'attaque', 1).attaque, ['KeyA']);
+  r = REGL.assign(d, 'attaque', 'KeyK', 1);
+  assert.deepEqual(r.touches.attaque, ['KeyA', 'KeyK']);
+  r = REGL.assign(r.touches, 'attaque', 'KeyK', 0);
+  assert.deepEqual(r.touches.attaque, ['KeyK'], 'la même touche ne se double pas');
+  assert.deepEqual(REGL.effacer({ ...d, attaque: ['KeyA', 'KeyK'] }, 'attaque', 1).attaque, ['KeyA']);
   assert.notEqual(r.touches, d, 'objet neuf');
   assert.deepEqual(d.attaque, ['KeyA'], 'l’original ne bouge pas');
 });
@@ -120,12 +149,12 @@ verifier('réglages : stockage lu, écrit, refusé ou illisible', () => {
   const stock = { getItem: k => (memoire.has(k) ? memoire.get(k) : null), setItem: (k, v) => memoire.set(k, String(v)) };
   const r = REGL.charger(stock, false);
   assert.deepEqual(r, REGL.defaults());
-  r.volumeGeneral = 0.3; r.partie.faction = 1; r.touches = REGL.assign(r.touches, 'attaque', 'KeyZ').touches;
+  r.volumeGeneral = 0.3; r.partie.faction = 1; r.touches = REGL.assign(r.touches, 'attaque', 'KeyK').touches;
   assert.equal(REGL.enregistrer(r, stock), true);
   const relu = REGL.charger(stock, false);
   assert.equal(relu.volumeGeneral, 0.3);
   assert.equal(relu.partie.faction, 1);
-  assert.deepEqual(relu.touches.attaque, ['KeyZ']);
+  assert.deepEqual(relu.touches.attaque, ['KeyK']);
   memoire.set(REGL.CLE, '{pas du json');
   assert.deepEqual(REGL.charger(stock, false), REGL.defaults());
   const refuse = { getItem() { throw new Error('SecurityError'); }, setItem() { throw new Error('QuotaExceeded'); } };
@@ -420,7 +449,7 @@ verifier('clavier et visées : attaque, arrêt, barricade en deux clics, touches
   f32[5 * 4] = cx + 25; f32[5 * 4 + 1] = cz; f32[5 * 4 + 3] = R.coder(1, 5, R.ETATS.MARCHE, 40, 0);
   c.etat(etat, f32);
   c.actions.rectangleSelection(0, 0, LARGEUR, HAUTEUR, false);
-  assert.equal(c.clavier(touche('KeyS', 's'), true), true);
+  assert.equal(c.clavier(touche('KeyF', 'f'), true), true);
   assert.equal(recu.ordres.at(-1).t, CMD.ARRETER); bienFormee(recu.ordres.at(-1));
   assert.equal(c.clavier(touche('KeyQ', 'a'), true), true, 'AZERTY : la touche marquée A');
   assert.equal(c.mode, 'attaque');
@@ -443,12 +472,15 @@ verifier('clavier et visées : attaque, arrêt, barricade en deux clics, touches
   assert.equal(c.mode, 'casser');
   assert.equal(c.annulerVisee(), true);
   assert.equal(c.annulerVisee(), false);
-  // Touches codées en dur par camera.js : consommées même sans assignation ; une lettre libre passe.
-  assert.equal(c.clavier(touche('KeyW', 'z'), true), true);
-  assert.equal(c.clavier(touche('KeyD', 'd'), true), true);
+  // Z, Q, D : la vue ; les touches codées en dur par camera.js sont consommées même sans assignation ; une lettre
+  // libre passe. Les touches de la vue sont relâchées aussitôt : elles ne changent rien à la suite.
+  for (const [code, key] of [['KeyW', 'z'], ['KeyD', 'd'], ['KeyA', 'q']]) {
+    assert.equal(c.clavier(touche(code, key), true), true, 'AZERTY : ' + key.toUpperCase() + ', la vue');
+    c.clavier(touche(code, key), false);
+  }
   assert.equal(c.clavier(touche('KeyZ', 'w'), true), true, 'AZERTY : la touche marquée W, assignée à la production, est prise');
   assert.equal(c.clavier(touche('KeyU', 'u'), true), false, 'U : libre, elle passe');
-  assert.equal(c.clavier(touche('KeyA', 'q'), true), true, 'Q : produire, consommée');
+  assert.equal(c.clavier(touche('KeyY', 'y'), true), true, 'Y : ralliement, consommée sans effet pour des unités');
   assert.equal(c.clavier(touche('Space', ' '), true), false, 'Espace passe à la caméra');
   // Clic droit au sol : un seul déplacement pour toute la sélection ; sur l'unité adverse : une attaque.
   let avant = recu.ordres.length;
@@ -462,6 +494,35 @@ verifier('clavier et visées : attaque, arrêt, barricade en deux clics, touches
   o = recu.ordres.at(-1);
   assert.equal(recu.ordres.length, avant + 1);
   assert.deepEqual([o.t, o.cible, o.ids.length], [CMD.ATTAQUER, 5, c.selection.n]); bienFormee(o);
+});
+
+verifier('clavier : Z Q S D et les flèches font défiler la vue ; Maj + Q ou D la tourne', () => {
+  const pas = [];
+  const camera = {
+    derniere: { D: 100 }, viser() {}, zoomer() {}, pointer: () => null,
+    glisser: (dr, da) => pas.push(['glisser', Math.sign(dr) + 0, Math.sign(da) + 0]),
+    tourner: a => pas.push(['tourner', Math.sign(a) + 0]),
+  };
+  const c = I.creerCommandes({ regles: R, protocole: P, reglages: REGL.defaults(), projecteur, camera,
+    rappels: { ordre() {}, message() {}, selection() {} } });
+  c.partie({ options: { joueur: 0, alliance: null }, carte: { voile: null }, sites: { qg: [], lieux: [], gisements: [], cassables: [] }, ville: null });
+  c.activer(true);
+  const apres = (e, bas = true) => { pas.length = 0; c.clavier(e, bas); c.image(0.016); return pas.slice(); };
+  // AZERTY : Z, Q, S, D sont en KeyW, KeyA, KeyS, KeyD ; QWERTY : Z et Q sont ailleurs, ce sont toujours les lettres.
+  for (const [code, key, sens] of [['KeyW', 'z', [0, 1]], ['KeyA', 'q', [-1, 0]], ['KeyS', 's', [0, -1]], ['KeyD', 'd', [1, 0]],
+    ['KeyZ', 'z', [0, 1]], ['KeyQ', 'q', [-1, 0]], ['ArrowUp', 'ArrowUp', [0, 1]], ['ArrowLeft', 'ArrowLeft', [-1, 0]]]) {
+    assert.deepEqual(apres(touche(code, key)), [['glisser', ...sens]], code + ' ' + key);
+    assert.deepEqual(apres(touche(code, key), false), [], code + ' ' + key + ' relâchée');
+  }
+  // Deux à la fois : en diagonale.
+  c.clavier(touche('KeyW', 'z'), true);
+  assert.deepEqual(apres(touche('KeyD', 'd')), [['glisser', 1, 1]]);
+  c.clavier(touche('KeyW', 'z'), false); c.clavier(touche('KeyD', 'd'), false);
+  // Maj + Q : tourner à gauche ; la lettre relâchée sans Maj arrête aussi la rotation.
+  assert.deepEqual(apres(touche('KeyA', 'Q', { shiftKey: true })), [['tourner', -1]]);
+  assert.deepEqual(apres(touche('KeyA', 'q'), false), []);
+  assert.deepEqual(apres(touche('KeyD', 'D', { shiftKey: true })), [['tourner', 1]]);
+  assert.deepEqual(apres(touche('KeyD', 'D', { shiftKey: true }), false), []);
 });
 
 verifier('contexte : douze boutons pour des unités, huit pour un QG, rien pour un QG adverse', () => {

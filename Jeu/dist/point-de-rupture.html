@@ -759,7 +759,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         <svg viewBox="0 0 16 16" style="--c:#4d86f0"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg>
       </span>
       <span class="titre-marque">POINT DE RUPTURE<small>RTS PROCÉDURAL · MOTEUR FERRO</small></span>
-      <span class="titre-edition"><span class="edition-nom">03 / MARSEILLE</span><b class="version-jeu" aria-label="Version 0.3b">V0.3b</b></span>
+      <span class="titre-edition"><span class="edition-nom">03 / MARSEILLE</span><b class="version-jeu" aria-label="Version 0.3c">V0.3c</b></span>
     </header>
     <div class="titre-corps">
       <p class="surtitre">UNE VILLE. TROIS CAMPS. TOUT TIENT À UN FIL.</p>
@@ -902,7 +902,7 @@ button.file-item:hover .icone { color: var(--alerte); }
           <p id="reglages-surtitre" class="surtitre">RÉGLAGES</p>
           <h2 id="reglages-titre">À votre main.</h2>
         </div>
-        <p class="edition">POINT DE RUPTURE<br>ESSAI 0.3b · FERRO</p>
+        <p class="edition">POINT DE RUPTURE<br>ESSAI 0.3c · FERRO</p>
       </header>
       <div class="coque-corps">
         <div class="onglets" role="tablist" aria-label="Rubriques des réglages" aria-orientation="vertical">
@@ -3066,7 +3066,7 @@ button.file-item:hover .icone { color: var(--alerte); }
   const TYPES = [
     type(0, 'equipe-convergence', 0, 'Équipe', 'Équipes', 'ouvrier',
       { coh: 40, pression: 1.0, portee: 1.2, vitesse: 3.6, vision: 14, cout: { moyens: 50, materiaux: 0 }, duree: 10, lot: 10 },
-      { recolter: true, construire: true, barricader: true, casser: 1, lever: 1 }, 'Q',
+      { recolter: true, construire: true, barricader: true, casser: 1, lever: 1 }, 'A',
       'Récolte, bâtit les relais et les barricades, casse.'),
     type(1, 'cortege', 0, 'Cortège', 'Cortèges', 'ligne',
       { coh: 60, pression: 3.0, portee: 1.2, vitesse: 3.4, vision: 16, cout: { moyens: 80, materiaux: 0 }, duree: 12, lot: 20 },
@@ -3082,7 +3082,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       'Rend 3 points de cohésion par seconde aux siens à moins de 8 m.'),
     type(4, 'equipe-bastion', 1, 'Équipe', 'Équipes', 'ouvrier',
       { coh: 50, pression: 1.5, portee: 1.2, vitesse: 3.4, vision: 14, cout: { moyens: 50, materiaux: 0 }, duree: 10, lot: 10 },
-      { recolter: true, construire: true, lever: 1 }, 'Q',
+      { recolter: true, construire: true, lever: 1 }, 'A',
       'Récolte, bâtit les cantonnements, lève les barricades.'),
     type(5, 'piquets', 1, 'Piquets', 'Piquets', 'ligne',
       { coh: 100, pression: 4.0, portee: 1.2, vitesse: 3.2, vision: 15, cout: { moyens: 100, materiaux: 0 }, duree: 14, lot: 10 },
@@ -3098,7 +3098,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       'Lèvent les barricades quatre fois plus vite.'),
     type(8, 'equipe-prefecture', 2, 'Équipe', 'Équipes', 'ouvrier',
       { coh: 50, pression: 1.0, portee: 1.2, vitesse: 3.6, vision: 14, cout: { moyens: 50, materiaux: 0 }, duree: 10, lot: 6 },
-      { recolter: true, construire: true, lever: 1, leverTout: true }, 'Q',
+      { recolter: true, construire: true, lever: 1, leverTout: true }, 'A',
       'Récolte, bâtit les postes mobiles, lève.'),
     type(9, 'patrouille', 2, 'Patrouille', 'Patrouilles', 'ligne',
       { coh: 90, pression: 4.0, portee: 1.2, vitesse: 3.4, vision: 18, cout: { moyens: 110, materiaux: 0 }, duree: 14, lot: 6 },
@@ -10198,7 +10198,9 @@ button.file-item:hover .icone { color: var(--alerte); }
     vec3(.90,.58,.12),vec3(.30,.29,.27),vec3(.80,.50,.10),vec3(.42,.40,.36),
     vec3(.10,.15,.30),vec3(.12,.17,.33),vec3(.16,.20,.36),vec3(.09,.12,.24),
     vec3(.12,.12,.13),vec3(.18,.17,.18),vec3(.25,.10,.09),vec3(.14,.14,.16));
-  vec3 haut(Unite u){uint k=(u.h>>4)&3u;return u.type==2u?HAUTS[12u+k]:HAUTS[u.faction*4u+k];}`;
+  vec3 haut(Unite u){uint k=(u.h>>4)&3u;return u.type==2u?HAUTS[12u+k]:HAUTS[u.faction*4u+k];}
+  // Un Cortège sur huit porte la banderole, un Piquet sur huit la pancarte (David, 12/11/2026 : « trop de pancartes »).
+  bool porteur(Unite u){return (u.type==1u||u.type==5u)&&((u.h>>20)&7u)==0u;}`;
 
   const FIGURINE_VS = `#version 300 es
   precision highp float;precision highp int;
@@ -10237,7 +10239,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     else if(e==11u){float k=.5+.5*sin(t*3.+ph);q.bd=.6+2.1*k;q.bg=1.;}
     if((u.drapeaux&1u)!=0u&&(e<2u||e==4u||e==8u))q.bg=q.bd=.95;
     if(e!=10u){
-      if(u.type==1u||u.type==5u){q.bd=2.85+.08*sin(t*1.7+ph);q.banderole=.12*sin(t*2.3+ph);if(u.type==5u)q.bg=marche?q.bg:.3;}
+      if(porteur(u)){q.bd=2.85+.08*sin(t*1.7+ph);q.banderole=.12*sin(t*2.3+ph);if(u.type==5u)q.bg=marche?q.bg:.3;}
       if(u.type==6u||u.type==10u){bool leve=(u.drapeaux&8u)!=0u||e==9u||e==2u;q.bouclier=leve?0.:-.35;q.bg=leve?1.05:.3;}
       if(u.type==7u){q.bg=q.bd=.95;q.poutre=(e==6u||e==2u||e==7u)?.38*max(0.,sin(t*5.+ph)):0.;}
       if(u.type==3u){if(cuivre){q.bg=q.bd=1.35;q.torse+=.05*sin(t*3.+ph);}else{q.bd=1.+.5*abs(sin(t*8.+ph));q.bg=1.+.5*abs(sin(t*8.+ph+1.57));}}
@@ -10256,6 +10258,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     uint os=aInfo.x;bool cuivre=(u.h&1u)==1u;
     bool cache=u.cachee;
     if(os==6u&&(u.drapeaux&1u)==0u&&u.etat!=4u)cache=true;
+    if(os==12u&&!porteur(u))cache=true;
     #ifdef OMBRE
     if(os==11u)cache=true;
     #else
@@ -15025,7 +15028,9 @@ button.file-item:hover .icone { color: var(--alerte); }
   'use strict';
 
   const I = PDR.interface = PDR.interface || {};
-  const VERSION = 1, CLE = 'pdr.reglages';
+  // Version 2 (12 novembre 2026) : ZQSD fait défiler la vue (David : « deplacement sur map en plus du bouton milieu et
+  // les fleches, zsqd aussi ») ; Arrêt passe de S à F, la première production de Q à A.
+  const VERSION = 2, CLE = 'pdr.reglages';
 
   const GROUPES = Object.freeze({ vue: 'Vue', ordres: 'Ordres aux unités', production: 'Production', general: 'Général' });
 
@@ -15039,20 +15044,21 @@ button.file-item:hover .icone { color: var(--alerte); }
   }
   function toucheProduction(k) {
     const R = PDR.regles, liste = R && R.TYPES_PAR_FACTION.find(l => l[k] !== undefined);
-    return liste ? 'Key' + R.TYPES[liste[k]].raccourci : 'Key' + 'QWERT'[k];
+    return liste ? 'Key' + R.TYPES[liste[k]].raccourci : 'Key' + 'AWERT'[k];
   }
 
+  // Les lettres suivent la disposition du clavier (touche) : sur un AZERTY, Z Q S D sont sous la main gauche.
   const ACTIONS = Object.freeze([
-    ['vueAvant', 'Faire défiler vers le haut', 'vue', ['ArrowUp']],
-    ['vueArriere', 'Faire défiler vers le bas', 'vue', ['ArrowDown']],
-    ['vueGauche', 'Faire défiler à gauche', 'vue', ['ArrowLeft']],
-    ['vueDroite', 'Faire défiler à droite', 'vue', ['ArrowRight']],
+    ['vueAvant', 'Faire défiler vers le haut', 'vue', ['ArrowUp', 'KeyZ']],
+    ['vueArriere', 'Faire défiler vers le bas', 'vue', ['ArrowDown', 'KeyS']],
+    ['vueGauche', 'Faire défiler à gauche', 'vue', ['ArrowLeft', 'KeyQ']],
+    ['vueDroite', 'Faire défiler à droite', 'vue', ['ArrowRight', 'KeyD']],
     ['vueTournerG', 'Tourner la vue à gauche', 'vue', ['Home']],
     ['vueTournerD', 'Tourner la vue à droite', 'vue', ['End']],
     ['zoomAvant', 'Rapprocher la vue', 'vue', ['PageUp', 'NumpadAdd']],
     ['zoomArriere', 'Éloigner la vue', 'vue', ['PageDown', 'NumpadSubtract']],
     ['attaque', 'Attaque-mouvement', 'ordres', ['KeyA']],
-    ['arret', 'Arrêt', 'ordres', ['KeyS']],
+    ['arret', 'Arrêt', 'ordres', ['KeyF']],
     ['tenir', 'Tenir la position', 'ordres', ['KeyH']],
     ['replier', 'Se replier', 'ordres', ['KeyR']],
     ['regrouper', 'Regrouper', 'ordres', ['KeyG']],
@@ -15076,6 +15082,10 @@ button.file-item:hover .icone { color: var(--alerte); }
     ['qg', 'Le QG', 'general', ['F3']],
   ].map(([id, libelle, groupe, defaut]) => Object.freeze({ id, libelle, groupe, defaut: Object.freeze(defaut) })));
   const PAR_ID = Object.freeze(Object.fromEntries(ACTIONS.map(a => [a.id, a])));
+  // Défauts de la version 1 qui ont changé, dans l'ordre de la reprise : les touches libérées d'abord (S, Q), la vue
+  // ensuite. Une action restée sur son ancien défaut prend le nouveau ; un choix du joueur ne bouge pas.
+  const DEFAUTS_V1 = Object.freeze([['arret', ['KeyS']], ['produire1', ['KeyQ']], ['vueAvant', ['ArrowUp']],
+    ['vueArriere', ['ArrowDown']], ['vueGauche', ['ArrowLeft']], ['vueDroite', ['ArrowRight']]]);
 
   const FIXES = Object.freeze([
     ['Échap', 'annuler la visée, sinon la pause'],
@@ -15083,7 +15093,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     ['1 à 9', 'choisir un groupe ; deux fois : centrer la vue'],
     ['Maj + 1 à 9', 'ajouter un groupe à la sélection'],
     ['Ctrl + A', 'toutes vos unités'],
-    ['Maj + ← / →', 'tourner la vue'],
+    ['Maj + ← / →, Maj + Q / D', 'tourner la vue'],
     ['Clic gauche', 'choisir ; Maj : ajouter ou retirer'],
     ['Double-clic, Ctrl + clic', 'tout ce type à l’écran'],
     ['Clic droit', 'ordre selon la cible ; glissé : tourner la vue'],
@@ -15168,6 +15178,16 @@ button.file-item:hover .icone { color: var(--alerte); }
       if (valide) {
         // Une action apparue depuis l'enregistrement laisse ses touches par défaut déjà prises par le joueur.
         for (const a of ACTIONS) if (v.touches[a.id] === undefined) candidat[a.id] = candidat[a.id].filter(c => !conflit(candidat, a.id, c));
+        // Réglages de la version 1 : les nouveaux défauts, sauf les touches que le joueur a déjà données ailleurs ; si
+        // aucune ne reste libre, l'ancienne touche.
+        if (!(v.version >= 2)) {
+          for (const [id, ancien] of DEFAUTS_V1) {
+            const c = candidat[id];
+            if (c.length !== ancien.length || c.some((k, i) => k !== ancien[i])) continue;
+            const neuf = PAR_ID[id].defaut.filter(k => ancien.includes(k) || !conflit(candidat, id, k));
+            candidat[id] = neuf.length ? neuf : ancien.slice();
+          }
+        }
         for (const a of ACTIONS) for (const c of candidat[a.id]) if (conflit(candidat, a.id, c)) valide = false;
       }
       if (valide) d.touches = candidat;

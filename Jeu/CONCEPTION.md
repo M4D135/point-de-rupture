@@ -176,7 +176,7 @@ Chaque camp tenu par l'IA réfléchit une fois par seconde, à tour de rôle.
 
 | Touche | Ordre | Touche | Ordre |
 |---|---|---|---|
-| A | attaque-mouvement | S | arrêt |
+| A | attaque-mouvement | F | arrêt |
 | H | tenir | R | se replier |
 | G | regrouper | B | barricade |
 | L | lever | C | casser |
@@ -185,7 +185,7 @@ Chaque camp tenu par l'IA réfléchit une fois par seconde, à tour de rôle.
 - Ctrl+1 à 9 et 1 à 9 : groupes ; un double appui centre la vue.
 - F1 : Équipes oisives. F2 : toute l'armée. F3 : le QG. Espace : la dernière alerte.
 - Échap : annuler, ou pause.
-- Les flèches : déplacer la vue ; Début et Fin : la tourner ; + et − : zoom. Les lettres servent aux ordres et à la production (Q, W, E, R), d'où ce choix ; tout se réassigne dans les réglages.
+- Les flèches, et Z Q S D : déplacer la vue (David, 12/11/2026 : « deplacement sur map en plus du bouton milieu et les fleches, zsqd aussi ») ; Maj + Q ou D, comme Maj + ← ou →, Début et Fin : la tourner ; + et − : zoom. Les autres lettres servent aux ordres et à la production (A, W, E, R, T) ; Arrêt passe donc de S à F. Les lettres suivent la disposition du clavier : Z Q S D sont sous la main gauche d'un AZERTY ; sur un QWERTY, les réassigner. Tout se réassigne dans les réglages ; des réglages enregistrés avant ce changement le reçoivent, sauf les touches que le joueur avait déjà données ailleurs.
 
 ### 1.11 Démo
 
