@@ -47,6 +47,25 @@ VILLES = {
         'exclus': ('Petit Train de Marseille', 'La Savonnerie Marseillaise', 'Le Musée du Savon',
                    "Monument à la mémoire de Frédéric Chevillon maire d'Allauch"),
         'aires': {"Le cours Honoré-d'Estienne-d'Orves": ("Cours Honoré-d'Estienne-d'Orves", 'place')},
+        # Le lointain : ce que l'on voit des bords du carré sans pouvoir y aller. reperes : (nom du repère OSM, classe
+        # de ce point d'intérêt, rayon en m, modèle) ; les bâtiments à moins du rayon de ce point gardent leur emprise
+        # exacte et vont au modèle (le constructeur de la ville l'habille), les autres deviennent des boîtes. Le point
+        # vient toujours des données, jamais d'une saisie. Le MuCEM (J4) est dans la tuile 14/8435/6001, à l'ouest : il
+        # entre dans le plan dès que cette tuile est posée avec les autres. zone : (x0, z0, x1, z1) en m ; elle descend
+        # au sud jusqu'à la colline de Notre-Dame de la Garde.
+        'lointain': {'zone': (-1250, -1250, 1250, 1460), 'reperes': (
+            ('Cathédrale de la Major', 'place_of_worship', 60, 'major'),
+            ('Tour du Roi René', 'attraction', 170, 'fort-saint-jean'),
+            ('Église Saint-Laurent', 'place_of_worship', 25, 'saint-laurent'),
+            ('Fort Saint-Nicolas', 'attraction', 60, 'fort-saint-nicolas'),
+            ('Basilique Saint-Victor', 'place_of_worship', 5, 'saint-victor'),
+            ('Basilique Notre-Dame de la Garde', 'place_of_worship', 40, 'garde'),
+            ('Grotte Cosquer', 'museum', 5, 'villa-mediterranee'),
+            ('Mucem', 'museum', 5, 'mucem'), ('MuCEM', 'museum', 5, 'mucem'),
+            ("Musée des Civilisations de l'Europe et de la Méditerranée", 'museum', 5, 'mucem'),
+            ("Porte d'Aix", 'monument', 12, 'porte-aix'),
+            ('Église Saint-Vincent-de-Paul-Les Réformés', 'place_of_worship', 30, 'reformes'),
+        )},
     },
     'paris': {
         'nom': 'Paris',
@@ -75,7 +94,7 @@ ATTRIBUTION = ("© les contributeurs d'OpenStreetMap — données sous licence O
                "(https://www.openstreetmap.org/copyright) · tuiles OpenFreeMap, schéma OpenMapTiles")
 
 COUCHES = ('building', 'transportation', 'transportation_name', 'water', 'landcover', 'landuse', 'poi', 'place',
-           'water_name', 'park')
+           'water_name', 'park', 'mountain_peak')
 
 
 # ---- Protobuf et Mapbox Vector Tile ------------------------------------------------------------------------------
@@ -803,18 +822,21 @@ ATTRIBUTS = {
     'poi': ('name', 'class', 'subclass', 'rank', 'level', 'layer', 'indoor'),
     'place': ('name', 'class', 'rank', 'capital'),
     'water_name': ('name', 'class'),
+    'mountain_peak': ('name', 'class', 'ele', 'rank'),
 }
 TOL_RACCORD = 1.5          # unités de tuile (≈ 0,65 m à Marseille) : écart admis entre deux bouts à raccorder
 
 
-def tuiles_utiles(cle, centre, dossier, demi=DEMI):
-    """Tuiles qui couvrent le carré extrait (demi-côté demi, en m), et leurs fichiers."""
+def tuiles_utiles(cle, centre, dossier, demi=DEMI, zone=None):
+    """Tuiles qui couvrent le carré extrait (demi-côté demi, en m) ou le rectangle zone = (x0, z0, x1, z1) en m, et
+    leurs fichiers."""
     proj = Projection(*centre)
     E = proj.extent
-    X0, _ = proj.unites(-demi, 0)
-    X1, _ = proj.unites(demi, 0)
-    _, Y0 = proj.unites(0, -demi)
-    _, Y1 = proj.unites(0, demi)
+    x0, z0, x1, z1 = zone or (-demi, -demi, demi, demi)
+    X0, _ = proj.unites(x0, 0)
+    X1, _ = proj.unites(x1, 0)
+    _, Y0 = proj.unites(0, z0)
+    _, Y1 = proj.unites(0, z1)
     carre = (X0, Y0, X1, Y1)
     tx0, tx1 = math.floor((X0 + proj.ox) / E), math.floor((X1 + proj.ox) / E)
     ty0, ty1 = math.floor((Y0 + proj.oy) / E), math.floor((Y1 + proj.oy) / E)
@@ -826,11 +848,12 @@ def tuiles_utiles(cle, centre, dossier, demi=DEMI):
     return proj, carre, tuiles
 
 
-def charger(cle, centre, dossier, demi=DEMI, journal=print):
-    """Lit les tuiles d'une ville et rend ses objets en mètres locaux, découpés au carré extrait :
+def charger(cle, centre, dossier, demi=DEMI, journal=print, zone=None):
+    """Lit les tuiles d'une ville et rend ses objets en mètres locaux, découpés au carré extrait (ou au rectangle
+    zone = (x0, z0, x1, z1), en m) :
     { couche: [(attributs, géométrie)] } ; géométrie : point (x, z), ligne [(x, z)…] ou polygone [anneau, trous…].
     Les polygones de la couche transportation (aires piétonnes, ponts, jetées) sont rangés sous 'transportation_aire'."""
-    proj, (X0, Y0, X1, Y1), tuiles = tuiles_utiles(cle, centre, dossier, demi)
+    proj, (X0, Y0, X1, Y1), tuiles = tuiles_utiles(cle, centre, dossier, demi, zone)
     manquantes = [t for t in tuiles if not t[2].exists()]
     if manquantes:
         lignes = '\n'.join(f'  {ZOOM}/{tx}/{ty} → {p}' for tx, ty, p in manquantes)
@@ -965,6 +988,15 @@ SORTES_POI = {
     'marina': 'port', 'station': 'gare', 'halt': 'gare', 'tram_stop': 'tram', 'subway_entrance': 'metro',
     'park': 'parc', 'garden': 'jardin', 'playground': 'jeux', 'viewpoint': 'point-de-vue', 'stadium': 'stade',
     'community_centre': None,
+}
+# Mobilier de rue et terrasses : points sans nom (aucune enseigne), par sous-classe de poi, sinon par classe.
+SORTES_MOBILIER = {
+    'restaurant': 'terrasse', 'cafe': 'terrasse', 'bar': 'terrasse', 'pub': 'terrasse', 'ice_cream': 'terrasse',
+    'nightclub': None, 'food_court': None,
+    'bollard': 'potelet', 'waste_basket': 'corbeille', 'recycling': 'conteneur', 'bicycle_parking': 'velos',
+    'bicycle_rental': 'velos-partage', 'motorcycle_parking': 'motos', 'bus_stop': 'arret-bus', 'shelter': 'abri',
+    'post_box': 'boite-lettres', 'drinking_water': 'fontaine-a-boire', 'toilets': 'toilettes', 'kiosk': 'kiosque',
+    'artwork': 'oeuvre', 'board': 'panneau', 'map': 'panneau', 'guidepost': 'panneau',
 }
 # Une bibliothèque n'est retenue que si son nom le dit (OpenMapTiles y range aussi des librairies).
 PREFIXES_BIBLIOTHEQUES = ('Bibliothèque', 'Médiathèque', 'Library')
@@ -1120,7 +1152,7 @@ def classer(r, ville=None, journal=print):
     ville : l'entrée de VILLES (noms exclus, noms d'aires)."""
     ville = ville or {}
     exclus = set(ville.get('exclus', ()))
-    plan = {'rues': [], 'batiments': [], 'eau': [], 'espaces': [], 'reperes': []}
+    plan = {'rues': [], 'batiments': [], 'eau': [], 'espaces': [], 'reperes': [], 'mobilier': []}
     ecartes = {}
 
     def ecarter(raison):
@@ -1164,30 +1196,7 @@ def classer(r, ville=None, journal=print):
             'connue': not (h == 5 and b == 0), 'couleur': couleur(attrs.get('colour')),
             'contour': bool(attrs.get('hide_3d'))})
 
-    # Eau : un port est une eau qui porte un nom de port ou un repère de port ; deux polygones identiques
-    # (la mer et le bassin du Vieux-Port, par exemple) n'en font qu'un.
-    nommes = [(a.get('name'), p) for a, p in r.get('water_name', ())]
-    nommes += [(a.get('name'), p) for a, p in r.get('poi', ()) if a.get('class') == 'harbor' and a.get('name')]
-    eaux = []
-    for attrs, poly in r.get('water', ()):
-        if attrs.get('brunnel') == 'tunnel':
-            ecarter('eau en tunnel')
-            continue
-        sorte = SORTES_EAU.get(attrs.get('class'), 'bassin')
-        nom = next((n for n, p in nommes if n and dans_poly(p[0], p[1], poly)), '')
-        if nom and sorte in ('mer', 'bassin') and any(w in nom.lower() for w in ('port', 'bassin', 'darse', 'harbo')):
-            sorte = 'port'
-        eaux.append({'sorte': sorte, 'nom': nom, 'points': poly[0], 'trous': poly[1:]})
-    rang_eau = {'port': 0, 'riviere': 1, 'bassin': 2, 'piscine': 3, 'mer': 4}
-    eaux.sort(key=lambda e: rang_eau.get(e['sorte'], 5))
-    gardees = []
-    for e in eaux:
-        sig = (round(aire(e['points'])), tuple(round(v) for v in boite(e['points'])))
-        if any(g[0] == sig for g in gardees):
-            ecarter('eau en double')
-            continue
-        gardees.append((sig, e))
-    plan['eau'] = [e for _, e in gardees]
+    plan['eau'] = eaux_de(r, ecarter)
 
     # Espaces : couverture du sol, usages au sol, aires piétonnes, quais d'arrêt, jetées et ponts.
     espaces = []
@@ -1338,8 +1347,344 @@ def classer(r, ville=None, journal=print):
             ecarter('repère en double')
             continue
         plan['reperes'].append(d)
+    # Mobilier : points sans nom, au sol et dehors ; deux points de même sorte à moins de 0,6 m n'en font qu'un.
+    vus = set()
+    for attrs, p in r.get('poi', ()):
+        sous, classe = attrs.get('subclass'), attrs.get('class')
+        sorte = SORTES_MOBILIER[sous] if sous in SORTES_MOBILIER else SORTES_MOBILIER.get(classe)
+        if not sorte:
+            continue
+        if (attrs.get('level') or 0) != 0 or (attrs.get('layer') or 0) != 0 or attrs.get('indoor'):
+            ecarter('mobilier hors du sol')
+            continue
+        cle = (sorte, round(p[0] / 0.6), round(p[1] / 0.6))
+        if cle in vus:
+            ecarter('mobilier en double')
+            continue
+        vus.add(cle)
+        plan['mobilier'].append({'sorte': sorte, 'x': p[0], 'z': p[1]})
     journal('écartés : ' + ', '.join(f'{k} {v}' for k, v in sorted(ecartes.items())))
     return plan, ecartes
+
+
+def eaux_de(r, ecarter=lambda raison: None):
+    """Eaux d'un chargement : un port est une eau qui porte un nom de port ou un repère de port ; deux polygones
+    identiques (la mer et le bassin du Vieux-Port, par exemple) n'en font qu'un."""
+    nommes = [(a.get('name'), p) for a, p in r.get('water_name', ())]
+    nommes += [(a.get('name'), p) for a, p in r.get('poi', ()) if a.get('class') == 'harbor' and a.get('name')]
+    eaux = []
+    for attrs, poly in r.get('water', ()):
+        if attrs.get('brunnel') == 'tunnel':
+            ecarter('eau en tunnel')
+            continue
+        sorte = SORTES_EAU.get(attrs.get('class'), 'bassin')
+        nom = next((n for n, p in nommes if n and dans_poly(p[0], p[1], poly)), '')
+        if nom and sorte in ('mer', 'bassin') and any(w in nom.lower() for w in ('port', 'bassin', 'darse', 'harbo')):
+            sorte = 'port'
+        eaux.append({'sorte': sorte, 'nom': nom, 'points': poly[0], 'trous': poly[1:]})
+    rang_eau = {'port': 0, 'riviere': 1, 'bassin': 2, 'piscine': 3, 'mer': 4}
+    eaux.sort(key=lambda e: rang_eau.get(e['sorte'], 5))
+    gardees = []
+    for e in eaux:
+        sig = (round(aire(e['points'])), tuple(round(v) for v in boite(e['points'])))
+        if any(g[0] == sig for g in gardees):
+            ecarter('eau en double')
+            continue
+        gardees.append((sig, e))
+    return [e for _, e in gardees]
+
+
+# ---- Le lointain : ce que l'on voit des bords du carré de jeu sans pouvoir y aller --------------------------------
+DEMI_LOIN = 1250.0                             # m : demi-côté de la zone lointaine, réduite là où une tuile manque
+TOL_LOIN = 2.5                                 # m : Douglas-Peucker de l'eau et des voies du lointain
+TOL_ESPACES_LOIN = 4.0
+AIRE_MIN_LOIN = {'eau': 150.0, 'espaces': 1500.0, 'trou': 100.0}
+CLASSES_VOIES_LOIN = ('motorway', 'trunk', 'primary', 'secondary', 'tertiary')
+SORTES_ESPACES_LOIN = ('parc', 'jardin', 'pelouse', 'bois', 'cimetiere', 'terrain', 'roche', 'sable', 'plage')
+PAS_BOITE = 1.0                                # m : centre et demi-côtés d'une boîte du lointain
+PAS_ANGLE = 120                                # une boîte tourne par 120es de demi-tour (1,5°)
+
+
+def zone_lointaine(cle, centre, dossier, zone=None):
+    """Le rectangle du lointain (x0, z0, x1, z1), en mètres entiers : la zone voulue (±DEMI_LOIN autour du centre par
+    défaut), rognée du côté où une tuile manque (le carré du plan, lui, exige toutes les siennes). Rend aussi les
+    tuiles absentes."""
+    proj = Projection(*centre)
+    E = proj.extent
+    x0, z0, x1, z1 = zone or (-DEMI_LOIN, -DEMI_LOIN, DEMI_LOIN, DEMI_LOIN)
+    absentes = []
+    while True:
+        _, _, tuiles = tuiles_utiles(cle, centre, dossier, zone=(x0, z0, x1, z1))
+        manque = [(tx, ty) for tx, ty, p in tuiles if not p.exists()]
+        if not manque:
+            break
+        tx, ty = manque[0]
+        absentes.append(f'{ZOOM}/{tx}/{ty}')
+        ax, az = proj.metres((tx * E - proj.ox, ty * E - proj.oy))
+        bx, bz = proj.metres(((tx + 1) * E - proj.ox, (ty + 1) * E - proj.oy))
+        if bx <= -DEMI:
+            x0 = max(x0, bx)
+        elif ax >= DEMI:
+            x1 = min(x1, ax)
+        elif bz <= -DEMI:
+            z0 = max(z0, bz)
+        elif az >= DEMI:
+            z1 = min(z1, az)
+        else:
+            raise SystemExit(f'tuile {ZOOM}/{tx}/{ty} manquante dans le carré du plan')
+    return (math.ceil(x0), math.ceil(z0), math.floor(x1), math.floor(z1)), absentes
+
+
+def enveloppe(points):
+    """Enveloppe convexe (chaîne monotone)."""
+    pts = sorted(set(points))
+    if len(pts) <= 2:
+        return pts
+    cr = lambda o, a, b: (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    bas, haut = [], []
+    for p in pts:
+        while len(bas) >= 2 and cr(bas[-2], bas[-1], p) <= 0:
+            bas.pop()
+        bas.append(p)
+    for p in reversed(pts):
+        while len(haut) >= 2 and cr(haut[-2], haut[-1], p) <= 0:
+            haut.pop()
+        haut.append(p)
+    return bas[:-1] + haut[:-1]
+
+
+def rectangle_minimal(points):
+    """Rectangle d'aire minimale autour des points : (cx, cz, a, b, angle), demi-côtés a ≥ b, angle de l'axe de a
+    dans [0, π) (direction (cos, sin) dans le plan x, z)."""
+    h = enveloppe(points)
+    n, meilleur = len(h), None
+    for i in range(n):
+        (x0, z0), (x1, z1) = h[i], h[(i + 1) % n]
+        l = math.hypot(x1 - x0, z1 - z0)
+        if l < 1e-9:
+            continue
+        ux, uz = (x1 - x0) / l, (z1 - z0) / l
+        us = [x * ux + z * uz for x, z in h]
+        vs = [z * ux - x * uz for x, z in h]
+        u0, u1, v0, v1 = min(us), max(us), min(vs), max(vs)
+        A = (u1 - u0) * (v1 - v0)
+        if meilleur is None or A < meilleur[0] - 1e-9:
+            meilleur = (A, ux, uz, u0, u1, v0, v1)
+    if meilleur is None:
+        return None
+    _, ux, uz, u0, u1, v0, v1 = meilleur
+    a, b, cu, cv = (u1 - u0) / 2, (v1 - v0) / 2, (u0 + u1) / 2, (v0 + v1) / 2
+    cx, cz = cu * ux - cv * uz, cu * uz + cv * ux
+    if b > a:
+        a, b, ux, uz = b, a, -uz, ux
+    return cx, cz, a, b, math.atan2(uz, ux) % math.pi
+
+
+def _coins(q):
+    ux, uz = math.cos(q['ang']), math.sin(q['ang'])
+    return [(q['cx'] + su * q['a'] * ux - sv * q['b'] * uz, q['cz'] + su * q['a'] * uz + sv * q['b'] * ux)
+            for su, sv in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+
+
+def fusionner_boites(boites, angle_max=10.0, ecart_h=5.0, plein_min=0.66, cote_max=110.0, fond_max=46.0, jeu=2.5):
+    """Regroupe les emprises voisines en boîtes orientées : deux boîtes de même orientation (à angle_max degrés près,
+    modulo le quart de tour), de hauteurs proches et qui se touchent (à `jeu` mètres près) n'en font qu'une si le bâti
+    remplit au moins plein_min de leur rectangle commun. Une rangée de maisons devient une barre, un îlot quelques
+    boîtes ; les rues, plus larges que `jeu`, restent ouvertes. boites : [{cx, cz, a, b, ang, A, h, Ah}] (A : aire
+    bâtie ; h : hauteur moyenne connue ou None ; Ah : aire dont la hauteur est connue). Rend les boîtes restantes."""
+    C = 64.0
+    grille = {}
+    cle = lambda q: (math.floor(q['cx'] / C), math.floor(q['cz'] / C))
+    for i, q in enumerate(boites):
+        q['coins'], q['vivant'], q['r'] = _coins(q), True, math.hypot(q['a'], q['b'])
+        grille.setdefault(cle(q), set()).add(i)
+    quart = math.pi / 2
+    amax = math.radians(angle_max)
+
+    def essai(p, q):
+        if math.hypot(p['cx'] - q['cx'], p['cz'] - q['cz']) > p['r'] + q['r'] + jeu:
+            return None
+        d = abs(p['ang'] - q['ang']) % quart
+        if min(d, quart - d) > amax:
+            return None
+        if p['h'] is not None and q['h'] is not None and abs(p['h'] - q['h']) > ecart_h:
+            return None
+        g = p if p['A'] >= q['A'] else q
+        ux, uz = math.cos(g['ang']), math.sin(g['ang'])
+        bornes = []
+        for c in (p['coins'], q['coins']):
+            us = [x * ux + z * uz for x, z in c]
+            vs = [z * ux - x * uz for x, z in c]
+            bornes.append((min(us), max(us), min(vs), max(vs)))
+        (pu0, pu1, pv0, pv1), (qu0, qu1, qv0, qv1) = bornes
+        if max(pu0, qu0) - min(pu1, qu1) > jeu or max(pv0, qv0) - min(pv1, qv1) > jeu:
+            return None
+        u0, u1, v0, v1 = min(pu0, qu0), max(pu1, qu1), min(pv0, qv0), max(pv1, qv1)
+        a, b = (u1 - u0) / 2, (v1 - v0) / 2
+        if 2 * max(a, b) > cote_max or 2 * min(a, b) > fond_max:
+            return None
+        A = p['A'] + q['A']
+        plein = A / (4 * a * b)
+        if plein < plein_min:
+            return None
+        cu, cv, ang = (u0 + u1) / 2, (v0 + v1) / 2, g['ang']
+        if b > a:
+            a, b, ang = b, a, (ang + quart) % math.pi
+        Ah = p['Ah'] + q['Ah']
+        h = ((p['h'] or 0) * p['Ah'] + (q['h'] or 0) * q['Ah']) / Ah if Ah > 0 else None
+        return {'cx': cu * ux - cv * uz, 'cz': cu * uz + cv * ux, 'a': a, 'b': b, 'ang': ang, 'A': A, 'h': h, 'Ah': Ah,
+                'plein': plein}
+    change = True
+    while change:
+        change = False
+        for i in sorted((i for i, q in enumerate(boites) if q['vivant']), key=lambda i: (-boites[i]['A'], i)):
+            p = boites[i]
+            if not p['vivant']:
+                continue
+            ci, cj = cle(p)
+            choix, plein, autre = None, 0.0, -1
+            for I in range(ci - 2, ci + 3):
+                for J in range(cj - 2, cj + 3):
+                    for j in sorted(grille.get((I, J), ())):
+                        if j != i:
+                            m = essai(p, boites[j])
+                            if m and m['plein'] > plein:
+                                choix, plein, autre = m, m['plein'], j
+            if choix:
+                grille[cle(p)].discard(i)
+                grille[cle(boites[autre])].discard(autre)
+                boites[autre]['vivant'] = False
+                p.update(choix)
+                p['coins'], p['r'] = _coins(p), math.hypot(p['a'], p['b'])
+                grille.setdefault(cle(p), set()).add(i)
+                change = True
+    return [q for q in boites if q['vivant']]
+
+
+def hors_du_carre(ligne, d):
+    """Morceaux d'une polyligne hors du carré [-d, d]² (Liang-Barsky segment par segment)."""
+    morceaux, courant = [], []
+    for k in range(len(ligne) - 1):
+        (ax, az), (bx, bz) = ligne[k], ligne[k + 1]
+        dx, dz = bx - ax, bz - az
+        t0, t1, coupe = 0.0, 1.0, True
+        for p, q in ((-dx, ax + d), (dx, d - ax), (-dz, az + d), (dz, d - az)):
+            if p == 0:
+                if q < 0:
+                    coupe = False
+                    break
+                continue
+            t = q / p
+            if p < 0:
+                if t > t1:
+                    coupe = False
+                    break
+                t0 = max(t0, t)
+            else:
+                if t < t0:
+                    coupe = False
+                    break
+                t1 = min(t1, t)
+        if not coupe:                              # tout le segment est dehors
+            if not courant:
+                courant.append((ax, az))
+            courant.append((bx, bz))
+            continue
+        if t0 > 1e-9:                              # [0, t0] dehors, puis le segment entre dans le carré
+            if not courant:
+                courant.append((ax, az))
+            courant.append((ax + dx * t0, az + dz * t0))
+        if len(courant) >= 2:
+            morceaux.append(courant)
+        courant = []
+        if t1 < 1 - 1e-9:                          # il en ressort : [t1, 1] dehors
+            courant = [(ax + dx * t1, az + dz * t1), (bx, bz)]
+    if len(courant) >= 2:
+        morceaux.append(courant)
+    return morceaux
+
+
+def classer_lointain(r, ville, zone, journal=print):
+    """Objets en mètres de la zone lointaine (sortie de charger) → le lointain du plan, encore en flottants :
+    { zone, reperes, sommets, batiments, boites, eau, espaces, voies } (voir l'en-tête du module écrit). Rien de ce qui
+    touche le carré du plan n'y entre deux fois : ni bâtiment à cheval, ni voie dans le carré."""
+    cfg = ville.get('lointain') or {}
+    proche = lambda x, z: abs(x) <= DEMI and abs(z) <= DEMI
+    loin = {'zone': zone, 'reperes': [], 'sommets': [], 'batiments': [], 'boites': [], 'eau': [], 'espaces': [],
+            'voies': []}
+    pois = [(a.get('name'), a.get('class'), p) for a, p in r.get('poi', ()) if a.get('name')]
+    for nom, classe, rayon, modele in cfg.get('reperes', ()):
+        points = [p for n, c, p in pois if n == nom and c == classe and not proche(*p)]
+        if not points:
+            continue
+        p = min(points, key=lambda p: (math.hypot(*p), p))
+        loin['reperes'].append({'nom': nom, 'modele': modele, 'x': p[0], 'z': p[1], 'rayon': float(rayon)})
+    absents = sorted({m for _, _, _, m in cfg.get('reperes', ())} - {d['modele'] for d in loin['reperes']})
+    if absents:
+        journal('lointain : repères absents des tuiles : ' + ', '.join(absents))
+    for attrs, p in r.get('mountain_peak_points', ()):
+        if attrs.get('name') and attrs.get('ele') is not None:
+            loin['sommets'].append({'nom': attrs['name'], 'x': p[0], 'z': p[1], 'altitude': float(attrs['ele'])})
+    loin['sommets'].sort(key=lambda s: (-s['altitude'], s['nom']))
+
+    boites, a_cheval = [], 0
+    for attrs, poly in r.get('building', ()):
+        ext = poly[0]
+        bx0, bz0, bx1, bz1 = boite(ext)
+        if bx0 <= DEMI and bx1 >= -DEMI and bz0 <= DEMI and bz1 >= -DEMI:
+            a_cheval += not (bx0 >= -DEMI and bx1 <= DEMI and bz0 >= -DEMI and bz1 <= DEMI)
+            continue                               # dans le carré du plan, ou à cheval : il est dans ses bâtiments
+        h, b = attrs.get('render_height', 5), max(0, attrs.get('render_min_height', 0))
+        if round(h / QUANTUM) <= round(b / QUANTUM):
+            continue
+        connue, contour = not (h == 5 and b == 0), bool(attrs.get('hide_3d'))
+        choix, dmin = -1, float('inf')
+        for k, d in enumerate(loin['reperes']):
+            x, z, ray = d['x'], d['z'], d['rayon']
+            if bx1 < x - ray or bx0 > x + ray or bz1 < z - ray or bz0 > z + ray:
+                continue
+            e = 0.0 if dans_anneau(x, z, ext) else min(
+                distance_segment((x, z), ext[i - 1], ext[i]) for i in range(len(ext)))
+            if e <= ray and e < dmin:
+                choix, dmin = k, e
+        if choix >= 0:
+            loin['batiments'].append({'points': ext, 'trous': poly[1:], 'hauteur': float(h), 'base': float(b),
+                                      'connue': connue, 'couleur': couleur(attrs.get('colour')), 'contour': contour,
+                                      'repere': choix})
+            continue
+        if contour or b >= 3:
+            continue
+        A = abs(aire(ext)) - sum(abs(aire(tr)) for tr in poly[1:])
+        m = rectangle_minimal(ext) if A >= 12 else None
+        if m and m[3] >= 1.0:
+            boites.append({'cx': m[0], 'cz': m[1], 'a': m[2], 'b': m[3], 'ang': m[4], 'A': A,
+                           'h': float(h) if connue else None, 'Ah': A if connue else 0.0})
+    avant = len(boites)
+    for q in fusionner_boites(boites):
+        # La boîte garde l'aire bâtie : elle rétrécit de ce que le bâti ne remplit pas (pas plus de 14 % par côté).
+        k = max(0.86, min(1.0, math.sqrt(q['A'] / (4 * q['a'] * q['b']))))
+        if q['A'] >= 45:
+            loin['boites'].append({'x': q['cx'], 'z': q['cz'], 'a': q['a'] * k, 'b': q['b'] * k, 'ang': q['ang'],
+                                   'h': q['h']})
+    journal(f'lointain : {len(loin["batiments"])} bâtiments de repères, {avant} emprises → {len(loin["boites"])} '
+            f'boîtes ; {a_cheval} bâtiments à cheval sur le carré laissés au plan')
+
+    loin['eau'] = [e for e in eaux_de(r) if e['sorte'] != 'piscine' and abs(aire(e['points'])) >= AIRE_MIN_LOIN['eau']]
+    espaces = [(SORTES_LANDCOVER.get(a.get('subclass')) or SORTES_LANDCOVER.get(a.get('class')), p)
+               for a, p in r.get('landcover', ())]
+    espaces += [(SORTES_LANDUSE.get(a.get('class')), p) for a, p in r.get('landuse', ())]
+    for sorte, poly in espaces:
+        if sorte in SORTES_ESPACES_LOIN and abs(aire(poly[0])) >= AIRE_MIN_LOIN['espaces'] \
+                and not proche(*centre_polygone(poly)):
+            loin['espaces'].append({'sorte': sorte, 'nom': '', 'points': poly[0], 'trous': poly[1:]})
+    for attrs, ligne in r.get('transportation', ()):
+        if attrs.get('class') not in CLASSES_VOIES_LOIN or attrs.get('brunnel') == 'tunnel' \
+                or (attrs.get('layer') or 0) < 0 or (attrs.get('level') or 0) < 0:
+            continue
+        for m in hors_du_carre(ligne, DEMI):
+            if longueur(m) >= 12:
+                loin['voies'].append({'classe': CLASSES_RUES[attrs['class']], 'points': m})
+    return loin
 
 
 # ---- Aperçu SVG --------------------------------------------------------------------------------------------------
@@ -1489,10 +1834,10 @@ def quantifier(points):
     return [(round(x / QUANTUM), round(z / QUANTUM)) for x, z in points]
 
 
-def anneau_fini(anneau, exterieur, aire_min, simplifier=True):
-    """Simplifie, quantifie (décimètres entiers) et oriente un anneau ; None s'il dégénère.
-    Orientation rendue : aire signée positive pour un extérieur, négative pour un trou (repère x est, z sud)."""
-    q = sans_doublons(quantifier(simplifier_anneau(anneau, TOLERANCE) if simplifier else anneau), ferme=True)
+def anneau_fini(anneau, exterieur, aire_min, simplifier=True, tol=TOLERANCE):
+    """Simplifie (Douglas-Peucker à tol mètres), quantifie (décimètres entiers) et oriente un anneau ; None s'il
+    dégénère. Orientation rendue : aire signée positive pour un extérieur, négative pour un trou (x est, z sud)."""
+    q = sans_doublons(quantifier(simplifier_anneau(anneau, tol) if simplifier else anneau), ferme=True)
     # Une pointe (l'anneau revient sur ses pas le long d'une même droite), laissée par la quantification ou par la
     # coupe au bord du carré, se replie : son sommet ne borde aucune aire.
     k = 0
@@ -1549,7 +1894,7 @@ def finir(plan):
     """Plan en flottants → plan en décimètres entiers, simplifié, sans éclats, rangé dans un ordre spatial stable.
     Un trou que la simplification fait sortir de son extérieur est repris sans simplification ; s'il déborde encore
     (donnée source incohérente), il est retiré."""
-    fini = {'rues': [], 'batiments': [], 'eau': [], 'espaces': [], 'reperes': []}
+    fini = {'rues': [], 'batiments': [], 'eau': [], 'espaces': [], 'reperes': [], 'mobilier': []}
     eclats = {}
     for r in plan['rues']:
         q = sans_doublons(quantifier(douglas_peucker(r['points'], TOLERANCE)))
@@ -1576,18 +1921,58 @@ def finir(plan):
             fini[genre].append(dict(o, points=ext, trous=trous))
     for d in plan['reperes']:
         fini['reperes'].append(dict(d, x=round(d['x'] / QUANTUM), z=round(d['z'] / QUANTUM)))
+    vus = set()
+    for d in plan.get('mobilier', ()):
+        q = dict(d, x=round(d['x'] / QUANTUM), z=round(d['z'] / QUANTUM))
+        if (q['sorte'], q['x'], q['z']) not in vus:
+            vus.add((q['sorte'], q['x'], q['z']))
+            fini['mobilier'].append(q)
 
-    # Ordre de Morton par cases de 64 m, pour que les écarts d'un objet au suivant restent petits.
-    def morton(x, z):
-        i, j = (x + 100000) // 640, (z + 100000) // 640
-        m = 0
-        for b in range(12):
-            m |= ((i >> b) & 1) << (2 * b) | ((j >> b) & 1) << (2 * b + 1)
-        return m
     for genre in ('rues', 'batiments', 'eau', 'espaces'):
         fini[genre].sort(key=lambda o: (morton(*o['points'][0]), o['points'][0], len(o['points'])))
     fini['reperes'].sort(key=lambda d: (morton(d['x'], d['z']), d['x'], d['z'], d['nom']))
+    fini['mobilier'].sort(key=lambda d: (morton(d['x'], d['z']), d['x'], d['z'], d['sorte']))
     return fini, eclats
+
+
+def morton(x, z):
+    """Ordre de Morton par cases de 64 m (coordonnées en décimètres) : les écarts d'un objet au suivant restent petits."""
+    i, j = (x + 100000) // 640, (z + 100000) // 640
+    m = 0
+    for b in range(12):
+        m |= ((i >> b) & 1) << (2 * b) | ((j >> b) & 1) << (2 * b + 1)
+    return m
+
+
+def finir_lointain(loin):
+    """Lointain en flottants → décimètres entiers (boîtes : demi-mètres et 120es de demi-tour), simplifié, rangé."""
+    fini = {'zone': [int(v) for v in loin['zone']], 'batiments': [], 'boites': [], 'eau': [], 'espaces': [], 'voies': [],
+            'reperes': [dict(d, x=round(d['x'] / QUANTUM), z=round(d['z'] / QUANTUM)) for d in loin['reperes']],
+            'sommets': [dict(d, x=round(d['x'] / QUANTUM), z=round(d['z'] / QUANTUM)) for d in loin['sommets']]}
+    for genre, tol, aire_min, aire_trou in (('batiments', TOLERANCE, AIRE_MIN['batiments'], AIRE_MIN_TROU),
+                                            ('eau', TOL_LOIN, AIRE_MIN_LOIN['eau'], AIRE_MIN_LOIN['trou']),
+                                            ('espaces', TOL_ESPACES_LOIN, AIRE_MIN_LOIN['espaces'], AIRE_MIN_LOIN['trou'])):
+        for o in loin[genre]:
+            ext = anneau_fini(o['points'], True, aire_min, tol=tol)
+            if ext is None:
+                continue
+            trous = [q for q in (anneau_fini(tr, False, aire_trou, tol=tol) for tr in o['trous'])
+                     if q is not None and trou_loge(q, ext)]
+            fini[genre].append(dict(o, points=ext, trous=trous))
+        fini[genre].sort(key=lambda o: (morton(*o['points'][0]), o['points'][0], len(o['points'])))
+    for v in loin['voies']:
+        q = sans_doublons(quantifier(douglas_peucker(v['points'], TOL_LOIN)))
+        if len(q) >= 2 and longueur(q) * QUANTUM >= 12:
+            fini['voies'].append(dict(v, points=q))
+    fini['voies'].sort(key=lambda o: (morton(*o['points'][0]), o['points'][0], len(o['points']), o['classe']))
+    for b in loin['boites']:
+        fini['boites'].append({'x': round(b['x'] / PAS_BOITE), 'z': round(b['z'] / PAS_BOITE),
+                               'a': max(1, round(b['a'] / PAS_BOITE)), 'b': max(1, round(b['b'] / PAS_BOITE)),
+                               'ang': round(b['ang'] / math.pi * PAS_ANGLE) % PAS_ANGLE,
+                               'h': 0 if b['h'] is None else max(1, min(255, round(b['h'])))})
+    k = round(PAS_BOITE / QUANTUM)
+    fini['boites'].sort(key=lambda b: (morton(b['x'] * k, b['z'] * k), b['x'], b['z'], b['a'], b['b'], b['ang'], b['h']))
+    return fini
 
 
 # ---- Codage : entiers en varint, écarts en zigzag, le tout en base64 --------------------------------------------
@@ -1635,7 +2020,7 @@ def coder(fini):
             textes.append(s)
         return index[s]
     sortie = {}
-    for genre in ('rues', 'batiments', 'eau', 'espaces', 'reperes'):
+    for genre in ('rues', 'batiments', 'eau', 'espaces', 'reperes', 'mobilier'):
         f, n, curseur = Flux(), 0, [0, 0]
 
         def points(pts):
@@ -1665,12 +2050,55 @@ def coder(fini):
                 n += points(o['points'])
                 for tr in o['trous']:
                     n += points(tr)
+            elif genre == 'mobilier':
+                f.u(t(o['sorte']))
+                f.z(o['x'] - curseur[0]); f.z(o['z'] - curseur[1])
+                curseur[0], curseur[1] = o['x'], o['z']
             else:
                 f.u(t(o['nom'])); f.u(t(o['sorte'])); f.u(t(o['classe'])); f.u(t(o['sousClasse'])); f.u(o['rang'])
                 f.z(o['x'] - curseur[0]); f.z(o['z'] - curseur[1])
                 curseur[0], curseur[1] = o['x'], o['z']
         sortie[genre] = (len(fini[genre]), n, f)
-    return textes, sortie
+    return textes, sortie, t
+
+
+def coder_lointain(loin, t):
+    """Lointain fini → { genre: (nombre d'objets, nombre de points, Flux) } ; t : l'index des textes du module."""
+    sortie = {}
+    for genre in ('batiments', 'boites', 'eau', 'espaces', 'voies'):
+        f, n, curseur = Flux(), 0, [0, 0]
+
+        def points(pts):
+            f.u(len(pts))
+            for x, z in pts:
+                f.z(x - curseur[0])
+                f.z(z - curseur[1])
+                curseur[0], curseur[1] = x, z
+            return len(pts)
+        for o in loin[genre]:
+            if genre == 'batiments':
+                f.u(round(o['hauteur'] / QUANTUM)); f.u(round(o['base'] / QUANTUM))
+                f.u((1 if o['connue'] else 0) | (2 if o['contour'] else 0) | (4 if o['couleur'] is not None else 0))
+                if o['couleur'] is not None:
+                    f.u(o['couleur'])
+                f.u(o['repere']); f.u(len(o['trous']))
+                n += points(o['points'])
+                for tr in o['trous']:
+                    n += points(tr)
+            elif genre == 'boites':
+                f.z(o['x'] - curseur[0]); f.z(o['z'] - curseur[1])
+                curseur[0], curseur[1] = o['x'], o['z']
+                f.u(o['a']); f.u(o['b']); f.u(o['ang']); f.u(o['h'])
+            elif genre == 'voies':
+                f.u(t(o['classe']))
+                n += points(o['points'])
+            else:
+                f.u(t(o['sorte'])); f.u(len(o['trous']))
+                n += points(o['points'])
+                for tr in o['trous']:
+                    n += points(tr)
+        sortie[genre] = (len(loin[genre]), n, f)
+    return sortie
 
 
 # ---- Module JavaScript -------------------------------------------------------------------------------------------
@@ -1702,8 +2130,8 @@ DECODEUR = r'''
     // Math.imul en variable locale : dans un contexte vm de Node, chaque lecture d'un global coûte cher (10× plus lent).
     const U = D.unite, T = D.textes, imul = Math.imul;
     let h = 0x811c9dc5 | 0;
-    const flux = (g) => {
-      const b = octets(D[g].octets), mal = () => { throw new Error(`plan ${D.cle} : flux ${g} mal formé`); };
+    const flux = (S, g) => {
+      const b = octets(S.octets), mal = () => { throw new Error(`plan ${D.cle} : flux ${g} mal formé`); };
       let i = 0;
       /** Un entier (varint). Lire au-delà du flux est une erreur : des données altérées ne font jamais boucler. */
       const u = () => {
@@ -1714,7 +2142,7 @@ DECODEUR = r'''
         return v;
       };
       const z = () => { const v = u(); return (v >>> 1) ^ -(v & 1); };
-      const tout = new Float32Array(D[g].points * 2);
+      const tout = new Float32Array(S.points * 2);
       let o = 0, cx = 0, cz = 0;
       /** Une suite de points : sous-tableau [x0, z0, x1, z1, …] d'un seul Float32Array par genre. */
       const points = () => {
@@ -1724,39 +2152,75 @@ DECODEUR = r'''
       };
       const repere = () => { cx += z(); cz += z(); return [cx / U, cz / U]; };
       const fin = () => { if (i !== b.length || o !== tout.length) mal(); };
-      return { u, points, repere, fin, tout };
+      return { u, z, points, repere, fin, tout };
     };
-    const rues = [], batiments = [], eau = [], espaces = [], reperes = [];
-    let f = flux('rues');
+    const couleur = c => (c < 0 ? null : [((c >>> 16) & 255) / 255, ((c >>> 8) & 255) / 255, (c & 255) / 255]);
+    /** Polygones { sorte, nom, points, trous } ; sans nom dans le lointain. */
+    const polygones = (S, g, nomme) => {
+      const liste = [], f = flux(S, g);
+      for (let k = 0; k < S.n; k++) {
+        const sorte = T[f.u()], nom = nomme ? T[f.u()] : '', nt = f.u(), points = f.points(), trous = [];
+        for (let t = 0; t < nt; t++) trous.push(f.points());
+        liste.push({ sorte, nom, points, trous });
+      }
+      f.fin();
+      return liste;
+    };
+    const rues = [], batiments = [], reperes = [], mobilier = [];
+    let f = flux(D.rues, 'rues');
     for (let k = 0; k < D.rues.n; k++) {
       const classe = T[f.u()], sousClasse = T[f.u()], nom = T[f.u()], dr = f.u(), niveau = f.u();
       rues.push({ classe, sousClasse, nom, pont: !!(dr & 1), sens: dr & 2 ? 1 : 0, niveau, points: f.points() });
     }
     f.fin();
-    f = flux('batiments');
+    f = flux(D.batiments, 'batiments');
     for (let k = 0; k < D.batiments.n; k++) {
       const hauteur = f.u() / U, base = f.u() / U, dr = f.u(), c = dr & 4 ? f.u() : -1, nt = f.u();
       const points = f.points(), trous = [];
       for (let t = 0; t < nt; t++) trous.push(f.points());
-      batiments.push({ points, trous, hauteur, base, connue: !!(dr & 1), contour: !!(dr & 2),
-        couleur: c < 0 ? null : [((c >>> 16) & 255) / 255, ((c >>> 8) & 255) / 255, (c & 255) / 255] });
+      batiments.push({ points, trous, hauteur, base, connue: !!(dr & 1), contour: !!(dr & 2), couleur: couleur(c) });
     }
     f.fin();
-    for (const [g, liste] of [['eau', eau], ['espaces', espaces]]) {
-      f = flux(g);
-      for (let k = 0; k < D[g].n; k++) {
-        const sorte = T[f.u()], nom = T[f.u()], nt = f.u(), points = f.points(), trous = [];
-        for (let t = 0; t < nt; t++) trous.push(f.points());
-        liste.push({ sorte, nom, points, trous });
-      }
-      f.fin();
-    }
-    f = flux('reperes');
+    const eau = polygones(D.eau, 'eau', true), espaces = polygones(D.espaces, 'espaces', true);
+    f = flux(D.reperes, 'reperes');
     for (let k = 0; k < D.reperes.n; k++) {
       const nom = T[f.u()], sorte = T[f.u()], classe = T[f.u()], sousClasse = T[f.u()], rang = f.u(), [x, z] = f.repere();
       reperes.push({ nom, sorte, classe, sousClasse, rang, x, z });
     }
     f.fin();
+    f = flux(D.mobilier, 'mobilier');
+    for (let k = 0; k < D.mobilier.n; k++) { const sorte = T[f.u()], [x, z] = f.repere(); mobilier.push({ sorte, x, z }); }
+    f.fin();
+    let lointain = null;
+    if (D.lointain) {
+      const L = D.lointain, bl = [], voies = [];
+      f = flux(L.batiments, 'lointain.batiments');
+      for (let k = 0; k < L.batiments.n; k++) {
+        const hauteur = f.u() / U, base = f.u() / U, dr = f.u(), c = dr & 4 ? f.u() : -1, repere = f.u(), nt = f.u();
+        const points = f.points(), trous = [];
+        for (let t = 0; t < nt; t++) trous.push(f.points());
+        bl.push({ points, trous, hauteur, base, connue: !!(dr & 1), contour: !!(dr & 2), couleur: couleur(c), repere });
+      }
+      f.fin();
+      f = flux(L.boites, 'lointain.boites');
+      const boites = new Float32Array(L.boites.n * 6), pas = L.pas, tour = Math.PI / L.angles;
+      for (let k = 0, x = 0, z = 0, o = 0; k < L.boites.n; k++) {
+        x += f.z(); z += f.z();
+        boites[o++] = x * pas; boites[o++] = z * pas; boites[o++] = f.u() * pas; boites[o++] = f.u() * pas;
+        boites[o++] = f.u() * tour; boites[o++] = f.u();
+      }
+      f.fin();
+      const eauL = polygones(L.eau, 'lointain.eau', false), espacesL = polygones(L.espaces, 'lointain.espaces', false);
+      f = flux(L.voies, 'lointain.voies');
+      for (let k = 0; k < L.voies.n; k++) { const classe = T[f.u()]; voies.push({ classe, points: f.points() }); }
+      f.fin();
+      lointain = Object.freeze({
+        zone: Object.freeze({ x0: L.zone[0], z0: L.zone[1], x1: L.zone[2], z1: L.zone[3] }), tuilesAbsentes: L.tuilesAbsentes,
+        reperes: L.reperes.map(([nom, modele, x, z, rayon]) => ({ nom, modele, x: x / U, z: z / U, rayon })),
+        sommets: L.sommets.map(([nom, x, z, altitude]) => ({ nom, x: x / U, z: z / U, altitude })),
+        batiments: bl, boites, eau: eauL, espaces: espacesL, voies,
+      });
+    }
     if ((h >>> 0) !== D.empreinte) throw new Error(`plan ${D.cle} : empreinte ${(h >>> 0).toString(16)} au lieu de ${D.empreinte.toString(16)}`);
     const carres = Object.freeze({ ...D.carres });
     const demi = D.demi;
@@ -1764,7 +2228,7 @@ DECODEUR = r'''
       cle: D.cle, nom: D.nom, centre: Object.freeze({ ...D.centre }), cote: D.cote, marge: D.marge, carres,
       etendue: Object.freeze({ x0: -demi, z0: -demi, x1: demi, z1: demi }),
       attribution: D.attribution, licence: D.licence, source: D.source, empreinte: D.empreinte, comptes: D.comptes,
-      rues, batiments, eau, espaces, reperes,
+      rues, batiments, eau, espaces, reperes, mobilier, lointain,
       /** Carré de jeu centré sur l'origine pour un nombre d'îlots par côté (PDR.regles.ilots). */
       carre(ilots) {
         const cote = carres[ilots] || Math.min(D.cote, Math.round(ilots * D.cote / 15));
@@ -1791,11 +2255,33 @@ def _paragraphe(texte):
                          break_on_hyphens=False)
 
 
-def entete(ville, cle, fini, comptes, taille_donnees):
+def entete(ville, cle, fini, comptes, taille_donnees, loin=None):
     """En-tête du module : le contrat avec le constructeur de la ville. Les listes de sortes viennent des tables de
     classement, pour qu'elles disent exactement ce que les données peuvent contenir."""
     lat, lon = ville['centre']
     nb = {g: len(fini[g]) for g in fini}
+    mobilier = ', '.join(_valeurs(SORTES_MOBILIER))
+    p_mobilier = _paragraphe(
+        'mobilier — points sans nom, au sol et dehors, tirés des points d\'intérêt d\'OpenStreetMap. sorte : ' + mobilier
+        + '. Une terrasse marque un restaurant, un café, un bar ou un glacier : jamais son nom ni son enseigne.')
+    if loin is None:
+        p_loin = "   lointain — null : ce plan n'a pas de lointain."
+    else:
+        z = loin['zone']
+        modeles = ', '.join(_valeurs([d['modele'] for d in loin['reperes']])) or 'aucun'
+        p_loin = '\n'.join([_paragraphe(
+            f"lointain — ce que l'on voit des bords du carré sans pouvoir y aller : zone {{ x0: {z[0]}, z0: {z[1]}, x1: "
+            f"{z[2]}, z1: {z[3]} }} (m ; rognée là où une tuile manquait : tuilesAbsentes). Rien de ce "
+            "qui touche le carré du plan n'y est répété, sauf l'eau, reprise en entier à gros traits."),
+            _paragraphe(
+            "lointain.reperes [ { nom, modele, x, z, rayon } ] : points nommés d'OpenStreetMap autour desquels les bâtiments gardent "
+            f"leur emprise (modèles présents : {modeles}) ; sommets [ {{ nom, x, z, altitude }} ] (m). batiments : comme "
+            "ceux du plan, plus repere (indice dans reperes). boites : Float32Array [x, z, a, b, angle, hauteur] × n, les "
+            "autres bâtiments regroupés en boîtes orientées (centre, demi-côtés a ≥ b en m, angle de l'axe de a en "
+            "radians : direction (cos, sin) dans le plan x, z ; hauteur en m, 0 si OSM ne la dit pas). eau et espaces "
+            f"[ {{ sorte, nom: '', points, trous }} ] simplifiés à {TOL_LOIN:g} et {TOL_ESPACES_LOIN:g} m (espaces : "
+            + ', '.join(SORTES_ESPACES_LOIN) + f", de {AIRE_MIN_LOIN['espaces']:g} m² au moins). voies [ {{ classe, points }} ] "
+            "(autoroute à tertiaire), hors du carré.")])
     notes = {'jetee': "pier : pontons du port, sur l'eau"}
     classes = ', '.join(f'{v} ({notes.get(v, ", ".join(k for k, w in CLASSES_RUES.items() if w == v))})'
                         for v in _valeurs(CLASSES_RUES))
@@ -1844,6 +2330,8 @@ def entete(ville, cle, fini, comptes, taille_donnees):
      eau:       [ {{ sorte, nom, points, trous }} ]                                                  × {nb["eau"]}
      espaces:   [ {{ sorte, nom, points, trous }} ]                                                  × {nb["espaces"]}
      reperes:   [ {{ nom, sorte, classe, sousClasse, rang, x, z }} ]                                × {nb["reperes"]}
+     mobilier:  [ {{ sorte, x, z }} ]                                                               × {nb["mobilier"]}
+     lointain:  null ou {{ zone, tuilesAbsentes, reperes, sommets, batiments, boites, eau, espaces, voies }}
    }}
    Repère : mètres, x vers l'est, z vers le sud (y vers le haut dans le jeu), origine au centre ; échelle exacte au
    centre (ellipsoïde WGS 84), moins de 1e-4 d'écart au bord. Coordonnées au décimètre près.
@@ -1862,15 +2350,17 @@ def entete(ville, cle, fini, comptes, taille_donnees):
 {p_eau}
 {p_espaces}
 {p_reperes}
+{p_mobilier}
+{p_loin}
    Taille des données codées : {taille_donnees} octets (base64).
 */'''
 
 
-def ecrire_module(ville, cle, fini, source):
-    textes, codes = coder(fini)
+def ecrire_module(ville, cle, fini, source, loin=None):
+    textes, codes, t = coder(fini)
     comptes = {g: n for g, (n, _, _) in codes.items()}
-    comptes['points'] = {g: p for g, (_, p, _) in codes.items() if g != 'reperes'}
-    for g, champ in (('rues', 'classe'), ('eau', 'sorte'), ('espaces', 'sorte'), ('reperes', 'sorte')):
+    comptes['points'] = {g: p for g, (_, p, _) in codes.items() if g not in ('reperes', 'mobilier')}
+    for g, champ in (('rues', 'classe'), ('eau', 'sorte'), ('espaces', 'sorte'), ('reperes', 'sorte'), ('mobilier', 'sorte')):
         par = {}
         for o in fini[g]:
             par[o[champ]] = par.get(o[champ], 0) + 1
@@ -1878,22 +2368,43 @@ def ecrire_module(ville, cle, fini, source):
     comptes['batimentsHauteurConnue'] = sum(1 for b in fini['batiments'] if b['connue'])
     comptes['batimentsContour'] = sum(1 for b in fini['batiments'] if b['contour'])
     comptes['ruesNommees'] = sum(1 for r in fini['rues'] if r['nom'])
-    h = empreinte([codes[g][2] for g in ('rues', 'batiments', 'eau', 'espaces', 'reperes')])
+    genres = ['rues', 'batiments', 'eau', 'espaces', 'reperes', 'mobilier']
+    flux = [codes[g][2] for g in genres]
+    codes_loin = None
+    if loin is not None:
+        codes_loin = coder_lointain(loin, t)
+        flux += [codes_loin[g][2] for g in ('batiments', 'boites', 'eau', 'espaces', 'voies')]
+        comptes['lointain'] = {g: n for g, (n, _, _) in codes_loin.items()}
+        comptes['lointain']['reperes'] = len(loin['reperes'])
+        comptes['lointain']['sommets'] = len(loin['sommets'])
+    h = empreinte(flux)
     lat, lon = ville['centre']
     D = {
-        'version': 1, 'cle': cle, 'nom': ville['nom'], 'centre': {'lat': lat, 'lon': lon},
+        'version': 2, 'cle': cle, 'nom': ville['nom'], 'centre': {'lat': lat, 'lon': lon},
         'cote': int(max(CARRES.values())), 'marge': int(MARGE), 'demi': DEMI,
         'carres': {str(k): v for k, v in CARRES.items()}, 'unite': round(1 / QUANTUM),
         'attribution': ATTRIBUTION, 'licence': 'ODbL 1.0 — https://opendatacommons.org/licenses/odbl/1-0/',
         'source': source, 'empreinte': h, 'comptes': comptes, 'textes': textes,
     }
     taille = 0
-    for g, (n, p, f) in codes.items():
+    for g in genres:
+        n, p, f = codes[g]
         b64 = base64.b64encode(bytes(f.octets)).decode('ascii')
         taille += len(b64)
         D[g] = {'n': n, 'points': p, 'octets': b64}
+    D['lointain'] = None
+    if loin is not None:
+        L = {'zone': loin['zone'], 'tuilesAbsentes': loin['tuilesAbsentes'], 'pas': PAS_BOITE, 'angles': PAS_ANGLE,
+             'reperes': [[d['nom'], d['modele'], d['x'], d['z'], d['rayon']] for d in loin['reperes']],
+             'sommets': [[d['nom'], d['x'], d['z'], d['altitude']] for d in loin['sommets']]}
+        for g in ('batiments', 'boites', 'eau', 'espaces', 'voies'):
+            n, p, f = codes_loin[g]
+            b64 = base64.b64encode(bytes(f.octets)).decode('ascii')
+            taille += len(b64)
+            L[g] = {'n': n, 'points': p, 'octets': b64}
+        D['lointain'] = L
     corps = json.dumps(D, ensure_ascii=False, separators=(',', ':'))
-    texte = (entete(ville, cle, fini, comptes, taille) + '\n(function (PDR) {\n  \'use strict\';\n'
+    texte = (entete(ville, cle, fini, comptes, taille, loin) + '\n(function (PDR) {\n  \'use strict\';\n'
              + DECODEUR + f'\n  const plans = PDR.plans = PDR.plans || {{}};\n'
              f'  plans[{json.dumps(cle)}] = decoder({corps});\n'
              '})(globalThis.PDR = globalThis.PDR || {});\n')
@@ -1929,6 +2440,13 @@ def main(argv=None):
             print(f'{cle:10s} {v["nom"]:10s} centre {v["centre"][0]:.5f}, {v["centre"][1]:.5f} — {v["notes"]}')
             for tx, ty, p in tuiles:
                 print(f'    {ZOOM}/{tx}/{ty}  {"présente" if p.exists() else "absente"}  {p.name}')
+            if v.get('lointain'):
+                # Le lointain se contente des tuiles présentes : une tuile absente rogne sa zone de ce côté.
+                d = DEMI_LOIN
+                _, _, loin = tuiles_utiles(cle, v['centre'], a.tuiles, zone=v['lointain'].get('zone') or (-d, -d, d, d))
+                for tx, ty, p in loin:
+                    if (tx, ty) not in {(x, y) for x, y, _ in tuiles}:
+                        print(f'    {ZOOM}/{tx}/{ty}  {"présente" if p.exists() else "absente"}  {p.name}  (lointain, facultative)')
         return 0
     if a.ville not in VILLES:
         raise SystemExit(f'ville inconnue : {a.ville} (connues : {", ".join(VILLES)})')
@@ -1942,7 +2460,16 @@ def main(argv=None):
     fini, eclats = finir(plan)
     source = {'donnees': 'OpenStreetMap', 'tuiles': 'OpenFreeMap ' + (version_tuiles(a.tuiles) or '(version inconnue)'),
               'schema': 'OpenMapTiles', 'zoom': ZOOM, 'fichiers': stats['tuiles']}
-    texte, comptes, h, taille = ecrire_module(ville, a.ville, fini, source)
+    loin = None
+    if ville.get('lointain'):
+        zone, absentes = zone_lointaine(a.ville, ville['centre'], a.tuiles, ville['lointain'].get('zone'))
+        if absentes:
+            print('lointain : tuiles absentes, zone rognée de leur côté : ' + ', '.join(absentes))
+        _, r_loin, stats_loin = charger(a.ville, ville['centre'], a.tuiles, zone=zone)
+        loin = finir_lointain(classer_lointain(r_loin, ville, zone))
+        loin['tuilesAbsentes'] = absentes
+        source['fichiersLointain'] = stats_loin['tuiles']
+    texte, comptes, h, taille = ecrire_module(ville, a.ville, fini, source, loin)
     sortie = pathlib.Path(a.sortie) if a.sortie else ici.parent.parent / 'src' / 'villes' / f'{a.ville}.js'
     sortie.parent.mkdir(parents=True, exist_ok=True)
     sortie.write_text(texte, encoding='utf-8')
@@ -1952,8 +2479,10 @@ def main(argv=None):
     print('comptes : ' + json.dumps(comptes, ensure_ascii=False))
     if a.apercu:
         # L'aperçu montre ce que contient le module : coordonnées repassées en mètres.
-        m = {g: [] for g in fini}
+        m = {g: [] for g in fini if g != 'mobilier'}
         for g, liste in fini.items():
+            if g == 'mobilier':
+                continue
             for o in liste:
                 o = dict(o)
                 if 'points' in o:

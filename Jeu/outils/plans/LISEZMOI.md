@@ -1,8 +1,10 @@
 # Plans de villes réelles
 
 `extraire.py` tire le plan d'un vrai quartier des données OpenStreetMap et en fait un module du jeu,
-`Jeu/src/villes/<ville>.js`, qui définit `PDR.plans.<ville>` : rues, bâtiments, eau, espaces au sol et repères nommés,
-en mètres autour d'un centre choisi. Le damier de `src/ville.js` reste la « ville imaginaire ».
+`Jeu/src/villes/<ville>.js`, qui définit `PDR.plans.<ville>` : rues, bâtiments, eau, espaces au sol, repères nommés et
+mobilier de rue, en mètres autour d'un centre choisi ; pour Marseille, aussi le **lointain** : ce que l'on voit des bords
+du carré de jeu sans pouvoir y aller (monuments, côte, bâti en boîtes). Le damier de `src/ville.js` reste la « ville
+imaginaire ».
 
 État au 12/11/2026 : **Marseille** est livrée (centre au coin nord-est du Vieux-Port, 43,2962 N 5,3734 E).
 Paris et New York ont leur entrée dans la table `VILLES` : l'outil les extrait et le test les passe, mais leurs
@@ -19,7 +21,10 @@ côté, soit le plus grand carré de jeu (1 100 m) et 60 m de marge. Elles se no
     python3 Jeu/outils/plans/extraire.py --liste --tuiles DOSSIER
 
 donne, ville par ville, les tuiles `14/x/y` qu'il faut et si elles sont là (2 à 4 par ville ; Marseille :
-`14/8436/6001` et `14/8436/6002`). L'adresse des tuiles dépend de la version du jeu de données ; elle est dans la
+`14/8436/6001` et `14/8436/6002`). Les tuiles marquées « lointain, facultative » ne servent qu'au lointain : s'il en
+manque une, sa zone est rognée de ce côté et le module le dit (`lointain.tuilesAbsentes`). Le module livré le
+12/11/2026 est fait sans `14/8435/6001` ni `14/8435/6002` : le lointain s'arrête à 979 m à l'ouest, avant le MuCEM
+(le J4) ; avec `14/8435/6001`, le MuCEM entre dans le plan sans rien changer d'autre à l'outil. L'adresse des tuiles dépend de la version du jeu de données ; elle est dans la
 description TileJSON du service :
 
     curl -sfA 'osm-extract-client/1.0' https://tiles.openfreemap.org/planet -o DOSSIER/tilejson.json
@@ -39,7 +44,8 @@ version du jeu de données ne reste pas forcément en ligne. Sans `--tuiles`, l'
 
     python3 Jeu/outils/plans/extraire.py marseille --tuiles DOSSIER --apercu /tmp/marseille.svg
 
-écrit `Jeu/src/villes/marseille.js` (`--sortie FICHIER` pour un autre chemin) en 0,3 s environ, et dit ce qu'il a
+écrit `Jeu/src/villes/marseille.js` (`--sortie FICHIER` pour un autre chemin) en 0,3 s environ (10 s avec le
+lointain de Marseille, dont le regroupement de 13 000 emprises en boîtes), et dit ce qu'il a
 écarté (tunnels, sous-sols, commerces…), les éclats retirés, la taille, l'empreinte et les comptes par sorte.
 Mêmes tuiles, mêmes octets : le module ne porte ni date ni chemin local. `--centre LAT,LON` essaie un autre cadrage
 sans toucher à la table.
@@ -58,6 +64,20 @@ Les étapes :
    ou retiré ;
 6. codage : écarts en zigzag, varints, base64, empreinte FNV-1a vérifiée au chargement ; décodeur sans dépendance
    (ni `atob` ni `Buffer`), le même dans la page, le travailleur et Node.
+
+Le mobilier vient des points d'intérêt (table `SORTES_MOBILIER`) : potelets, corbeilles, conteneurs, arceaux à vélos,
+arrêts de bus, abris, boîtes aux lettres, fontaines, kiosques, œuvres, et une « terrasse » par restaurant, café, bar
+ou glacier. Des points sans nom : aucune enseigne n'entre dans le jeu.
+
+Le lointain (entrée `lointain` de la ville dans `VILLES` : `zone`, et `reperes` = nom du point d'intérêt, sa classe,
+un rayon, un modèle) se charge à part, sur les tuiles présentes :
+
+- autour de chaque repère, les bâtiments gardent leur emprise et leurs hauteurs, et portent l'indice du repère : le
+  constructeur de la ville (`ville-reelle.js`) les habille selon le modèle ;
+- les autres bâtiments deviennent des boîtes orientées : rectangle minimal de chaque emprise, puis regroupement des
+  voisines de même orientation et de hauteur proche qui se touchent (`fusionner_boites`) ;
+- l'eau (2,5 m), les grands espaces verts (4 m) et les voies de l'autoroute à la tertiaire, hors du carré ;
+- les sommets qui ont un nom et une altitude (la colline de Notre-Dame de la Garde).
 
 ## 3. Aperçu
 
@@ -97,7 +117,10 @@ Décrit en tête de chaque module : c'est le contrat avec le constructeur de la 
 - `rues` : polylignes (`Float32Array` [x, z, …]) avec `classe`, `sousClasse`, `nom`, `pont`, `niveau`, `sens` ;
 - `batiments`, `eau`, `espaces` : anneau extérieur (aire > 0) et trous (aire < 0), le premier point non répété ;
   bâtiments avec `hauteur`, `base`, `connue`, `contour`, `couleur` ;
-- `reperes` : points nommés avec `sorte`, `rang`.
+- `reperes` : points nommés avec `sorte`, `rang` ;
+- `mobilier` : points sans nom `{ sorte, x, z }` ;
+- `lointain` : `null`, ou `{ zone, tuilesAbsentes, reperes, sommets, batiments, boites, eau, espaces, voies }` ;
+  `boites` est un `Float32Array` [x, z, a, b, angle, hauteur] × n.
 
 Pas de toits, peu de hauteurs connues (à Marseille, 1 080 bâtiments sur 5 274) : le constructeur choisit le reste.
 
