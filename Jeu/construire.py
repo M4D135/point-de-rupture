@@ -18,9 +18,44 @@ import re
 ICI = pathlib.Path(__file__).resolve().parent
 SRC = ICI / 'src'
 DIST = ICI / 'dist'
-MODULES = ['moteur/renderer.js', 'noyau.js', 'ville.js', 'foule.js', 'camera.js', 'jeu.js']
-VERSION = 'essai-0.1'
-BUDGET = 1_400_000      # octets, le budget de FERRO
+# Chaque script a un rôle :
+#   page        exécuté dans la page ;
+#   partage     exécuté dans la page et recopié dans le travailleur de simulation (data-travailleur) ;
+#   simulation  recopié dans le travailleur seulement : posé en text/plain, donc inerte dans la page, sauf si le
+#               navigateur refuse le travailleur et que hote.js fait tourner la simulation sur le fil principal.
+# Le travailleur reçoit les scripts « partage » et « simulation » dans l'ordre de cette liste.
+MODULES = [
+    ('moteur/renderer.js', 'page'),
+    ('sim/regles.js', 'partage'),
+    ('sim/protocole.js', 'partage'),
+    ('ville.js', 'partage'),
+    ('villes/marseille.js', 'partage'),
+    ('ville-reelle.js', 'partage'),
+    ('sim/nav.js', 'simulation'),
+    ('sim/monde.js', 'simulation'),
+    ('sim/ia.js', 'simulation'),
+    ('sim/travailleur.js', 'simulation'),
+    ('foule.js', 'page'),
+    ('decor.js', 'page'),
+    ('camera.js', 'page'),
+    ('moteur/audio.js', 'page'),
+    ('moteur/musique.js', 'page'),
+    ('son.js', 'page'),
+    ('interface/reglages.js', 'page'),
+    ('interface/titre.js', 'page'),
+    ('interface/hud.js', 'page'),
+    ('interface/minicarte.js', 'page'),
+    ('interface/commandes.js', 'page'),
+    ('hote.js', 'page'),
+    ('jeu.js', 'page'),
+]
+OUVERTURE = {
+    'page': '<script>',
+    'partage': '<script data-travailleur>',
+    'simulation': '<script type="text/plain" data-travailleur>',
+}
+VERSION = 'essai-0.2'
+BUDGET = 3_000_000      # octets : la page reste bien sous la limite des artefacts (16 Mo)
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
 POLICES = re.compile(r'^<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">\n', re.M)
 ICONE = ('<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'%3E'
@@ -31,14 +66,14 @@ ICONE = ('<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3
 def main():
     gabarit = (SRC / 'index.html').read_text(encoding='utf-8')
     style = (SRC / 'style.css').read_text(encoding='utf-8')
-    sources = {nom: (SRC / nom).read_text(encoding='utf-8') for nom in MODULES}
+    sources = {nom: (SRC / nom).read_text(encoding='utf-8') for nom, _ in MODULES}
     for nom, code in sources.items():
         if '</script' in code.lower():
             raise SystemExit(f'{nom} contient « </script » : la page serait coupée')
     if gabarit.count('/*STYLE*/') != 1 or gabarit.count('<!--MODULES-->') != 1:
         raise SystemExit('index.html doit contenir une fois /*STYLE*/ et une fois <!--MODULES-->')
 
-    scripts = '\n'.join(f'<script>\n// ---- {nom} ----\n{code}</script>' for nom, code in sources.items())
+    scripts = '\n'.join(f'{OUVERTURE[role]}\n// ---- {nom} ----\n{sources[nom]}</script>' for nom, role in MODULES)
     fragment = gabarit.replace('/*STYLE*/', style.rstrip('\n')).replace('<!--MODULES-->', scripts)
     autonome, remplacements = POLICES.subn('', fragment)
     if remplacements != 1:

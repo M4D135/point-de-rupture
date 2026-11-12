@@ -1,100 +1,297 @@
 <title>Point de rupture</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Essai de RTS entièrement procédural : une ville, trois factions et des centaines d'escouades, rendues par le moteur FERRO.">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<meta name="description" content="RTS entièrement procédural : une ville, trois camps et cent mille unités dans une bousculade où personne n'est blessé, rendus par le moteur FERRO.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
 /*STYLE*/
 </style>
-<main id="jeu">
-  <canvas id="scene" aria-label="La ville vue de dessus. Clic gauche pour choisir des escouades, clic droit pour les envoyer."></canvas>
+<main id="jeu" data-ecran="chargement">
+  <canvas id="scene" aria-label="La ville vue de dessus. Clic gauche ou cadre pour choisir des unités, clic droit pour leur donner un ordre."></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+  <svg id="apercu" aria-hidden="true" hidden><polygon points="0,0"/><line x1="0" y1="0" x2="0" y2="0"/><circle cx="0" cy="0" r="7"/></svg>
   <div id="cadre" hidden></div>
+  <div id="visee" hidden><span id="visee-texte"></span></div>
 
-  <div id="hud">
-    <header class="bandeau">
-      <div class="marque panneau">
-        <span class="titre">Point de rupture</span>
-        <span class="sous">Essai procédural · moteur FERRO 0.6 · aucun fichier de décor</span>
-      </div>
-      <form class="reglages panneau" id="reglages" onsubmit="return false">
-        <label for="nombre">Escouades
-          <select id="nombre">
-            <option value="60">60</option>
-            <option value="240">240</option>
-            <option value="960">960</option>
-            <option value="2400">2 400</option>
-          </select>
-        </label>
-        <label for="faction">Vous jouez
-          <select id="faction">
-            <option value="0">La Convergence</option>
-            <option value="1">Le Bastion</option>
-            <option value="2">La Préfecture</option>
-          </select>
-        </label>
-        <label for="qualite">Qualité
-          <select id="qualite">
-            <option value="auto">Auto</option>
-            <option value="low">Basse</option>
-            <option value="high">Haute</option>
-          </select>
-        </label>
-        <button type="button" id="recommencer">Recommencer</button>
-      </form>
-    </header>
-
-    <aside class="mesures panneau" id="mesures" aria-live="off">
-      <div class="compteur">
-        <span class="grand" id="ips">–</span>
-        <span class="unite">images/s</span>
-        <span class="cpu"><span id="ms">–</span> ms de calcul par image</span>
-      </div>
-      <dl>
-        <dt>Escouades</dt><dd id="m-escouades">–</dd>
-        <dt>En vue</dt><dd id="m-vues">–</dd>
-        <dt>Instances</dt><dd id="m-instances">–</dd>
-        <dt class="detail">Appels de dessin</dt><dd class="detail" id="m-appels">–</dd>
-        <dt class="detail">Triangles</dt><dd class="detail" id="m-triangles">–</dd>
-        <dt class="detail">Image</dt><dd class="detail" id="m-resolution">–</dd>
-        <dt class="detail">Rendu</dt><dd class="detail" id="m-effets">–</dd>
-        <dt>Itération</dt><dd id="m-iteration">–</dd>
-        <dt class="detail">Empreinte</dt><dd class="detail code" id="m-empreinte">–</dd>
-      </dl>
-      <p class="note">Les factions n’ont pas encore de règles propres : l’essai mesure la ville, le rendu et les déplacements.</p>
-    </aside>
-
-    <footer class="pied">
-      <div class="gauche">
-        <ul class="factions panneau" aria-label="Factions">
-          <li data-faction="0" style="--c: var(--convergence)">La Convergence</li>
-          <li data-faction="1" style="--c: var(--bastion)">Le Bastion</li>
-          <li data-faction="2" style="--c: var(--prefecture)">La Préfecture</li>
-        </ul>
-        <p id="selection" class="selection panneau" data-vide="oui">Aucune sélection</p>
-      </div>
-      <details class="aide panneau" id="aide">
-        <summary>Commandes</summary>
-        <dl>
-          <dt>Clic gauche</dt><dd>choisir une escouade (Maj : ajouter)</dd>
-          <dt>Glisser</dt><dd>encadrer plusieurs escouades</dd>
-          <dt>Double-clic</dt><dd>toutes vos escouades en vue</dd>
-          <dt>Clic droit</dt><dd>y aller ; glissé : tourner la vue</dd>
-          <dt>Molette, pincement</dt><dd>zoom vers le curseur</dd>
-          <dt>Deux doigts</dt><dd>déplacer la carte (trackpad)</dd>
-          <dt>Espace + glisser</dt><dd>saisir la carte</dd>
-          <dt>ZQSD, WASD, flèches</dt><dd>déplacer la vue</dd>
-          <dt>A / E (Q / E)</dt><dd>tourner la vue</dd>
-          <dt>Ctrl ou ⌘ + A, Échap</dt><dd>tout choisir, tout lâcher</dd>
-          <dt>Écran tactile</dt><dd>un doigt déplace, un toucher choisit ou envoie, deux doigts zooment et tournent</dd>
-        </dl>
-      </details>
-    </footer>
-  </div>
-
-  <div id="echec" class="echec" hidden>
-    <div class="panneau">
-      <h1>WebGL 2 requis</h1>
-      <p id="echec-texte"></p>
+  <!-- Chargement -->
+  <section id="ecran-chargement" class="ecran" aria-labelledby="chargement-titre">
+    <div class="chargement">
+      <span class="marque" aria-hidden="true">
+        <svg viewBox="0 0 16 16" style="--c:#e6452f"><circle cx="8" cy="8" r="6.3"/></svg>
+        <svg viewBox="0 0 16 16" style="--c:#eda326"><rect x="2.1" y="2.1" width="11.8" height="11.8" rx="1"/></svg>
+        <svg viewBox="0 0 16 16" style="--c:#4d86f0"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg>
+      </span>
+      <p id="chargement-titre" class="surtitre">POINT DE RUPTURE</p>
+      <p id="chargement-texte" class="chargement-texte">La ville se dessine.</p>
+      <div id="chargement-piste" class="piste" role="progressbar" aria-label="Chargement" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><b id="chargement-barre"></b></div>
+      <p id="chargement-etapes" class="meta"><span data-etape>VILLE</span><i></i><span data-etape>INSTRUMENTS</span><i></i><span data-etape>SIMULATION</span></p>
     </div>
+  </section>
+
+  <!-- Écran titre -->
+  <section id="ecran-titre" class="ecran" hidden aria-labelledby="titre-jeu">
+    <div class="titre-fond" aria-hidden="true"></div>
+    <header class="titre-haut">
+      <span class="marque" aria-hidden="true">
+        <svg viewBox="0 0 16 16" style="--c:#e6452f"><circle cx="8" cy="8" r="6.3"/></svg>
+        <svg viewBox="0 0 16 16" style="--c:#eda326"><rect x="2.1" y="2.1" width="11.8" height="11.8" rx="1"/></svg>
+        <svg viewBox="0 0 16 16" style="--c:#4d86f0"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg>
+      </span>
+      <span class="titre-marque">POINT DE RUPTURE<small>ESSAI 0.2 · MOTEUR FERRO</small></span>
+    </header>
+    <div class="titre-corps">
+      <p class="surtitre">UNE VILLE. TROIS CAMPS. TOUT TIENT À UN FIL.</p>
+      <h1 id="titre-jeu" class="titre-jeu" aria-label="Point de rupture">
+        <span class="titre-l1" aria-hidden="true">POINT DE</span>
+        <span class="titre-l2" aria-hidden="true"><span class="rupture-haut">RUPTURE</span><span class="rupture-bas">RUPTURE</span></span>
+      </h1>
+      <p class="accroche">Cent mille, une ville, et personne ne recule.</p>
+      <p class="titre-texte">La Convergence tient la rue, le Bastion tient ses lignes, la Préfecture veut l’ordre partout. Une bousculade géante où l’on ne blesse personne : qui plie sort du jeu.</p>
+      <div class="titre-actions">
+        <button id="titre-jouer" type="button" class="primaire"><span>Nouvelle partie</span><i class="fleche" aria-hidden="true"></i></button>
+        <button id="titre-reglages" type="button" class="secondaire">Réglages<span>Image, audio, commandes</span></button>
+        <button id="titre-son" type="button" class="secondaire" aria-pressed="true">Son<span><strong>Activé</strong></span></button>
+      </div>
+      <p class="meta titre-meta"><span>3 FACTIONS</span><i></i><span>100 000 UNITÉS</span><i></i><span>100 % PROCÉDURAL</span></p>
+    </div>
+    <footer class="titre-bas">
+      <ul class="titre-camps" aria-label="Les trois camps">
+        <li style="--c:#e6452f"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/></svg><strong>La Convergence</strong><span>Le nombre et la rue.</span></li>
+        <li style="--c:#eda326"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.1" y="2.1" width="11.8" height="11.8" rx="1"/></svg><strong>Le Bastion</strong><span>Tenir et nettoyer.</span></li>
+        <li style="--c:#4d86f0"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg><strong>La Préfecture</strong><span>L’ordre, partout.</span></li>
+      </ul>
+      <div id="titre-attente" class="attente" hidden><span id="titre-attente-texte">Démo dans 5 s</span><i><b></b></i></div>
+    </footer>
+    <p class="credit-osm titre-credit">Plan de Marseille : <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© les contributeurs d’OpenStreetMap</a></p>
+  </section>
+
+  <!-- Préparation de la partie -->
+  <section id="ecran-preparation" class="ecran" hidden aria-labelledby="preparation-titre">
+    <div class="prep">
+      <header class="prep-tete">
+        <div>
+          <p class="surtitre">NOUVELLE PARTIE</p>
+          <h2 id="preparation-titre">Choisissez votre camp.</h2>
+        </div>
+        <p class="prep-aide">Trois camps, trois manières de tenir la rue. Personne n’est blessé : à bout de cohésion, une unité sort du jeu.</p>
+      </header>
+      <div id="prep-camps" class="camps" role="radiogroup" aria-labelledby="preparation-titre"></div>
+      <div class="prep-options">
+        <div class="champ champ-alliance">
+          <label for="prep-alliance" class="champ-nom">Alliance</label>
+          <select id="prep-alliance"></select>
+          <p class="champ-note">Des alliés ne se frappent pas, partagent leur vue et gagnent ensemble.</p>
+        </div>
+        <div class="champ champ-effectifs">
+          <span id="prep-effectifs-nom" class="champ-nom">Effectifs</span>
+          <div id="prep-effectifs" class="segments" role="group" aria-labelledby="prep-effectifs-nom"></div>
+          <p id="prep-effectifs-note" class="champ-note"></p>
+        </div>
+        <div class="champ champ-difficulte">
+          <span id="prep-difficulte-nom" class="champ-nom">Difficulté</span>
+          <div id="prep-difficulte" class="segments" role="group" aria-labelledby="prep-difficulte-nom"></div>
+          <p class="champ-note">Les IA touchent plus ou moins de Moyens et pensent plus ou moins vite.</p>
+        </div>
+        <div class="champ champ-ville">
+          <span id="prep-ville-nom" class="champ-nom">Ville</span>
+          <div id="prep-ville" class="segments" role="group" aria-labelledby="prep-ville-nom">
+            <button type="button" data-ville="marseille" aria-pressed="true">Marseille</button>
+            <button type="button" data-ville="damier" aria-pressed="false">Imaginaire</button>
+          </div>
+          <div class="graine"><input id="prep-graine" type="number" min="1" max="999999" step="1" inputmode="numeric" aria-label="Graine" aria-describedby="prep-graine-note"><button id="prep-hasard" type="button" class="secondaire petit">Au hasard</button></div>
+          <p id="prep-graine-note" class="champ-note">Une graine, une ville : la même graine redonne les mêmes rues.</p>
+        </div>
+        <div class="champ champ-bascules">
+          <button id="prep-brouillard" type="button" class="option-bascule" aria-pressed="true"><span>Brouillard<small>On ne voit que ce que voient ses unités.</small></span><strong>Oui</strong></button>
+          <button id="prep-coalitions" type="button" class="option-bascule" aria-pressed="true"><span>Coalitions des IA<small>Les IA peuvent s’allier en cours de partie.</small></span><strong>Oui</strong></button>
+        </div>
+      </div>
+      <footer class="prep-pied">
+        <button id="prep-retour" type="button" class="texte"><i class="fleche retour" aria-hidden="true"></i>Retour</button>
+        <p id="prep-resume" class="prep-resume"></p>
+        <button id="prep-lancer" type="button" class="primaire"><span>Lancer la partie</span><i class="fleche" aria-hidden="true"></i></button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- En partie -->
+  <div id="hud" hidden>
+    <header id="barre" class="barre">
+      <div id="barre-camp" class="barre-camp"><span id="barre-motif" class="barre-motif"></span><strong id="barre-nom">Convergence</strong></div>
+      <div class="ressources">
+        <div id="res-moyens" class="res moyens" title="Moyens : dotation, lieux tenus et marchés. Ils paient la production.">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6.8" rx="7" ry="2.9"/><path d="M5 6.8v5.1c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9V6.8M5 11.9V17c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-5.1"/></svg>
+          <span class="res-val"><span class="sr">Moyens</span><strong id="moyens">0</strong><small id="moyens-rythme">+0/min</small></span>
+        </div>
+        <div id="res-materiaux" class="res materiaux" title="Matériaux : chantiers et casse. Ils paient les barricades et les avant-postes.">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="8" height="5.5" rx=".6"/><rect x="13" y="5" width="8" height="5.5" rx=".6"/><rect x="8" y="13" width="8" height="5.5" rx=".6"/></svg>
+          <span class="res-val"><span class="sr">Matériaux</span><strong id="materiaux">0</strong><small id="materiaux-rythme">+0/min</small></span>
+        </div>
+        <div id="res-pop" class="res pop" title="Population et plafond : le plafond suit le QG et les avant-postes.">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2.8-6.2 6-6.2s6 2.2 6 6.2"/><path d="M15.5 5.2a3 3 0 010 5.6M17.6 14.3c2 .9 3.4 2.9 3.4 5.7"/></svg>
+          <span class="res-val"><span class="sr">Population</span><strong id="pop">0</strong><small id="pop-max">/ 0</small></span>
+        </div>
+      </div>
+      <div id="scores" class="scores" role="group" aria-label="Scores des trois camps"></div>
+      <div class="barre-droite">
+        <button id="bouton-oisifs" type="button" class="bouton-barre oisifs" hidden title="Équipes oisives (F1)">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14v10H5z"/><path d="M5 9l2.2-4h9.6L19 9M10 13h4"/></svg><strong>0</strong><span class="sr">Équipes oisives</span>
+        </button>
+        <button id="bouton-diplomatie" type="button" class="bouton-barre" aria-expanded="false" aria-controls="diplomatie">
+          <svg class="icone" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1.2 1.2"/><path d="M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1.2-1.2"/></svg><span class="etiquette">Diplomatie</span>
+        </button>
+        <span class="horloge" title="Temps de partie"><time id="horloge">00:00</time><span id="vitesse" class="vitesse" hidden></span></span>
+        <span id="ips" class="ips" title="Images par seconde">– <small>i/s</small></span>
+        <button id="bouton-pause" type="button" class="bouton-barre pause" aria-label="Pause et réglages (P)"><i class="icone-pause" aria-hidden="true"></i></button>
+      </div>
+    </header>
+    <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
+    <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
+      <div class="proposition-texte"></div>
+      <span class="proposition-reste">60 s</span>
+      <span class="proposition-boutons"><button type="button" class="primaire petit" data-reponse="accepter">Accepter</button><button type="button" class="secondaire petit" data-reponse="refuser">Refuser</button></span>
+    </section>
+    <section id="diplomatie" class="diplomatie" hidden aria-label="Diplomatie">
+      <p class="surtitre">DIPLOMATIE</p>
+      <div class="diplo-corps"></div>
+      <p class="diplo-note">Une alliance rompue ne se renoue pas avant 60 s. Le Bastion ne frappe la Préfecture qu’en colère : 45 s chaque fois qu’elle le frappe.</p>
+    </section>
+    <ol id="alertes" class="alertes" aria-live="polite" aria-label="Alertes"></ol>
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+    <div class="console">
+      <div class="minicarte-cadre"><canvas id="minicarte" aria-label="Minicarte : clic pour déplacer la vue, clic droit pour envoyer la sélection"></canvas><small class="credit-osm"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a></small></div>
+      <section id="selection" class="selection" aria-label="Sélection"></section>
+      <section id="commandes" class="commandes" aria-label="Commandes"><div id="commandes-grille" class="commandes-grille"></div></section>
+    </div>
+    <div id="infobulle" class="infobulle" role="tooltip" hidden></div>
   </div>
+
+  <!-- Démo -->
+  <div id="demo" class="demo" hidden>
+    <p class="demo-bandeau"><strong>DÉMO</strong><span class="demo-souris">Cliquez ou appuyez sur une touche</span><span class="demo-tactile">Touchez l’écran</span></p>
+    <p class="demo-note">Les trois camps sont joués par l’ordinateur.</p>
+  </div>
+
+  <!-- Pause et réglages, à la manière de METAL -->
+  <section id="ecran-reglages" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="reglages-titre">
+    <div class="coque">
+      <header class="coque-tete">
+        <div>
+          <p id="reglages-surtitre" class="surtitre">RÉGLAGES</p>
+          <h2 id="reglages-titre">À votre main.</h2>
+        </div>
+        <p class="edition">POINT DE RUPTURE<br>ESSAI 0.2 · FERRO</p>
+      </header>
+      <div class="coque-corps">
+        <div class="onglets" role="tablist" aria-label="Rubriques des réglages" aria-orientation="vertical">
+          <button id="onglet-partie" type="button" role="tab" aria-controls="volet-partie" aria-selected="true"><span>01</span>Partie</button>
+          <button id="onglet-image" type="button" role="tab" aria-controls="volet-image" aria-selected="false" tabindex="-1"><span>02</span>Image</button>
+          <button id="onglet-audio" type="button" role="tab" aria-controls="volet-audio" aria-selected="false" tabindex="-1"><span>03</span>Audio</button>
+          <button id="onglet-commandes" type="button" role="tab" aria-controls="volet-commandes" aria-selected="false" tabindex="-1"><span>04</span>Commandes</button>
+        </div>
+        <div id="reglages-contenu" class="volets">
+          <div id="volet-partie" class="volet" role="tabpanel" aria-labelledby="onglet-partie">
+            <h3>Partie</h3>
+            <div class="en-partie" data-pause hidden>
+              <div id="partie-infos"></div>
+              <div class="actions"><button type="button" class="secondaire petit" data-action="recommencer">Recommencer</button><button type="button" class="secondaire petit" data-action="quitter">Abandonner la partie</button></div>
+            </div>
+            <p class="rubrique">DÉROULEMENT</p>
+            <div class="grille-options">
+              <label class="option-ligne"><span>Vitesse de la partie</span><select data-choix="vitesse" data-nombre><option value="1">Normale · ×1</option><option value="2">Rapide · ×2</option><option value="4">Très rapide · ×4</option></select></label>
+              <button type="button" class="option-bascule" data-bascule="alertes"><span>Alertes<small>Lieux pris, QG occupé, renforts</small></span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="infobulles"><span>Infobulles<small>Au survol des commandes</small></span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="demo"><span>Démo sur l’écran titre<small>Après 5 s sans geste</small></span><strong>Activé</strong></button>
+            </div>
+            <p class="aide">La vitesse s’applique à la reprise. Pendant la démo, un clic ou une touche ramène à l’écran titre.</p>
+            <div class="actions"><button type="button" class="texte" data-retablir="partie">Rétablir la rubrique</button></div>
+          </div>
+          <div id="volet-image" class="volet" role="tabpanel" aria-labelledby="onglet-image" hidden>
+            <h3>Image</h3>
+            <p class="rubrique">RENDU</p>
+            <div class="grille-options">
+              <label class="option-ligne"><span>Qualité</span><select data-choix="qualite"><option value="auto">Automatique</option><option value="low">Basse</option><option value="high">Haute</option></select></label>
+              <label class="option-ligne"><span>Limite d’images</span><select data-choix="limiteImages" data-nombre><option value="0">Aucune</option><option value="30">30 i/s</option><option value="60">60 i/s</option><option value="120">120 i/s</option></select></label>
+              <button type="button" class="option-bascule" data-bascule="ombres"><span>Ombres</span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="eclat"><span>Éclat<small>Halo des lumières</small></span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="anticrenelage"><span>Anticrénelage</span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="vignettage"><span>Vignettage</span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="compteur"><span>Compteur d’images</span><strong>Activé</strong></button>
+            </div>
+            <label class="option-curseur"><span><span>Luminosité</span><output data-sortie="luminosite">100 %</output></span><input type="range" min="70" max="140" step="1" data-curseur="luminosite" data-echelle="100"></label>
+            <p class="aide">En automatique, la définition baisse d’elle-même quand les images ralentissent et remonte quand la machine suit. La limite d’images économise la batterie.</p>
+            <div class="actions"><button type="button" class="texte" data-retablir="image">Rétablir la rubrique</button></div>
+          </div>
+          <div id="volet-audio" class="volet" role="tabpanel" aria-labelledby="onglet-audio" hidden>
+            <h3>Audio</h3>
+            <div class="grille-options">
+              <button type="button" class="option-bascule" data-bascule="son" data-oui="Activé" data-non="Coupé"><span>Son<small>Musique, effets et ambiances</small></span><strong>Activé</strong></button>
+            </div>
+            <div class="grille-options">
+              <label class="option-curseur"><span><span>Volume général</span><output data-sortie="volumeGeneral">100 %</output></span><input type="range" min="0" max="100" step="1" data-curseur="volumeGeneral" data-echelle="100"></label>
+              <label class="option-curseur"><span><span>Musique MOD</span><output data-sortie="volumeMusique">45 %</output></span><input type="range" min="0" max="100" step="1" data-curseur="volumeMusique" data-echelle="100"></label>
+              <label class="option-curseur"><span><span>Effets</span><output data-sortie="volumeEffets">100 %</output></span><input type="range" min="0" max="100" step="1" data-curseur="volumeEffets" data-echelle="100"></label>
+              <label class="option-curseur"><span><span>Ambiances</span><output data-sortie="volumeAmbiances">80 %</output></span><input type="range" min="0" max="100" step="1" data-curseur="volumeAmbiances" data-echelle="100"></label>
+            </div>
+            <div class="module-ligne">
+              <div class="module">
+                <span class="module-badge">MOD · 4 CANAUX</span>
+                <strong id="musique-titre">Thème de la ville</strong>
+                <p>Un module à quatre canaux, composé par le jeu à la manière de ProTracker : il s’enregistre et se lit dans n’importe quel lecteur de modules.</p>
+              </div>
+              <div class="actions module-actions">
+                <button type="button" class="secondaire" data-action="exporter-musique">Enregistrer le module<span>fichier .mod</span></button>
+                <button type="button" class="secondaire" data-action="essai-son">Essayer le son<span>ordre, frappe, rue</span></button>
+              </div>
+            </div>
+            <p id="audio-etat" class="statut" role="status" aria-live="polite">Les quatre volumes sont indépendants.</p>
+            <div class="actions"><button type="button" class="texte" data-retablir="audio">Rétablir la rubrique</button></div>
+          </div>
+          <div id="volet-commandes" class="volet" role="tabpanel" aria-labelledby="onglet-commandes" hidden>
+            <h3>Commandes</h3>
+            <label class="option-curseur"><span><span>Vitesse de la caméra</span><output data-sortie="vitesseCamera">1,00 ×</output></span><input type="range" min="50" max="200" step="5" data-curseur="vitesseCamera" data-echelle="100"></label>
+            <div class="grille-options">
+              <button type="button" class="option-bascule" data-bascule="defilementBord"><span>Défilement au bord<small>La vue suit la souris au bord de l’écran</small></span><strong>Activé</strong></button>
+              <button type="button" class="option-bascule" data-bascule="moletteInversee"><span>Molette inversée<small>Pour le zoom à la molette</small></span><strong>Activé</strong></button>
+            </div>
+            <p class="rubrique">TOUCHES</p>
+            <p id="touches-etat" class="statut" role="status" aria-live="polite"></p>
+            <div id="touches-grille" class="touches"></div>
+            <p class="rubrique">RACCOURCIS FIXES</p>
+            <div id="touches-fixes" class="touches fixes"></div>
+            <div class="actions"><button type="button" class="texte" data-retablir="commandes">Rétablir les commandes</button></div>
+          </div>
+        </div>
+      </div>
+      <footer class="coque-pied">
+        <span id="reglages-memoire">Réglages enregistrés sur cet appareil.</span>
+        <button id="reglages-fermer" type="button" class="primaire"><span>Reprendre </span><i class="fleche" aria-hidden="true"></i></button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Fin de partie -->
+  <section id="ecran-fin" class="ecran modal" hidden aria-labelledby="fin-titre">
+    <div class="panneau fin">
+      <p id="fin-surtitre" class="surtitre">FIN DE PARTIE</p>
+      <h2 id="fin-titre">VICTOIRE</h2>
+      <p id="fin-vainqueur" class="fin-vainqueur"></p>
+      <p id="fin-raison" class="fin-raison"></p>
+      <table id="fin-bilan" class="bilan"></table>
+      <div class="fin-actions">
+        <button id="fin-rejouer" type="button" class="primaire"><span>Rejouer</span><i class="fleche" aria-hidden="true"></i></button>
+        <button id="fin-retour" type="button" class="secondaire">Écran titre<span>Changer de camp ou de ville</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panne -->
+  <section id="echec" class="ecran modal" hidden role="alert" aria-labelledby="echec-titre">
+    <div class="panneau">
+      <p class="surtitre alerte">LE JEU NE PEUT PAS DÉMARRER</p>
+      <h2 id="echec-titre">Le moteur cale.</h2>
+      <p id="echec-texte" class="panneau-texte"></p>
+      <button id="echec-recharger" type="button" class="primaire"><span>Recharger la page</span><i class="fleche" aria-hidden="true"></i></button>
+    </div>
+  </section>
 </main>
 <!--MODULES-->

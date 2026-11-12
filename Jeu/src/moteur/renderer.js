@@ -80,6 +80,10 @@
   uniform vec3 uSkyTop;
   uniform vec3 uSkyBottom;
   uniform vec2 uEnvironment;
+  // PDR : voile du brouillard (fx.voile) : visibilité R8, zone (x0, z0, 1/largeur, 1/profondeur) en mètres, force 0..1.
+  uniform sampler2D uVoile;
+  uniform vec4 uVoileZone;
+  uniform float uVoileForce;
   out vec4 fragColor;
   float hash(vec2 p) {
     vec3 p3=fract(vec3(p.xyx)*.1031);
@@ -394,6 +398,12 @@
     color=mix(color,fogColor,min(fog,.86));
     color=color/(color+vec3(.76));
     color=pow(max(color,vec3(0.)),vec3(.4545));
+    // PDR : voile du brouillard. Hors de la vue du joueur, le dehors s'assombrit et perd ses couleurs ; à force 0, rien ne change.
+    if(uVoileForce>0.&&outdoors>.5){
+      float seen=texture(uVoile,(vWorld.xz-uVoileZone.xy)*uVoileZone.zw).r;
+      vec3 dull=vec3(dot(color,vec3(.299,.587,.114)))*vec3(.93,.97,1.04);
+      color=mix(color,mix(color,dull,.6)*.42,uVoileForce*(1.-seen));
+    }
     vec2 screen=gl_FragCoord.xy/uResolution;
     float vignette=pow(max(0.,16.*screen.x*screen.y*(1.-screen.x)*(1.-screen.y)),.13);
     // PDR : vignettage adouci ; en vue RTS, les escouades au bord de l'écran doivent rester lisibles.
@@ -537,6 +547,96 @@
     if(uPass==2)c=texture(uScene,vUV).rgb+c*.28;
     fragColor=vec4(c,1.);
   }`;
+
+  // PDR : bibliothèque d'éclairage pour les shaders du jeu (la foule sur le GPU). Ce sont les formules du shader du monde,
+  // pour une surface du dehors : ambiance, soleil et son ombre (même atlas, même noyau, même biais), lampes de passage,
+  // reflet du ciel, émission, puis brouillard, tonemap, gamma et vignettage. Le shader du monde n'en dépend pas : son
+  // code reste celui de FERRO. À insérer après « precision highp float; ». Uniformes posées par renderer.pdr.lier.
+  const PDR_GLSL=`
+  uniform highp sampler2D uPdrOmbre;
+  uniform mat4 uPdrMatriceOmbre;
+  uniform vec4 uPdrOmbreReglages;
+  uniform vec3 uPdrOeil;
+  uniform vec3 uPdrSoleil;
+  uniform vec3 uPdrCouleurSoleil;
+  uniform vec3 uPdrAmbiance;
+  uniform vec3 uPdrBrouillard;
+  uniform vec3 uPdrCielHaut;
+  uniform vec3 uPdrCielBas;
+  uniform vec4 uPdrEnvironnement;
+  uniform vec2 uPdrResolution;
+  uniform vec3 uPdrLumierePosition[12];
+  uniform vec3 uPdrLumiereCouleur[12];
+  uniform float uPdrLumierePortee[12];
+  uniform int uPdrLumieres;
+  float pdrEchantillon(vec2 uv,vec2 decalage,float profondeur,vec2 pente){
+    float texel=uPdrOmbreReglages.y;
+    vec2 tap=uv+decalage*texel,centre=(floor(tap/texel)+.5)*texel;
+    return step(profondeur+dot(pente,(centre-uv)*2.),texture(uPdrOmbre,tap).r);
+  }
+  float pdrOmbreSoleil(vec3 monde,vec3 n){
+    if(uPdrOmbreReglages.x<.5)return 1.;
+    vec4 projete=uPdrMatriceOmbre*vec4(monde+n*.014,1.);
+    vec3 p=projete.xyz/projete.w*.5+.5;
+    vec3 dx=dFdx(p),dy=dFdy(p);
+    float determinant=dx.x*dy.y-dx.y*dy.x;
+    vec2 pente=abs(determinant)>.00000000001?vec2(dx.z*dy.y-dy.z*dx.y,dy.z*dx.x-dx.z*dy.x)/determinant:vec2(0.);
+    if(projete.w<=0.||p.z<=0.||p.z>=1.||min(p.x,p.y)<=.001||max(p.x,p.y)>=.999)return 1.;
+    float biais=.00014+.00024*(1.-max(dot(n,uPdrSoleil),0.)),z=p.z-biais;
+    vec2 uv=uPdrOmbreReglages.z>.5?p.xy:p.xy*.5+vec2(.5,0.);
+    float v=pdrEchantillon(uv,vec2(0.),z,pente)*4.;
+    v+=(pdrEchantillon(uv,vec2(-1.25,0.),z,pente)+pdrEchantillon(uv,vec2(1.25,0.),z,pente)+pdrEchantillon(uv,vec2(0.,-1.25),z,pente)+pdrEchantillon(uv,vec2(0.,1.25),z,pente))*2.;
+    v+=pdrEchantillon(uv,vec2(-1.25,-1.25),z,pente)+pdrEchantillon(uv,vec2(1.25,-1.25),z,pente)+pdrEchantillon(uv,vec2(-1.25,1.25),z,pente)+pdrEchantillon(uv,vec2(1.25,1.25),z,pente);
+    v*=.0625;
+    float bord=min(min(p.x,p.y),min(1.-p.x,1.-p.y));
+    return mix(1.,mix(.055,1.,v),smoothstep(.012,.085,bord));
+  }
+  vec3 pdrFresnel(float c,vec3 f0){float q=1.-clamp(c,0.,1.),q2=q*q;return f0+(1.-f0)*q2*q2*q;}
+  vec3 pdrReflet(vec3 n,vec3 vue,vec3 l,float rugosite,vec3 f0){
+    vec3 h=normalize(vue+l);
+    float nv=max(dot(n,vue),.001),nl=max(dot(n,l),0.),nh=max(dot(n,h),0.);
+    float a=max(.055,rugosite*rugosite),a2=a*a,d=nh*nh*(a2-1.)+1.;
+    float k=(rugosite+1.)*(rugosite+1.)*.125;
+    return pdrFresnel(max(dot(vue,h),0.),f0)*min(a2/max(3.141593*d*d,.00001)/max(4.*(nv*(1.-k)+k)*(nl*(1.-k)+k),.001),12.)*nl;
+  }
+  /** Couleur linéaire, avant brouillard et tonemap, d'une surface du dehors ; ombre : visibilité du soleil (pdrOmbreSoleil). */
+  vec3 pdrEclairer(vec3 base,vec3 n,vec3 monde,float rugosite,float metal,float emission,float ombre){
+    vec3 vue=normalize(uPdrOeil-monde),f0=mix(vec3(.04),clamp(base,vec3(.025),vec3(.92)),metal);
+    vec3 lumiere=uPdrAmbiance*(.72+.28*max(n.y,0.)),reflet=vec3(0.);
+    for(int i=0;i<12;i++){
+      if(i>=uPdrLumieres)break;
+      vec3 versLumiere=uPdrLumierePosition[i]-monde;
+      float d=length(versLumiere);
+      vec3 l=versLumiere/max(d,.001);
+      float attenuation=(i<2?.27:.13)/(1.+d*d*.26);
+      if(uPdrLumierePortee[i]>0.)attenuation*=1.-smoothstep(uPdrLumierePortee[i]*.35,uPdrLumierePortee[i],d);
+      lumiere+=uPdrLumiereCouleur[i]*attenuation*(max(dot(n,l),0.)+.035);
+      reflet+=uPdrLumiereCouleur[i]*attenuation*pdrReflet(n,vue,l,rugosite,f0)*2.4;
+    }
+    lumiere+=uPdrCouleurSoleil*max(dot(n,uPdrSoleil),0.)*ombre;
+    reflet+=uPdrCouleurSoleil*ombre*pdrReflet(n,vue,uPdrSoleil,rugosite,f0);
+    vec3 couleur=base*lumiere+reflet;
+    vec3 r=reflect(-vue,n),ciel=mix(uPdrCielBas,uPdrCielHaut,smoothstep(0.,1.,r.y));
+    vec3 milieu=mix(mix(uPdrAmbiance*.20,ciel,smoothstep(-.16,.18,r.y)),uPdrAmbiance*.85,rugosite*rugosite*.8);
+    float rasant=pow(1.-max(dot(n,vue),0.),5.);
+    couleur+=milieu*(f0+(max(vec3(1.-rugosite),f0)-f0)*rasant)*(.18+1.3*(1.-rugosite)*(1.-rugosite))*(.5+metal*2.5);
+    return couleur+base*emission*(.94+.06*sin(uPdrEnvironnement.z*2.2+monde.y*3.))*1.55;
+  }
+  /** Brouillard, tonemap, gamma et vignettage du monde : la sortie est celle de la cible de scène (RGBA8, avant le halo). */
+  vec3 pdrFinir(vec3 couleur,vec3 monde){
+    float brume=1.-exp(-length(uPdrOeil-monde)*uPdrEnvironnement.y);
+    couleur=mix(couleur,uPdrBrouillard,min(brume,.86));
+    couleur=pow(max(couleur/(couleur+vec3(.76)),vec3(0.)),vec3(.4545));
+    vec2 ecran=gl_FragCoord.xy/uPdrResolution;
+    return couleur*mix(.84,1.,pow(max(0.,16.*ecran.x*ecran.y*(1.-ecran.x)*(1.-ecran.y)),.13));
+  }`;
+  // Les valeurs que le shader du monde prend sans atmosphère (setWorld sans environnement).
+  const PDR_INDOOR=Object.freeze({sunDirection:[.4,.8,.3],sunColor:[0,0,0],ambient:[.075,.10,.12],fog:[.009,.018,.024],fogDensity:.014,skyTop:[.05,.08,.10],skyBottom:[.16,.20,.22]});
+  // Uniformes de la bibliothèque, dans l'ordre où renderer.pdr.lier les pose. uPdrEnvironnement : x dehors (toujours 1),
+  // y densité du brouillard, z temps (s), w inutilisé.
+  const PDR_UNIFORMS=['uPdrOmbre','uPdrMatriceOmbre','uPdrOmbreReglages','uPdrOeil','uPdrSoleil','uPdrCouleurSoleil','uPdrAmbiance',
+    'uPdrBrouillard','uPdrCielHaut','uPdrCielBas','uPdrEnvironnement','uPdrResolution','uPdrLumierePosition','uPdrLumiereCouleur',
+    'uPdrLumierePortee','uPdrLumieres'];
 
   // A closed, asymmetric crown shared with collision raycasts. Its canonical
   // 72 triangles are smaller than the old GPU sphere and remain identical in
@@ -1304,6 +1404,18 @@
     let world=[],worldIndex=spatialIndex([]),lights=[],environment=null,worldBatch=pack([]),quality='auto',disposed=false,worldRevision=0;
     let staticCaches=[],lampCasters=[],actorLightPlan=null;
     const governor=resolutionGovernor();let autoScale=1;
+    // PDR : points d'accroche du jeu. pdrSlots : un tampon GPU par lot de fx.lots, renvoyé seulement quand le lot change ;
+    // pdrLots : les lots de l'image en cours. pdrLumiere et pdrVue sont remplis à chaque image, sans allocation, et passés
+    // à fx.foule.ombre et fx.foule.couleur. pdrGeneration change à chaque (ré)initialisation du contexte.
+    let pdrSlots=[],pdrGeneration=0;const pdrLots=[];
+    const pdrMatriceSoleil=new Float32Array(16);
+    const pdrLumiere={matrice:pdrMatriceSoleil,direction:[.4,.8,.3],texel:1,plein:false,viewport:[0,0,1,1],centre:[0,0,0],etendue:1,profondeur:1};
+    const pdrVue={gl,glsl:PDR_GLSL,vp,vue:view,projection,oeil:[0,0,0],avant:[0,0,-1],droite:[1,0,0],haut:[0,1,0],fov:1,tangente:1,focale:1,
+      largeur:1,hauteur:1,near:.045,far:180,temps:0,qualite:'auto',msaa:0,soleil:[.4,.8,.3],couleurSoleil:[0,0,0],ambiance:[.075,.10,.12],
+      brouillard:[.009,.018,.024],densiteBrouillard:.014,cielHaut:[.05,.08,.10],cielBas:[.16,.20,.22],
+      ombre:{texture:null,unite:2,matrice:pdrMatriceSoleil,texel:1,plein:false,active:false},
+      lumieres:{positions:lightPositions,couleurs:lightColors,portees:lightRanges,nombre:0},
+      sortie:'Couleur finale de la cible de scène (RGBA8) : pdrFinir applique brouillard, tonemap c/(c+0,76), gamma 1/2,2 et vignettage, comme le monde.'};
 
     function compile(type,code) {
       const shader=gl.createShader(type);gl.shaderSource(shader,code);gl.compileShader(shader);
@@ -1371,6 +1483,9 @@
     function initialize() {
       program=link(VERT,FRAG);depthProgram=link(VERT,DEPTH_FRAG);postProgram=link(POST_VERT,POST_FRAG);skyProgram=link(POST_VERT,SKY_FRAG);fxProgram=link(FX_VERT,FX_FRAG);
       uniforms={};for(const name of ['uViewProjection','uWindTime','uEye','uForward','uLightPosition','uLightColor','uLightRange','uLightCount','uResolution','uEffects','uShadowMap','uShadowMatrix','uShadowSettings','uTorchPosition','uSunDirection','uSunColor','uAmbient','uFogColor','uSkyTop','uSkyBottom','uEnvironment']) uniforms[name]=gl.getUniformLocation(program,name);
+      // PDR : uniformes du voile du brouillard ; les tampons des lots du jeu sont à recréer avec le contexte.
+      for(const name of ['uVoile','uVoileZone','uVoileForce'])uniforms[name]=gl.getUniformLocation(program,name);
+      pdrSlots=[];pdrLots.length=0;pdrGeneration++;
       postUniforms={};for(const name of ['uScene','uBloom','uTexel','uPass'])postUniforms[name]=gl.getUniformLocation(postProgram,name);
       skyUniforms={};for(const name of ['uSkyRight','uSkyUp','uSkyForward','uSkyTop','uSkyBottom','uSkyFog','uSunDirection','uSunColor','uSkyFov','uSkyMotion'])skyUniforms[name]=gl.getUniformLocation(skyProgram,name);
       fxUniforms={};for(const name of ['uViewProjection','uWindTime','uEye','uAmbient','uFogColor','uEnvironment','uTime'])fxUniforms[name]=gl.getUniformLocation(fxProgram,name);
@@ -1495,7 +1610,21 @@
         return Math.abs(along(r))<extent+e.radius&&Math.abs(along(u))<extent+e.radius&&z+e.radius>near&&z-e.radius<far;
       };
       const casters=camera.allStatic?worldIndex.entries:worldIndex.query(center,[extent+24,26,0]).filter(inside);
-      renderStatic(casters,2,true);renderBatch(dynamicBatch,dynamicBuffer,false,true);if(crowd)renderBatch(crowd,crowdBuffer,false,true);gl.disable(gl.POLYGON_OFFSET_FILL);
+      renderStatic(casters,2,true);renderBatch(dynamicBatch,dynamicBuffer,false,true);if(crowd)renderBatch(crowd,crowdBuffer,false,true);
+      // PDR : les lots du jeu (fx.lots) et la foule sur le GPU (fx.foule.ombre) entrent dans la même vue du soleil, au même biais.
+      for(const entry of pdrLots)renderBatch(entry.lot,entry.buffer,false,true);
+      if(fx.foule&&typeof fx.foule.ombre==='function'){
+        pdrMatriceSoleil.set(shadowMatrix);pdrLumiere.direction=sun;pdrLumiere.texel=texel;pdrLumiere.plein=full;
+        pdrLumiere.viewport[0]=full?0:shadowTarget.size;pdrLumiere.viewport[1]=0;pdrLumiere.viewport[2]=pdrLumiere.viewport[3]=tile;
+        pdrLumiere.centre=center;pdrLumiere.etendue=extent;pdrLumiere.profondeur=far;
+        pdrCompter(fx.foule.ombre(gl,pdrLumiere),true);
+        gl.useProgram(depthProgram);gl.bindVertexArray(vao);gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.depthMask(true);gl.disable(gl.BLEND);
+      }
+      gl.disable(gl.POLYGON_OFFSET_FILL);
+    }
+    // PDR : ce que rend un point d'accroche ({ appels, triangles, instances }) entre dans les statistiques du moteur.
+    function pdrCompter(r,shadow){
+      if(!r)return;stats.drawCalls+=r.appels||0;stats.triangles+=r.triangles||0;if(!shadow)stats.instances+=r.instances||0;
     }
     function skyPass(axes,f,time){
       gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.bindVertexArray(postVao);gl.useProgram(skyProgram);
@@ -1607,13 +1736,25 @@
       const crowd=fx.instances&&fx.instances.groups&&fx.instances.groups.length?fx.instances:null,sunOnly=!!fx.sunOnly;
       stats.crowdInstances=crowd?crowd.values.length/16:0;if(sunOnly)stats.shadowMaps=stats.shadows&&environment?1:0;
       if(crowd){gl.bindBuffer(gl.ARRAY_BUFFER,crowdBuffer);gl.bufferData(gl.ARRAY_BUFFER,crowd.values,gl.DYNAMIC_DRAW);stats.uploadBytes+=crowd.values.byteLength;}
+      // PDR : lots déjà empaquetés par le jeu (fx.lots : le décor), au format de pack. Un lot ne repart au GPU que si l'objet
+      // ou sa version (lot.version) change ; il sert ensuite à l'ombre du soleil et à la passe couleur.
+      pdrLots.length=0;stats.pdrLotInstances=0;
+      if(Array.isArray(fx.lots))for(let i=0;i<fx.lots.length;i++){
+        const lot=fx.lots[i];if(!lot||!lot.values||!lot.groups||!lot.groups.length)continue;
+        const slot=pdrSlots[i]||(pdrSlots[i]={buffer:gl.createBuffer(),lot:null,version:NaN});
+        if(slot.lot!==lot||slot.version!==lot.version){
+          gl.bindBuffer(gl.ARRAY_BUFFER,slot.buffer);gl.bufferData(gl.ARRAY_BUFFER,lot.values,gl.DYNAMIC_DRAW);stats.uploadBytes+=lot.values.byteLength;
+          slot.lot=lot;slot.version=lot.version;
+        }
+        pdrLots.push(slot);stats.pdrLotInstances+=lot.values.length/16;
+      }
       if(stats.shadows){
         gl.bindFramebuffer(gl.FRAMEBUFFER,shadowTarget.framebuffer);gl.clear(gl.DEPTH_BUFFER_BIT);
         if(!sunOnly)shadowLights.forEach((light,i)=>shadowPass(light,dynamicBatch,i,null,t));
         if(environment)sunShadowPass(eye,axes,dynamicBatch,t,camera,fx,crowd);
         if(!sunOnly)shadowPass({p:torchPosition},dynamicBatch,2,axes,t);
       }
-      const msaa=stats.bloom&&post.msaa?post.msaa:null;
+      const msaa=stats.bloom&&post.msaa&&fx.msaa!==false?post.msaa:null;
       gl.bindFramebuffer(gl.FRAMEBUFFER,stats.bloom?(msaa?msaa.framebuffer:post.scene.framebuffer):null);gl.viewport(0,0,canvas.width,canvas.height);
       gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);if(environment)skyPass(axes,f,t);gl.useProgram(program);gl.bindVertexArray(vao);
       gl.uniformMatrix4fv(uniforms.uViewProjection,false,vp);gl.uniform3fv(uniforms.uEye,eye);gl.uniform3fv(uniforms.uForward,forward);
@@ -1626,9 +1767,30 @@
       gl.uniformMatrix4fv(uniforms.uShadowMatrix,false,shadowMatrices);gl.uniform4f(uniforms.uShadowSettings,stats.shadows&&!sunOnly?shadowLights.length:0,shadowTarget?1/(shadowTarget.size*2):1,stats.shadows&&!sunOnly?1:0,stats.shadows&&environment?(sunOnly?2:1):0);
       // PDR : sans lampe torche (fx.torch === false), sa source est renvoyée assez loin pour ne plus rien éclairer.
       gl.uniform3fv(uniforms.uTorchPosition,fx.torch===false?[0,-1e5,0]:torchPosition);
+      // PDR : voile du brouillard (fx.voile = { texture R8, origine [x0, z0], taille [largeur, profondeur], force }) sur l'unité 4.
+      const voile=fx.voile&&fx.voile.texture&&fx.voile.force>0?fx.voile:null;
+      gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,voile?voile.texture:whiteTexture);gl.uniform1i(uniforms.uVoile,4);
+      if(voile)gl.uniform4f(uniforms.uVoileZone,voile.origine[0],voile.origine[1],1/Math.max(.001,voile.taille[0]),1/Math.max(.001,voile.taille[1]));
+      gl.uniform1f(uniforms.uVoileForce,voile?Math.min(1,voile.force):0);gl.activeTexture(gl.TEXTURE2);
       renderStatic(shown,0);
       renderBatch(dynamicBatch,dynamicBuffer,false);
       if(crowd)renderBatch(crowd,crowdBuffer,false);
+      // PDR : lots du jeu, puis la foule sur le GPU (fx.foule.couleur), dans la cible MSAA, avant les effets translucides.
+      for(const entry of pdrLots)renderBatch(entry.lot,entry.buffer,false);
+      if(fx.foule&&typeof fx.foule.couleur==='function'){
+        const v=pdrVue,ombre=v.ombre;
+        v.oeil=eye;v.avant=forward;v.droite=right;v.haut=up;v.fov=fov;v.tangente=1/f;v.focale=canvas.height*f*.5;v.largeur=canvas.width;v.hauteur=canvas.height;
+        v.near=near;v.far=far;v.temps=t;v.qualite=quality;v.msaa=msaa?msaa.samples:0;
+        const env=environment||PDR_INDOOR;
+        v.soleil=env.sunDirection;v.couleurSoleil=env.sunColor;v.ambiance=env.ambient;v.brouillard=env.fog;
+        v.densiteBrouillard=env.fogDensity;v.cielHaut=env.skyTop;v.cielBas=env.skyBottom;
+        ombre.texture=stats.shadows?shadowTarget.texture:whiteTexture;ombre.active=!!(stats.shadows&&environment);ombre.plein=sunOnly;
+        ombre.texel=shadowTarget?1/(shadowTarget.size*2):1;if(ombre.active)for(let k=0;k<16;k++)pdrMatriceSoleil[k]=shadowMatrices[16+k];
+        v.lumieres.nombre=selected.length;
+        pdrCompter(fx.foule.couleur(gl,v),false);
+        gl.useProgram(program);gl.bindVertexArray(vao);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
+        gl.depthMask(true);gl.disable(gl.BLEND);gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,ombre.texture);
+      }
       if(particles.length)renderEffects(particles,eye,t);
       if(overlay.length||overlayParticles.length) {
         if(blackout){selected.forEach(({light},i)=>{const c=light.color||[1,1,1],power=light.power===undefined?1:light.power;lightColors.set([c[0]*power,c[1]*power,c[2]*power],i*3);});gl.uniform3fv(uniforms.uLightColor,lightColors);}
@@ -1650,10 +1812,33 @@
       canvas.removeEventListener('webglcontextlost',lost);canvas.removeEventListener('webglcontextrestored',restored);
       for(const buffer of [vbo,ibo,worldBuffer,dynamicBuffer,overlayBuffer,fxBuffer,crowdBuffer]) gl.deleteBuffer(buffer);
       for(const cache of staticCaches.slice(1))gl.deleteBuffer(cache.buffer);
+      // PDR : tampons des lots du jeu.
+      for(const slot of pdrSlots)if(slot)gl.deleteBuffer(slot.buffer);pdrSlots=[];pdrLots.length=0;
       freePost();deleteTarget(shadowTarget);gl.deleteTexture(whiteTexture);
       gl.deleteVertexArray(vao);gl.deleteVertexArray(postVao);gl.deleteProgram(program);gl.deleteProgram(depthProgram);gl.deleteProgram(postProgram);gl.deleteProgram(skyProgram);gl.deleteProgram(fxProgram);
     }
-    return {setWorld,updateWorld,draw,resize,dispose,stats,actorFilter};
+    // PDR : le jeu dessine la foule lui-même dans les passes du moteur. renderer.gl est le contexte WebGL 2 ; renderer.pdr
+    // donne la bibliothèque d'éclairage (glsl), lier(programme) qui rend la fonction posant ses uniformes à partir de la vue
+    // passée à fx.foule.couleur, la génération du contexte (elle change après une perte de contexte : tout est à recréer)
+    // et la compilation des shaders avec les messages du moteur.
+    const pdr={glsl:PDR_GLSL,uniformes:PDR_UNIFORMS,
+      get generation(){return pdrGeneration;},
+      programme(vertex,fragment){return link(vertex,fragment);},
+      lier(programme){
+        const u={};for(const name of PDR_UNIFORMS)u[name]=gl.getUniformLocation(programme,name);
+        return v=>{
+          const o=v.ombre;
+          gl.uniform1i(u.uPdrOmbre,o.unite);gl.uniformMatrix4fv(u.uPdrMatriceOmbre,false,o.matrice);
+          gl.uniform4f(u.uPdrOmbreReglages,o.active?1:0,o.texel,o.plein?1:0,0);
+          gl.uniform3fv(u.uPdrOeil,v.oeil);gl.uniform3fv(u.uPdrSoleil,v.soleil);gl.uniform3fv(u.uPdrCouleurSoleil,v.couleurSoleil);
+          gl.uniform3fv(u.uPdrAmbiance,v.ambiance);gl.uniform3fv(u.uPdrBrouillard,v.brouillard);
+          gl.uniform3fv(u.uPdrCielHaut,v.cielHaut);gl.uniform3fv(u.uPdrCielBas,v.cielBas);
+          gl.uniform4f(u.uPdrEnvironnement,1,v.densiteBrouillard,v.temps,0);gl.uniform2f(u.uPdrResolution,v.largeur,v.hauteur);
+          const l=v.lumieres;gl.uniform3fv(u.uPdrLumierePosition,l.positions);gl.uniform3fv(u.uPdrLumiereCouleur,l.couleurs);
+          gl.uniform1fv(u.uPdrLumierePortee,l.portees);gl.uniform1i(u.uPdrLumieres,l.nombre);
+        };
+      }};
+    return {setWorld,updateWorld,draw,resize,dispose,stats,actorFilter,gl,pdr};
   }
   window.FRender={create,foliageTriangles};
 })();

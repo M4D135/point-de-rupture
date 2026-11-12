@@ -7,23 +7,46 @@ full procedural rts ».
 
 En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus bas).
 
-## Essai 0.1 (12 novembre 2026)
+## Essai 0.2 (12 novembre 2026)
 
-Ce que montre cet essai : une ville générée, trois factions et jusqu'à 2 400 escouades de six figurines, commandées
-à la souris et au clavier, avec un compteur d'images par seconde. Les factions n'ont pas encore de règles propres :
-elles se déplacent, rien de plus. Le noyau (`src/noyau.js`) est le portage exact du noyau C++ de l'étape A1 :
-entiers en millimètres, 20 itérations par seconde, commandes dans un ordre canonique, empreinte toutes les
-100 itérations.
+Un vrai RTS à trois camps, joué sur le **plan réel de Marseille** (ou sur une ville imaginaire tirée d'une graine),
+avec jusqu'à 200 000 unités, 100 000 par défaut. Conception et décisions de David : `CONCEPTION.md`.
 
-Mesures du 12 novembre 2026 sur le Mac de référence. Chrome sans écran, Metal, 1 440 × 813, MSAA ×4, ombre du soleil,
-bloom, 5 s par relevé, aucune image lente :
+- **Écrans** : chargement, titre, préparation (camp, alliance, effectifs, difficulté, ville, graine, brouillard,
+  coalitions des IA), partie, pause et réglages à la manière de METAL (image, audio, commandes réassignables),
+  fin avec bilan. Sans geste pendant 5 s sur l'écran titre, la **démo** part seule : trois IA, filmées par un
+  réalisateur qui cherche l'action ; le moindre geste ramène au titre.
+- **Règles** (`src/sim/regles.js`) : la Convergence casse, barricade, frappe le Bastion et la Préfecture ; le Bastion
+  lève les barricades et ne frappe la Préfecture qu'en colère, quand elle l'a frappé ; la Préfecture lève tout et
+  frappe tout le monde. Deux camps sur trois peuvent s'allier. Récolte, production, avant-postes, lieux à tenir.
+- **Simulation** dans un Web Worker (`src/sim/`, `src/hote.js`), à 20 itérations par seconde, en entiers et
+  millimètres, déterministe ; repli sur le fil principal si le navigateur refuse le travailleur.
+- **Rendu** FERRO (`src/moteur/renderer.js`) : la foule entière sur le GPU (`src/foule.js`), le décor vivant
+  (`src/decor.js` : barricades, feux, casse, gisements, lieux), la caméra RTS au-dessus des toits (`src/camera.js`).
+- **Son** sans fichier (`src/moteur/audio.js`, `src/moteur/musique.js`, `src/son.js`) : bruitages calculés, quatre
+  morceaux ProTracker (thème et un par camp), exportables en `.mod` depuis les réglages.
+- **Plan réel** : rues, bâti, eau et parcs d'OpenStreetMap, par les tuiles vectorielles d'OpenFreeMap
+  (`outils/plans/`, `src/villes/marseille.js`, `src/ville-reelle.js`). Licence ODbL : le jeu affiche
+  « © les contributeurs d'OpenStreetMap ». Paris et New York viendront dans les mises à jour suivantes.
 
-| Escouades | Vue | Images/s | CPU par image | Appels | Triangles |
-|---|---|---|---|---|---|
-| 240 | par défaut | 60 | 0,8 ms | 19 | 926 024 |
-| 960 | par défaut | 60,2 | 2,2 ms | 19 | 1 121 288 |
-| 2 400 | par défaut | 60,1 | 4,0 ms | 19 | 1 405 632 |
-| 2 400 | ville entière | 60,1 | 2,6 ms | 17 | 926 904 |
+Mesures du 12 novembre 2026 sur le Mac de référence (Apple M5), Chrome 157 sans écran, Metal, 1 440 × 900,
+MSAA ×4, ombre du soleil, bloom, 100 000 unités, 5 s par relevé. La machine était chargée par d'autres travaux
+(charge moyenne de 9 à 11) ; la simulation a tenu ses 20 états par seconde dans tous les relevés.
+
+| Ville | Écran | Images/s | Images lentes | Simulation par itération (moyenne, p95) |
+|---|---|---|---|---|
+| Marseille | démo | 60,1 | 0 | 22,2 ms (28,4) |
+| Marseille | partie, vue par défaut | 60,1 | 0 | 16,4 ms (20,3) |
+| imaginaire | démo | 60,2 | 0 | 17,9 ms (22,7) |
+| imaginaire | partie, vue par défaut | 60,1 | 0 | 16,2 ms (22,4) |
+
+Marseille se construit en 0,1 à 0,2 s selon le carré de jeu (660, 950 ou 1 100 m de côté autour du Vieux-Port,
+pour 9, 13 ou 15 « îlots » d'effectifs) : 15 000 à 31 000 pièces de décor, 1 100 à 3 900 objets cassables.
+
+Sur téléphone (390 × 844, tactile émulé, 20 000 unités) : 60 images/s en démo comme en partie.
+
+L'essai 0.1 (2 400 escouades sans règles, noyau `src/noyau.js`) reste dans l'historique du dépôt ; `noyau.js` et son
+essai sont gardés, mais la page ne le charge plus.
 
 ## Construire, vérifier, ouvrir
 

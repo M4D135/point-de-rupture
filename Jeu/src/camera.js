@@ -25,9 +25,63 @@
   /** Plus on s'éloigne, plus on regarde à plomb : 42° près du sol, 60° tout en haut. */
   const tangage = D => -(42 + 18 * Math.pow(borner((D - DMIN) / (DMAX - DMIN), 0, 1), 0.7)) * Math.PI / 180;
 
-  function creerCamera(canvas, limites, directionSoleil) {
+  /**
+   * Hauteur des toits par cases de 4 m, élargie de 12 m de chaque côté, tirée des pièces de la ville (ville.objets) :
+   * la caméra passe au-dessus des immeubles, jamais dedans. Rend une fonction (x, z) → hauteur (m), 0 hors de la ville.
+   */
+  function grilleToits(ville) {
+    const objets = ville && ville.objets, e = ville && ville.etendue;
+    if (!Array.isArray(objets) || !e) return null;
+    const C = 4, M = 80, x0 = e.x0 - M, z0 = e.z0 - M;
+    const nx = Math.ceil((e.x1 - e.x0 + 2 * M) / C), nz = Math.ceil((e.z1 - e.z0 + 2 * M) / C);
+    let h = new Float32Array(nx * nz);
+    for (const o of objets) {
+      if (!o || !o.p || !o.s) continue;
+      const haut = o.p[1] + o.s[1] / 2;
+      if (!(haut > 3)) continue;
+      const a = (o.r && o.r[1]) || 0, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+      const hx = (ca * o.s[0] + sa * o.s[2]) / 2, hz = (sa * o.s[0] + ca * o.s[2]) / 2;
+      const i0 = Math.max(0, Math.floor((o.p[0] - hx - x0) / C)), i1 = Math.min(nx - 1, Math.floor((o.p[0] + hx - x0) / C));
+      const j0 = Math.max(0, Math.floor((o.p[2] - hz - z0) / C)), j1 = Math.min(nz - 1, Math.floor((o.p[2] + hz - z0) / C));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (h[j * nx + i] < haut) h[j * nx + i] = haut;
+    }
+    for (let passe = 0; passe < 2; passe++) {
+      const g = new Float32Array(nx * nz);
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        let m = 0;
+        for (let d = -3; d <= 3; d++) {
+          const ii = passe ? i : i + d, jj = passe ? j + d : j;
+          if (ii >= 0 && jj >= 0 && ii < nx && jj < nz && h[jj * nx + ii] > m) m = h[jj * nx + ii];
+        }
+        g[j * nx + i] = m;
+      }
+      h = g;
+    }
+    return (x, z) => {
+      const i = Math.floor((x - x0) / C), j = Math.floor((z - z0) / C);
+      return i < 0 || j < 0 || i >= nx || j >= nz ? 0 : h[j * nx + i];
+    };
+  }
+  const MARGE_TOITS = 4;
+
+  /**
+   * options.ville : la ville (objets, etendue) ; la caméra recule alors d'elle-même au-dessus des toits, sans toucher à
+   * la visée. options.toits : à la place, une fonction (x, z) → hauteur des toits (m).
+   */
+  function creerCamera(canvas, limites, directionSoleil, options = {}) {
     const vise = { x: 0, z: 0, D: 330, yaw: 0 };
-    const lis = { x: canal(0), z: canal(0), D: canal(330), yaw: canal(0) };
+    const lis = { x: canal(0), z: canal(0), D: canal(330), yaw: canal(0), recul: canal(0) };
+    let toits = typeof options.toits === 'function' ? options.toits : options.ville ? grilleToits(options.ville) : null;
+    /** Distance où l'œil, qui regarde (x, z) sous le lacet donné, passe à MARGE_TOITS au-dessus des toits. */
+    function degager(x, z, D, yaw) {
+      if (!toits) return D;
+      for (let k = 0; k < 24 && D < DMAX; k++) {
+        const p = tangage(D), cp = Math.cos(p), sp = Math.sin(p);
+        if (-sp * D >= toits(x - Math.sin(yaw) * cp * D, z + Math.cos(yaw) * cp * D) + MARGE_TOITS) break;
+        D = Math.min(DMAX, D * 1.06);
+      }
+      return D;
+    }
     const touches = new Set();
     let vue = null;
 
@@ -76,13 +130,20 @@
       vise.z = borner(vise.z, limites.z0 - 60, limites.z1 + 60);
       vise.D = borner(vise.D, DMIN, DMAX);
     }
-    const visee = () => camera(vise.x, vise.z, vise.D, vise.yaw);
+    const visee = () => camera(vise.x, vise.z, degager(vise.x, vise.z, vise.D, vise.yaw), vise.yaw);
 
     const api = {
       DMIN, DMAX,
+      /** Une autre ville (nouvelle partie) : nouvelles limites et nouveaux toits ; la visée est bornée de nouveau. */
+      monde(nouvelles, opt = {}) {
+        limites = nouvelles;
+        toits = typeof opt.toits === 'function' ? opt.toits : opt.ville ? grilleToits(opt.ville) : null;
+        borne();
+      },
       placer(x, z, D = vise.D, yaw = vise.yaw) {
         Object.assign(vise, { x, z, D, yaw }); borne();
         lis.x = canal(vise.x); lis.z = canal(vise.z); lis.D = canal(vise.D); lis.yaw = canal(vise.yaw);
+        lis.recul = canal(degager(vise.x, vise.z, vise.D, vise.yaw) - vise.D);
       },
       viser(x, z) { vise.x = x; vise.z = z; borne(); },
       /** Déplace la visée dans le plan du sol : droite et avant de l'écran, en mètres. */
@@ -109,6 +170,16 @@
         borne();
       },
       tourner(da) { vise.yaw += da; },
+      /** Pose la visée sans couper le lissage : c'est ainsi que le réalisateur de la démo mène la caméra. */
+      diriger(x, z, D = vise.D, yaw = vise.yaw) {
+        if (Number.isFinite(x)) vise.x = x;
+        if (Number.isFinite(z)) vise.z = z;
+        if (Number.isFinite(D)) vise.D = D;
+        if (Number.isFinite(yaw)) vise.yaw = yaw;
+        borne();
+      },
+      /** La visée en cours (copie). */
+      get visee() { return { x: vise.x, z: vise.z, D: vise.D, yaw: vise.yaw }; },
       touche(code, bas) { if (bas) touches.add(code); else touches.delete(code); },
       relacher() { touches.clear(); },
       /** Avance le lissage et rend la caméra du moteur pour cette image. */
@@ -128,7 +199,9 @@
         // La rotation suit le plus court chemin ; la visée garde son nombre de tours.
         const yaw = amortir(lis.yaw, lis.yaw.x + angle(vise.yaw - lis.yaw.x), 12, dt);
         const x = amortir(lis.x, vise.x, 14, dt), z = amortir(lis.z, vise.z, 14, dt), D = amortir(lis.D, vise.D, 11, dt);
-        vue = camera(x, z, D, yaw);
+        // Au-dessus des toits : le recul se lisse vite, et la grille élargie le fait commencer avant le bord du toit.
+        const recul = toits ? Math.max(0, amortir(lis.recul, degager(x, z, D, yaw) - D, 12, dt)) : 0;
+        vue = camera(x, z, Math.min(DMAX, D + recul), yaw);
         vue.sun = emprise(vue);
         return vue;
       },
@@ -283,5 +356,190 @@
     window.addEventListener('blur', () => { cam.relacher(); espace = false; });
   }
 
-  PDR.camera = { creerCamera, brancher, DMIN, DMAX, FOV };
+  // ---------------------------------------------------------------------------------------------------------------
+  // Réalisateur de la démo (CONCEPTION.md §1.11).
+  // ---------------------------------------------------------------------------------------------------------------
+
+  /** Tirage reproductible (mulberry32) : la démo n'a pas besoin d'être la même d'une fois à l'autre, les tests si. */
+  function alea(graine) {
+    let a = (graine === undefined ? (Math.random() * 4294967296) : graine) >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const lisse = s => s * s * s * (s * (s * 6 - 15) + 10);
+  const PI = Math.PI;
+
+  // Poids de chaque évènement dans l'activité (protocole.EV), et sorte de plan qu'il nourrit.
+  const POIDS = { 1: [0.4, 0], 2: [10, 1], 3: [22, 1], 4: [12, 1], 5: [26, 1], 7: [45, 1], 8: [70, 2], 9: [45, 2], 10: [14, 0],
+    11: [30, 0], 12: [6, 0], 18: [8, 0], 19: [16, 0], 22: [70, 2], 23: [50, 2] };
+  const SORTES = ['combat', 'barricade', 'lieu', 'marche'];
+
+  /**
+   * Le réalisateur : toutes les 8 à 12 s, il choisit le point le plus vivant (combats, barricades, prises de lieux,
+   * grandes marches), y vole en douceur et tourne lentement autour ; de temps en temps, il prend de la hauteur pour
+   * montrer toute la ville. Il mène la caméra RTS par cam.diriger ; le lissage de la caméra reste le sien.
+   *   const real = PDR.camera.creerRealisateur(cam, ville, { carte, graine })
+   *     cam : creerCamera(...) ; ville : etendue, sites.lieux ; carte : CARTE du message « pret » (grille des combats).
+   *   real.etat(etat, f32, n)   à chaque message « etat » : combats, evenements, lieux ; f32 et n (les unités, comme
+   *                             foule.recevoir) nourrissent les grandes marches, une fois sur dix.
+   *   real.avancer(dt)          à chaque image, avant cam.vue(dt).
+   *   real.arreter()            le joueur reprend la main (premier geste) ; real.reprendre() : la démo repart.
+   *   real.plan                 { sorte: 'ville' | 'combat' | 'barricade' | 'lieu' | 'marche', x, z, D, debut, duree,
+   *                               vol (s), bosse (m), dyaw (rad : quart de tour au plus, vers le centre de la ville) }
+   *   real.actif, real.activite (Float32Array G × G), real.G
+   */
+  function creerRealisateur(cam, ville, options = {}) {
+    const e = (ville && ville.etendue) || { x0: -400, z0: -400, x1: 400, z1: 400 };
+    const G = 32, cw = (e.x1 - e.x0) / G, ch = (e.z1 - e.z0) / G;
+    const grilles = SORTES.map(() => new Float32Array(G * G)), activite = new Float32Array(G * G);
+    const rd = alea(options.graine);
+    const lieux = (ville && ville.sites && ville.sites.lieux) || [];
+    const carte = options.carte || null;
+    const centre = [(e.x0 + e.x1) / 2, (e.z0 + e.z1) / 2];
+    let t = 0, tEtat = -1, nEtats = 0, actif = true, plan = null, nPlans = 0, prochaineVille = 3 + Math.floor(rd() * 3), sens = 1;
+    let depart = null;
+    const recents = [];
+
+    function ajouter(sorte, x, z, poids) {
+      if (!Number.isFinite(x) || !Number.isFinite(z) || !(poids > 0)) return;
+      const i = Math.floor((x - e.x0) / cw), j = Math.floor((z - e.z0) / ch);
+      if (i < 0 || j < 0 || i >= G || j >= G) return;
+      grilles[sorte][j * G + i] += poids;
+    }
+    function geometrie(g, taille) {
+      if (g && Number.isFinite(g.cote) && Number.isFinite(g.x0) && Number.isFinite(g.z0)) {
+        return { x0: g.x0, z0: g.z0, cellule: g.cote * taille > 20000 ? g.cote / taille : g.cote };
+      }
+      return { x0: e.x0, z0: e.z0, cellule: Math.max(e.x1 - e.x0, e.z1 - e.z0) / taille };
+    }
+
+    function etat(et, f32, n) {
+      if (!et) return;
+      // L'activité s'éteint d'elle-même : demi-vie d'environ 4 s.
+      if (tEtat >= 0 && t > tEtat) {
+        const k = Math.exp(-(t - tEtat) / 6);
+        for (const g of grilles) for (let i = 0; i < g.length; i++) g[i] *= k;
+      }
+      tEtat = t; nEtats++;
+      if (et.combats && et.combats.length) {
+        const gc = carte && carte.combats, taille = gc && gc.taille ? gc.taille | 0 : Math.round(Math.sqrt(et.combats.length));
+        const geo = geometrie(gc, taille);
+        for (let j = 0; j < taille; j++) for (let i = 0; i < taille; i++) {
+          const v = et.combats[j * taille + i];
+          if (v) ajouter(0, geo.x0 + (i + 0.5) * geo.cellule, geo.z0 + (j + 0.5) * geo.cellule, v * 0.04);
+        }
+      }
+      const ev = et.evenements, T = 6;
+      if (ev && ev.length) for (let k = 0; k + T <= ev.length; k += T) {
+        const p = POIDS[ev[k] | 0];
+        if (p) ajouter(p[1], ev[k + 1], ev[k + 2], p[0]);
+      }
+      if (Array.isArray(et.lieux)) for (let i = 0; i < et.lieux.length && i < lieux.length; i++) {
+        const l = et.lieux[i];
+        if (l && (l.conteste || Math.abs(l.progression || 0) > 0.01)) ajouter(2, lieux[i].x, lieux[i].z, l.conteste ? 3 : 2);
+      }
+      // Grandes marches : un échantillon des unités en marche ou en repli, une fois sur dix.
+      if (f32 && n > 0 && nEtats % 10 === 0) {
+        const pas = Math.max(1, Math.floor(n / 12000));
+        for (let i = 0; i < n; i += pas) {
+          const code = f32[i * 4 + 3] | 0, etatU = (code >>> 6) & 15;
+          if ((code & 3) === 3 || (etatU !== 1 && etatU !== 8)) continue;
+          ajouter(3, f32[i * 4], f32[i * 4 + 1], pas * 0.012);
+        }
+      }
+    }
+
+    function choisir() {
+      nPlans++;
+      const v = cam.visee;
+      depart = { x: v.x, z: v.z, D: v.D, yaw: v.yaw, t };
+      sens = rd() < 0.5 ? -1 : 1;
+      const duree = 8 + 4 * rd();
+      let cible = null;
+      if (nPlans > 1 && nPlans < prochaineVille) {
+        // La case la plus vivante, loin des deux derniers plans.
+        let best = -1, score = 0;
+        for (let c = 0; c < G * G; c++) {
+          let s = 0;
+          for (const g of grilles) s += g[c];
+          activite[c] = s;
+          if (s <= score) continue;
+          const x = e.x0 + ((c % G) + 0.5) * cw, z = e.z0 + (Math.floor(c / G) + 0.5) * ch;
+          let pen = 1;
+          for (const r of recents) if (Math.hypot(x - r[0], z - r[1]) < 140) pen = 0.3;
+          if (s * pen > score) { score = s * pen; best = c; }
+        }
+        if (best >= 0 && score > 4) {
+          // Barycentre des cases voisines, pondéré par leur activité.
+          const bi = best % G, bj = Math.floor(best / G);
+          let sx = 0, sz = 0, sw = 0, kinds = [0, 0, 0, 0];
+          for (let j = Math.max(0, bj - 1); j <= Math.min(G - 1, bj + 1); j++) for (let i = Math.max(0, bi - 1); i <= Math.min(G - 1, bi + 1); i++) {
+            const c = j * G + i, w = activite[c];
+            sx += (e.x0 + (i + 0.5) * cw) * w; sz += (e.z0 + (j + 0.5) * ch) * w; sw += w;
+            for (let k = 0; k < 4; k++) kinds[k] += grilles[k][c];
+          }
+          let sorte = 0;
+          for (let k = 1; k < 4; k++) if (kinds[k] > kinds[sorte]) sorte = k;
+          cible = { sorte: SORTES[sorte], x: sx / sw, z: sz / sw, D: 150 + 90 * rd() };
+        } else if (lieux.length) {
+          const l = lieux[Math.floor(rd() * lieux.length)];
+          cible = { sorte: 'lieu', x: l.x, z: l.z, D: 190 + 80 * rd() };
+        }
+      }
+      if (!cible) {
+        cible = { sorte: 'ville', x: centre[0], z: centre[1], D: DMAX };
+        prochaineVille = nPlans + 3 + Math.floor(rd() * 3);
+      }
+      // Près d'un bord, la cible rentre un peu dans la ville et la caméra tourne (d'un quart de tour au plus) pour la
+      // regarder depuis le dehors : la ville emplit l'image plutôt que la campagne.
+      let dyaw = 0;
+      if (cible.sorte !== 'ville') {
+        const marge = 0.22 * cible.D;
+        cible.x = borner(cible.x, e.x0 + marge, e.x1 - marge);
+        cible.z = borner(cible.z, e.z0 + marge, e.z1 - marge);
+        const dx = centre[0] - cible.x, dz = centre[1] - cible.z;
+        if (Math.hypot(dx, dz) > 120) {
+          let d = Math.atan2(dx, -dz) - depart.yaw;
+          d -= 2 * PI * Math.round(d / (2 * PI));
+          dyaw = borner(d, -PI / 2, PI / 2);
+        }
+      }
+      recents.unshift([cible.x, cible.z]); recents.length = Math.min(recents.length, 2);
+      const distance = Math.hypot(cible.x - depart.x, cible.z - depart.z);
+      plan = { sorte: cible.sorte, x: cible.x, z: cible.z, D: cible.D, debut: t, duree, dyaw,
+        vol: borner(distance / 160 + 1.8, 2.2, 5.5), bosse: distance > 120 ? Math.min(320, distance * 0.35) : 0 };
+    }
+
+    function avancer(dt) {
+      if (!(dt > 0)) dt = 0;
+      dt = Math.min(dt, 0.25);
+      t += dt;
+      if (!actif) return;
+      if (!plan || t >= plan.debut + plan.duree) choisir();
+      const age = t - plan.debut, s = lisse(borner(age / plan.vol, 0, 1));
+      const x = depart.x + (plan.x - depart.x) * s, z = depart.z + (plan.z - depart.z) * s;
+      // Après le vol, un lent travelling avant ; la ville entière reste à distance.
+      const rapproche = plan.sorte === 'ville' ? 1 : 1 - 0.1 * borner((age - plan.vol) / (plan.duree - plan.vol), 0, 1);
+      const D = (depart.D + (plan.D - depart.D) * s) * (s >= 1 ? rapproche : 1) + plan.bosse * Math.sin(PI * s);
+      const omega = (plan.sorte === 'ville' ? 0.045 : 0.075) * sens * (0.4 + 0.6 * s);
+      depart.yaw += omega * dt;
+      cam.diriger(x, z, D, depart.yaw + plan.dyaw * s);
+    }
+
+    return {
+      etat, avancer,
+      arreter() { actif = false; },
+      reprendre() { actif = true; plan = null; },
+      get actif() { return actif; },
+      get plan() { return plan; },
+      activite, G, grilles,
+    };
+  }
+
+  PDR.camera = { creerCamera, brancher, creerRealisateur, grilleToits, DMIN, DMAX, FOV };
 })(globalThis.PDR = globalThis.PDR || {});
