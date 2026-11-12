@@ -1921,6 +1921,7 @@
           res[f * 2 + 1] += montant; revenuSeconde[f * 2 + 1] += montant;
           bilan[f].casses++;
           evenement(EV.CASSE, casX[cible], casZ[cible], f, cible, casSorte[cible]);
+          allumerCassable(cible, f, 0);
           if (!enchainerCasse(i, f)) arriver(i);
         }
         return false;
@@ -1968,6 +1969,8 @@
     }
     /** Après une casse, l'objet intact le plus proche à moins de 15 m. */
     function enchainerCasse(i) {
+      // L'objet qu'on vient de casser brûle : on s'écarte, on n'enchaîne pas sur le voisin.
+      if (casEtat[ucib[i]] === 2) return false;
       const c8 = uc8[i], ci = c8 % nx8, cj = (c8 / nx8) | 0;
       let meilleur = -1, md = 15000 * 15000;
       for (let j = Math.max(0, cj - 2); j <= Math.min(nz8 - 1, cj + 2); j++) for (let ii = Math.max(0, ci - 2); ii <= Math.min(nx8 - 1, ci + 2); ii++) {
