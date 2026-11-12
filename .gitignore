@@ -1,36 +1,3 @@
-# Sorties de compilation et caches d'Unreal : tout se regenere depuis les sources.
-/Binaries/
-/Intermediate/
-/DerivedDataCache/
-/Plugins/**/Binaries/
-/Plugins/**/Intermediate/
-
-# Sorties d'empaquetage. Ce qui s'ecrit a la main sous Build/<plateforme>/ reste suivi : le dossier Resources
-# (icones, dont le catalogue du Mac), les listes d'exclusion PakDenylist-<configuration>.txt, une icone .ico.
-/Build/*
-!/Build/*/
-/Build/*/**
-!/Build/*/PakDenylist*.txt
-!/Build/*/*.ico
-!/Build/*/Resources/
-!/Build/*/Resources/**
-
-# Etat local de l'editeur. Une exception : le reglage de l'outil de compilation, qui coupe l'ecoute
-# du port 1345 sur le reseau et doit suivre le depot (CONTRE-EXPERTISE.md, section 8.1).
-/Saved/*
-!/Saved/UnrealBuildTool/
-/Saved/UnrealBuildTool/*
-!/Saved/UnrealBuildTool/BuildConfiguration.xml
-
-# Fichiers de projet des environnements de developpement, regeneres par Unreal.
-*.xcworkspace/
-*.xcodeproj/
-*.sln
-.vs/
-.vscode/
-.idea/
-*.code-workspace
-
 # Divers.
 .DS_Store
 __pycache__/

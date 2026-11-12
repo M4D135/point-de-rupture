@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8" ?>
-<Configuration xmlns="https://www.unrealengine.com/BuildConfiguration">
-	<!-- Sans ce reglage, chaque compilation ouvre le port 1345 sur toutes les interfaces reseau
-	     pour accepter des machines d'appoint. Le projet se compile sur ce seul Mac : aucune ecoute. -->
-	<UnrealBuildAccelerator>
-		<bDisableRemote>true</bDisableRemote>
-	</UnrealBuildAccelerator>
-</Configuration>
