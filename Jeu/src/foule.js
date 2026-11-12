@@ -426,7 +426,9 @@
     vec3(.90,.58,.12),vec3(.30,.29,.27),vec3(.80,.50,.10),vec3(.42,.40,.36),
     vec3(.10,.15,.30),vec3(.12,.17,.33),vec3(.16,.20,.36),vec3(.09,.12,.24),
     vec3(.12,.12,.13),vec3(.18,.17,.18),vec3(.25,.10,.09),vec3(.14,.14,.16));
-  vec3 haut(Unite u){uint k=(u.h>>4)&3u;return u.type==2u?HAUTS[12u+k]:HAUTS[u.faction*4u+k];}`;
+  vec3 haut(Unite u){uint k=(u.h>>4)&3u;return u.type==2u?HAUTS[12u+k]:HAUTS[u.faction*4u+k];}
+  // Un Cortège sur huit porte la banderole, un Piquet sur huit la pancarte (David, 12/11/2026 : « trop de pancartes »).
+  bool porteur(Unite u){return (u.type==1u||u.type==5u)&&((u.h>>20)&7u)==0u;}`;
 
   const FIGURINE_VS = `#version 300 es
   precision highp float;precision highp int;
@@ -465,7 +467,7 @@
     else if(e==11u){float k=.5+.5*sin(t*3.+ph);q.bd=.6+2.1*k;q.bg=1.;}
     if((u.drapeaux&1u)!=0u&&(e<2u||e==4u||e==8u))q.bg=q.bd=.95;
     if(e!=10u){
-      if(u.type==1u||u.type==5u){q.bd=2.85+.08*sin(t*1.7+ph);q.banderole=.12*sin(t*2.3+ph);if(u.type==5u)q.bg=marche?q.bg:.3;}
+      if(porteur(u)){q.bd=2.85+.08*sin(t*1.7+ph);q.banderole=.12*sin(t*2.3+ph);if(u.type==5u)q.bg=marche?q.bg:.3;}
       if(u.type==6u||u.type==10u){bool leve=(u.drapeaux&8u)!=0u||e==9u||e==2u;q.bouclier=leve?0.:-.35;q.bg=leve?1.05:.3;}
       if(u.type==7u){q.bg=q.bd=.95;q.poutre=(e==6u||e==2u||e==7u)?.38*max(0.,sin(t*5.+ph)):0.;}
       if(u.type==3u){if(cuivre){q.bg=q.bd=1.35;q.torse+=.05*sin(t*3.+ph);}else{q.bd=1.+.5*abs(sin(t*8.+ph));q.bg=1.+.5*abs(sin(t*8.+ph+1.57));}}
@@ -484,6 +486,7 @@
     uint os=aInfo.x;bool cuivre=(u.h&1u)==1u;
     bool cache=u.cachee;
     if(os==6u&&(u.drapeaux&1u)==0u&&u.etat!=4u)cache=true;
+    if(os==12u&&!porteur(u))cache=true;
     #ifdef OMBRE
     if(os==11u)cache=true;
     #else

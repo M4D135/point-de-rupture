@@ -36,7 +36,9 @@
   'use strict';
 
   const I = PDR.interface = PDR.interface || {};
-  const VERSION = 1, CLE = 'pdr.reglages';
+  // Version 2 (12 novembre 2026) : ZQSD fait défiler la vue (David : « deplacement sur map en plus du bouton milieu et
+  // les fleches, zsqd aussi ») ; Arrêt passe de S à F, la première production de Q à A.
+  const VERSION = 2, CLE = 'pdr.reglages';
 
   const GROUPES = Object.freeze({ vue: 'Vue', ordres: 'Ordres aux unités', production: 'Production', general: 'Général' });
 
@@ -50,20 +52,21 @@
   }
   function toucheProduction(k) {
     const R = PDR.regles, liste = R && R.TYPES_PAR_FACTION.find(l => l[k] !== undefined);
-    return liste ? 'Key' + R.TYPES[liste[k]].raccourci : 'Key' + 'QWERT'[k];
+    return liste ? 'Key' + R.TYPES[liste[k]].raccourci : 'Key' + 'AWERT'[k];
   }
 
+  // Les lettres suivent la disposition du clavier (touche) : sur un AZERTY, Z Q S D sont sous la main gauche.
   const ACTIONS = Object.freeze([
-    ['vueAvant', 'Faire défiler vers le haut', 'vue', ['ArrowUp']],
-    ['vueArriere', 'Faire défiler vers le bas', 'vue', ['ArrowDown']],
-    ['vueGauche', 'Faire défiler à gauche', 'vue', ['ArrowLeft']],
-    ['vueDroite', 'Faire défiler à droite', 'vue', ['ArrowRight']],
+    ['vueAvant', 'Faire défiler vers le haut', 'vue', ['ArrowUp', 'KeyZ']],
+    ['vueArriere', 'Faire défiler vers le bas', 'vue', ['ArrowDown', 'KeyS']],
+    ['vueGauche', 'Faire défiler à gauche', 'vue', ['ArrowLeft', 'KeyQ']],
+    ['vueDroite', 'Faire défiler à droite', 'vue', ['ArrowRight', 'KeyD']],
     ['vueTournerG', 'Tourner la vue à gauche', 'vue', ['Home']],
     ['vueTournerD', 'Tourner la vue à droite', 'vue', ['End']],
     ['zoomAvant', 'Rapprocher la vue', 'vue', ['PageUp', 'NumpadAdd']],
     ['zoomArriere', 'Éloigner la vue', 'vue', ['PageDown', 'NumpadSubtract']],
     ['attaque', 'Attaque-mouvement', 'ordres', ['KeyA']],
-    ['arret', 'Arrêt', 'ordres', ['KeyS']],
+    ['arret', 'Arrêt', 'ordres', ['KeyF']],
     ['tenir', 'Tenir la position', 'ordres', ['KeyH']],
     ['replier', 'Se replier', 'ordres', ['KeyR']],
     ['regrouper', 'Regrouper', 'ordres', ['KeyG']],
@@ -87,6 +90,10 @@
     ['qg', 'Le QG', 'general', ['F3']],
   ].map(([id, libelle, groupe, defaut]) => Object.freeze({ id, libelle, groupe, defaut: Object.freeze(defaut) })));
   const PAR_ID = Object.freeze(Object.fromEntries(ACTIONS.map(a => [a.id, a])));
+  // Défauts de la version 1 qui ont changé, dans l'ordre de la reprise : les touches libérées d'abord (S, Q), la vue
+  // ensuite. Une action restée sur son ancien défaut prend le nouveau ; un choix du joueur ne bouge pas.
+  const DEFAUTS_V1 = Object.freeze([['arret', ['KeyS']], ['produire1', ['KeyQ']], ['vueAvant', ['ArrowUp']],
+    ['vueArriere', ['ArrowDown']], ['vueGauche', ['ArrowLeft']], ['vueDroite', ['ArrowRight']]]);
 
   const FIXES = Object.freeze([
     ['Échap', 'annuler la visée, sinon la pause'],
@@ -94,7 +101,7 @@
     ['1 à 9', 'choisir un groupe ; deux fois : centrer la vue'],
     ['Maj + 1 à 9', 'ajouter un groupe à la sélection'],
     ['Ctrl + A', 'toutes vos unités'],
-    ['Maj + ← / →', 'tourner la vue'],
+    ['Maj + ← / →, Maj + Q / D', 'tourner la vue'],
     ['Clic gauche', 'choisir ; Maj : ajouter ou retirer'],
     ['Double-clic, Ctrl + clic', 'tout ce type à l’écran'],
     ['Clic droit', 'ordre selon la cible ; glissé : tourner la vue'],
@@ -179,6 +186,16 @@
       if (valide) {
         // Une action apparue depuis l'enregistrement laisse ses touches par défaut déjà prises par le joueur.
         for (const a of ACTIONS) if (v.touches[a.id] === undefined) candidat[a.id] = candidat[a.id].filter(c => !conflit(candidat, a.id, c));
+        // Réglages de la version 1 : les nouveaux défauts, sauf les touches que le joueur a déjà données ailleurs ; si
+        // aucune ne reste libre, l'ancienne touche.
+        if (!(v.version >= 2)) {
+          for (const [id, ancien] of DEFAUTS_V1) {
+            const c = candidat[id];
+            if (c.length !== ancien.length || c.some((k, i) => k !== ancien[i])) continue;
+            const neuf = PAR_ID[id].defaut.filter(k => ancien.includes(k) || !conflit(candidat, id, k));
+            candidat[id] = neuf.length ? neuf : ancien.slice();
+          }
+        }
         for (const a of ACTIONS) for (const c of candidat[a.id]) if (conflit(candidat, a.id, c)) valide = false;
       }
       if (valide) d.touches = candidat;

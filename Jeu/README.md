@@ -9,6 +9,16 @@ En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus b
 
 ## Essai 0.3 (en cours)
 
+Étape « essai-0.3c » (12 novembre 2026) : Z Q S D font défiler la vue, en plus des flèches et du bouton du milieu, et
+Maj + Q ou D la tourne ; Arrêt passe donc de S à F, et la première production de Q à A. Des réglages déjà enregistrés
+reçoivent ces touches sans perdre ce que le joueur avait choisi. Un Cortège sur huit porte la banderole, un Piquet sur
+huit la pancarte : jusqu'ici, tous en portaient une.
+
+Étape « essai-0.3b » (12 novembre 2026) : l'écran titre affiche l'édition et la version, en haut à droite (« 03 /
+MARSEILLE V0.3b » ; la version seule sur un téléphone), comme dans METAL. `construire.py` les écrit dans la page à
+partir de `VERSION` et d'`EDITION` : chaque page mise en ligne porte la sienne, et le titre ne peut plus en afficher
+une ancienne.
+
 Étape « essai-0.3a » (12 novembre 2026), première intégration du plan de la 0.3 (`PLAN.md`) :
 
 - **Le moteur à jour.** `src/moteur/renderer.js` passe sur FERRO 0.2, le dernier état du moteur commun avant la

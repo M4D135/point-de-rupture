@@ -54,8 +54,9 @@ OUVERTURE = {
     'partage': '<script data-travailleur>',
     'simulation': '<script type="text/plain" data-travailleur>',
 }
-VERSION = 'essai-0.3a'
-BUDGET = 3_000_000      # octets : la page reste bien sous la limite des artefacts (16 Mo)
+VERSION = 'essai-0.3c'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3c »)
+EDITION = '03 / MARSEILLE'    # le nom de l'étape, à gauche de la version sur l'écran titre
+BUDGET = 3_000_000     # octets : la page reste bien sous la limite des artefacts (16 Mo)
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
 POLICES = re.compile(r'^<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">\n', re.M)
 ICONE = ('<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'%3E'
@@ -72,6 +73,10 @@ def main():
             raise SystemExit(f'{nom} contient « </script » : la page serait coupée')
     if gabarit.count('/*STYLE*/') != 1 or gabarit.count('<!--MODULES-->') != 1:
         raise SystemExit('index.html doit contenir une fois /*STYLE*/ et une fois <!--MODULES-->')
+    # La version et l'édition s'écrivent ici, comme dans METAL : l'écran titre ne peut plus en afficher une ancienne.
+    if '__VERSION_JEU__' not in gabarit or gabarit.count('__EDITION_JEU__') != 1:
+        raise SystemExit('index.html doit contenir __VERSION_JEU__ et, une fois, __EDITION_JEU__')
+    gabarit = gabarit.replace('__VERSION_JEU__', VERSION.removeprefix('essai-')).replace('__EDITION_JEU__', EDITION)
 
     scripts = '\n'.join(f'{OUVERTURE[role]}\n// ---- {nom} ----\n{sources[nom]}</script>' for nom, role in MODULES)
     fragment = gabarit.replace('/*STYLE*/', style.rstrip('\n')).replace('<!--MODULES-->', scripts)

@@ -155,6 +155,19 @@ h3 { margin: 4px 0 22px; font: 600 24px/1.1 var(--titre); letter-spacing: .02em;
 .titre-haut { display: flex; align-items: center; gap: 14px; }
 .titre-marque { display: flex; flex-direction: column; gap: 3px; font: 700 12px/1 var(--corps); letter-spacing: .2em; }
 .titre-marque small { font-size: 9px; font-weight: 600; letter-spacing: .2em; color: var(--texte-3); }
+/* L'édition et la version, à droite du bandeau, comme dans METAL : construire.py les écrit, elles ne se périment pas. */
+.titre-edition {
+  margin-left: auto; padding: 6px 7px 6px 12px; font: 600 11px/1 var(--corps); letter-spacing: .2em; color: var(--texte-2); white-space: nowrap;
+  background: rgba(11, 14, 18, .66); border: 1px solid rgba(235, 230, 218, .12); border-radius: 4px;
+}
+.version-jeu { display: inline-block; margin-left: .7em; padding: 4px 7px; border: 1px solid currentColor; border-radius: 3px; color: var(--texte); font-weight: 700; letter-spacing: .08em; }
+/* Sur un téléphone, le nom de l'édition laisse la place à la marque : il ne reste que la version. */
+@media (max-width: 520px) {
+  .titre-marque { white-space: nowrap; }
+  .titre-edition { padding: 4px; font-size: 10px; }
+  .edition-nom { display: none; }
+  .version-jeu { margin-left: 0; }
+}
 .titre-corps { margin: auto 0; max-width: 660px; padding: 28px 0; }
 .titre-jeu { margin: 0 0 26px; font: 800 clamp(84px, 11.4vw, 178px)/.84 var(--titre); letter-spacing: -.005em; text-transform: uppercase; filter: drop-shadow(0 6px 0 rgba(0, 0, 0, .5)); }
 .titre-l1, .titre-l2 { display: block; }

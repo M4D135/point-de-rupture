@@ -25,6 +25,15 @@ Mot pour mot, le 12 novembre 2026, dans l'ordre :
 6. « aide toi du spark pour economiser tes tokens »
 7. « tu peux utiliser opencode cli avec deepseek free pour t'aider »
 
+Puis, le même soir, après la mise en ligne de l'essai 0.3a :
+
+8. « je veux voir la version sur l'ecran tigtre comme on a fait pour metal »
+9. « deplacement sur map en plus du bouton milieu et les fleches, zsqd aussi »
+10. « trop de pancartes »
+11. « faut que ça foute le feu un peu partout et que les batiments prennent si les pompiers viennent pas eteindre, donc
+    camion pompier etc, pompiers gérés avec la police »
+12. « en gros casseurs gaucho, patriotes , flics et pompiers »
+
 Avant cela, le même jour : « fais marseille et paris pour commencer / ou juste marseille, on verra les autres seront
 pour les maj suivantes » ; puis, sur Paris : « Pas encore ».
 
@@ -46,8 +55,14 @@ Prises par Claude à partir de ces demandes. David peut en changer une d'un mot 
 | D6 | **Marseille seule** dans la 0.3. Paris et New York attendent. | — |
 | D7 | **Qui fait quoi.** Le plan : Fable 5.2. L'exécution : Opus 5.5, un agent à la fois, pas de rafale. Le gros des lectures, des premiers jets et des relectures : le Spark (§ 6.2). Les premières passes des tâches que les suites savent vérifier : DeepSeek gratuit par opencode (§ 6.3), en parallèle, puisqu'il ne coûte rien. L'interface reste écrite par Claude. | tous |
 | D8 | **Pas dans la 0.3**, à proposer ensuite : l'heure du jour (crépuscule ou nuit, où le feu se verrait bien mieux), Paris, New York. | § 11 |
+| D9 | **Le feu gagne la ville** (demande 11). Un feu laissé à lui-même gagne la façade, puis l'immeuble, puis ses voisins, jusqu'à calciner des îlots entiers. La Préfecture a des pompiers et des camions de pompiers, qu'elle produit et commande comme sa police, pour éteindre ; un immeuble éteint à temps reste debout, noirci. Personne n'est montré en feu (D1). Les monuments ne brûlent pas. | L9, L5b, L6, L7, L8 |
+| D10 | **Les trois camps, « en gros »** (demande 12). La Convergence, ce sont les casseurs ; le Bastion, les patriotes ; la Préfecture, la police et les pompiers. Les noms du jeu restent. À l'écran : « les casseurs », « les patriotes », « la police et les pompiers » ; l'étiquette politique (« gaucho ») reste hors du jeu, comme toute cause énoncée (D1), et il n'y a ni drapeau, ni emblème, ni slogan, ni organisation réels. L'allure suit : tenues sombres, capuches et foulards pour la Convergence. | L6, L7 |
+| D11 | **Commandes et foule** (demandes 9 et 10). Z Q S D font défiler la vue, en plus des flèches et du bouton du milieu ; Arrêt passe donc de S à F, et la première production de Q à A ; les réglages déjà enregistrés passent en version 2 sans perdre les choix du joueur. Un Cortège sur huit porte la banderole, un Piquet sur huit la pancarte. | fait (0.3c) |
 
 ## 3. Où l'on en est (12/11/2026, 20 h)
+
+Mise à jour du même soir : les essais 0.3a, 0.3b et 0.3c sont passés en ligne ; l'état des lots est au § 10. Ce qui
+suit décrit le point de départ du plan.
 
 **En ligne** : l'essai 0.2, commit `28d1d7c`, sur https://pdr.estrasse.fr.
 **`main`** : `a4cfed3`, poussé. Il contient le retrait d'Unreal (`5ac0066`) et la réparation de `noyau.test.mjs`, que ce
@@ -104,6 +119,11 @@ Chaque ligne est un critère de recette : la version n'est pas finie tant qu'une
 10. **Le même confort** : 100 000 unités à 60 images/s en 1440×900 sur ce Mac, 60 images/s sur téléphone à 20 000,
     simulation à 22 ms par itération au plus en moyenne, aucune erreur de console, toutes les suites vertes, le crédit
     OpenStreetMap affiché.
+11. **La ville brûle.** Un feu qu'on laisse gagne la façade, l'immeuble, puis le voisin : flammes aux fenêtres, des
+    étages bas vers les hauts, fumée noire du toit. Un immeuble que personne n'éteint finit calciné, noir, sans toit. La
+    Préfecture envoie pompiers et camions, sirène deux-tons, lances à eau ; un immeuble éteint à temps reste debout,
+    noirci. Des îlots entiers brûlent dans une partie où la Préfecture regarde ailleurs.
+12. **Les commandes et la foule** : Z Q S D font défiler la vue ; moins de pancartes (fait dans l'essai 0.3c).
 
 ## 5. Contrats
 
@@ -144,6 +164,19 @@ si le lot L4 change un format, il corrige ce paragraphe.
   3 m, pression 12, 8 unités au plus, mise à terre 3 s, recharge 25 s ; charge, portée 12 m, 2 s, pression 8 à 10, recul
   1,5 à 2 m ; salve, mise à terre 4 s ; lacrymogène, portée 26 m, recharge 35 s. Ce sont des chiffres de premier jet :
   L4 les règle.
+- **Ajouts prévus par L9** (D9 ; contrat que L5b, L6, L7 et L8 attendent, que L9 précise s'il le faut) :
+  - **Types** 13 `pompiers` (« Pompiers », à pied) et 14 `camion-pompiers` (« Camion de pompiers », véhicule), à la
+    Préfecture : `TYPES_PAR_FACTION[2]` devient `[8, 9, 10, 11, 12, 13, 14]`. Le code d'unité garde ses 4 bits de type,
+    15 reste libre. Raccourcis de production : U et I (Z Q S D, P et les touches de la vue sont pris).
+  - **Ville** : `sites.immeubles`, un par bâtiment du carré jouable, monuments exclus (§ 5.3).
+  - **`etat.immeubles`** : `Float32Array`, 4 nombres par immeuble qui n'est plus intact, `[id, etat, intensite 0..1,
+    avancee 0..1]`, états 1 en feu, 2 éteint (noirci), 3 calciné ; 1 024 au plus. `avancee` dit ce que le feu a déjà
+    pris : la page monte les flammes des étages bas vers les hauts. Envoyé comme les foyers.
+  - **`etat.lances`** : 5 nombres par jet d'eau, `[x, z, cx, cz, hauteur]` (de la lance au point visé, hauteur sur la
+    façade), 96 au plus, à chaque itération où l'on arrose.
+  - **Commande** `ETEINDRE: 18`, `{ ids, immeuble }` ou `{ ids, x, z }` (un foyer) : pompiers, camions et canon à eau.
+  - **Évènements** 38 IMMEUBLE_FEU (`a` : id, `b` : camp à l'origine du feu), 39 IMMEUBLE_ETEINT (`a` : id, `b` : 1
+    éteint à l'eau, 0 calciné). `mesure` gagne `immeubles` (en feu) ; le bilan, `immeublesBrules` et `immeublesSauves`.
 
 ### 5.2 Le moteur de rendu (écrit par l'agent, `ferro-rendu`)
 
@@ -165,7 +198,9 @@ opaques, sauf si L5 ajoute au moteur de quoi faire mieux.
 ### 5.3 La ville
 
 L'interface d'une ville ne change pas (`objets`, grille de navigation, `sites` : lieux, gisements, cassables, départs,
-QG, `etendue`, `attribution`). Les cassables gardent leur format ; chaque objet porte ses points de structure et son
+QG, `etendue`, `attribution`), sauf un ajout de L9 : `sites.immeubles`, dans les deux villes, `[{ id, x, z, rayon, h,
+boites: [{ x, z, lx, lz, lacet }], voisins: [id], pieces: [indices dans objets] }]`. `voisins` : les bâtiments à moins
+de 3 m, par où le feu passe ; `pieces` : ce que le décor noircit ou ôte (la toiture d'un immeuble calciné). Les cassables gardent leur format ; chaque objet porte ses points de structure et son
 rendement, et la simulation en tire son feu (`regles.feuObjet`). Le lot L2 peut ajouter des sortes : la simulation
 donne des valeurs par défaut à une sorte inconnue, et le décor (L5) doit la dessiner intacte, cassée, en feu, calcinée.
 L2 remet donc à L5 la liste des sortes et leur dessin.
@@ -200,13 +235,17 @@ L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préc
 - Commits fréquents, en français, sur la branche du lot ; dernière ligne : `Co-Authored-By: Claude Opus 5.5
   <noreply@anthropic.com>` (ou le modèle qui écrit vraiment). Ni push ni fusion par un lot.
 - Dire ce qui est vérifié, comment, et ce qui ne l'est pas.
+- Chaque page mise en ligne a sa version : avant `Jeu/deposer.sh`, passer `VERSION` à la lettre suivante dans
+  `Jeu/construire.py` (0.3b, 0.3c… puis 0.3) et, si l'étape change, `EDITION`. L'écran titre les affiche, comme dans METAL
+  (David, 12/11 : « je veux voir la version sur l'ecran titre comme on a fait pour metal »).
 
 ## 6. Organisation
 
 ### 6.1 Rôles
 
 - **David** tranche. Une décision datée de lui passe avant ce plan.
-- **Fable 5.2** a écrit ce plan. Il peut le corriger si une décision change.
+- **Fable 5.2** a écrit ce plan. Depuis le 12/11 au soir, la session principale tourne sur Opus 5.5 (choix de David) :
+  c'est elle qui le corrige quand une décision change, et qui y a ajouté D9 à D11, L9 et L5b.
 - **Opus 5.5** exécute : un agent par lot, l'un après l'autre, chacun dans l'arbre de sa branche. L'agent lit ce plan,
   fait son lot, vérifie, committe, rend un compte rendu court.
 - **Le Spark** lit, résume, propose des premiers jets, relit des diffs. Il ne décide rien et ne prouve rien.
@@ -394,6 +433,44 @@ jet des contrôles à ajouter à `sim.test.mjs` (un par mécanique).
 **Recette** : suites vertes ; tableau d'équilibre avant et après ; durée des parties par mode ; relevé de la démo ;
 coût ; essai Chrome sans erreur.
 
+### L9 — Le feu gagne la ville : immeubles et pompiers (simulation)
+
+**Part de** la fin de L4, branche `v03-immeubles`. **Fichiers** : ceux de L4, plus `Jeu/src/ville.js` et
+`Jeu/src/ville-reelle.js` pour `sites.immeubles` seulement, et leurs tests. Ajouté le 12/11 au soir (D9).
+
+**À faire** (chiffres de premier jet, réglés au banc) :
+1. **Les immeubles** : `sites.immeubles` dans les deux villes (§ 5.3), un par bâtiment du carré jouable, monuments
+   exclus ; déterministe, sans les fonctions interdites (§ 5.5) ; coût de construction mesuré, 0,4 s au plus en tout.
+2. **Prise de feu** : un foyer à moins de 3 m d'une façade la chauffe ; 15 s d'un foyer à pleine intensité et
+   l'immeuble prend. Un cocktail qui éclate à moins de 2,5 m d'une façade l'allume aussitôt une fois sur trois (tirage
+   déterministe). Le camp à l'origine du feu est retenu.
+3. **Le feu grandit et passe** : l'intensité monte en 40 s ; à pleine intensité, l'immeuble se consume en 4 minutes
+   (`avancee` de 0 à 1). Au-dessus de 0,6, il chauffe ses voisins, qui prennent après 25 s : un îlot laissé à lui-même
+   brûle d'un bout à l'autre en quelques minutes. À 1, il est calciné : plus de flammes, 60 s de fumée. Pas plus de 48
+   immeubles en feu à la fois ; au-delà, les prises attendent.
+4. **Autour** : une unité à moins de 4 m d'une façade en feu perd de la cohésion selon l'intensité et s'en écarte.
+5. **Pompiers et camions** pour la Préfecture (§ 5.1). Pompiers : lot 6, lance à 8 m. Camion : lot 1, population 6,
+   lance à 16 m, quatre à cinq fois le débit d'un pompier, plus rapide sur la chaussée. Ils frappent à peine et se
+   font frapper comme toute la Préfecture.
+6. **Éteindre** : `ETEINDRE` mène les unités à portée ; elles arrosent (état CAPACITE, cap vers la cible). Arrêtées ou
+   en position, elles arrosent d'elles-mêmes le feu le plus proche à portée. Le canon à eau éteint aussi un immeuble,
+   moins vite. Un immeuble ramené à 0 est éteint, noirci, et peut reprendre.
+7. **Protocole** du § 5.1, documenté en tête de `protocole.js` ; corriger le § 5.1 si un format change.
+8. **Points** : un immeuble calciné compte pour le camp à l'origine du feu ; un immeuble éteint, pour la Préfecture.
+   Les règles de victoire ne changent pas.
+9. **IA** : la Préfecture produit des pompiers aux premiers feux, des camions ensuite ; elle envoie les plus proches
+   sur les immeubles en feu près de ses lieux et de sa base, avec une escorte quand la Convergence est là. La
+   Convergence vise de ses cocktails les façades près de ses barricades et des lieux qu'elle tient. Le Bastion ne s'en
+   mêle pas.
+10. **Démo** : en une heure, des immeubles qui brûlent, des pompiers qui arrivent, des îlots sauvés, d'autres calcinés.
+11. **Coût** : 10 % de plus par itération au maximum à 100 000 unités (`banc-sim.mjs`).
+
+**Le Spark** : premier jet des contrôles de `sim.test.mjs` (un par mécanique) et de la construction de
+`sites.immeubles` ; relecture du diff.
+**Recette** : `sim.test.mjs` (prise de feu, propagation, extinction, calciné, plafond de 48, commandes mal formées
+refusées, déterminisme) ; les tests des deux villes (immeubles, voisins, pièces, coût) ; le banc d'équilibre (une
+partie où la ville brûle, une où les pompiers la sauvent) ; un relevé de démo ; l'essai Chrome de la page sans erreur.
+
 ### IB — Intégration B
 
 `integration-b` = `main` (après IA) + `v03-feu-sim`. Construire, suites, un essai Chrome (Marseille, 100 000) : la page
@@ -436,6 +513,24 @@ demande, à partir du dessin du feu de barricade existant.
 **Recette** : `banc-feu.py` injecte un faux état (foyers de chaque sorte, nuages, évènements de vol) et rend des captures
 de près et de loin ; une partie où l'IA lance des cocktails, capturée ; les mesures.
 
+### L5b — Les immeubles en feu à l'écran
+
+**Part de** l'intégration de L5 et de L9, branche `v03-immeubles-ecran`. **Fichiers** : ceux de L5. Ajouté le 12/11 au
+soir (D9) ; L5 a été prié de garder ses dessins de flammes, de fumée et de lampe réutilisables.
+
+**À faire** :
+1. **En feu** : flammes aux fenêtres, des étages bas vers les hauts selon `avancee`, lueur sur la rue et les façades d'en
+   face, braises, et une grosse colonne de fumée noire depuis le toit, lisible de l'autre bout de la carte.
+2. **Éteint** : suie au-dessus des fenêtres, un filet de fumée blanche qui s'épuise.
+3. **Calciné** : murs noircis, toiture ôtée (`pieces`), fenêtres vides, fumée qui s'éteint en une minute.
+4. **Lances** (`etat.lances`) : arc d'eau du pompier ou du camion jusqu'au point visé, gerbe et vapeur à l'impact.
+5. **Lampes** : un immeuble en feu passe avant un foyer dans le choix des huit lampes.
+6. **Brouillard de guerre** comme pour les foyers.
+
+**Budget** : 48 immeubles en feu et 96 lances à 60 images/s à 100 000 unités ; 6 000 instances de plus au maximum.
+**Recette** : le banc du feu étendu (immeubles dans les trois états, lances), captures de près et de loin ; une partie où
+un îlot brûle, capturée ; les mesures.
+
 ### L6 — Les animations
 
 **Part de** `integration-b`, branche `v03-animations`. **Fichiers** : `Jeu/src/foule.js`, `foule.test.mjs`, un banc
@@ -464,6 +559,11 @@ hors-jeu sont assis.
 7. **Accessoires** : la bouteille dans la main pendant le lancer, la matraque dans le coup, le bouclier dans la charge.
 8. **De loin** : les couchés se voient, la marche se devine ; le passage de la figurine au point se fait sur une bande
    de tailles, en trame, sans saut.
+9. **Pompiers et camions** (D9, types 13 et 14) : le pompier, casque à visière, veste sombre à bandes claires, lance
+   tenue à deux mains ; le camion rouge, cabine, citerne, échelle, gyrophares bleus. La pose « lance » (état CAPACITE) :
+   jambes écartées, buste penché, lance vers la cible ; le camion arrose depuis son toit.
+10. **Les camps** (D10) : la Convergence en tenues sombres, capuches et foulards, avec des touches de rouge. Les pancartes
+    restent à un porteur sur huit (D11, `porteur` dans `foule.js`).
 
 **Budget** : 60 images/s à 100 000 unités ; le coût de la foule (`foule.mesure`) à 15 % de plus au maximum.
 **Le Spark** : fiche de `foule.js` (existe : `spark/foule.fiche.md`) ; premier jet de chaque pose en GLSL, une par
@@ -484,7 +584,8 @@ contrôle la passe des débuts d'état ; les mesures.
    Enregistrés dans les réglages de partie, repris dans la ligne de résumé, envoyés à la simulation.
 2. **Ordres.** Cocktail Molotov pour la Convergence (touche proposée : M), lacrymogène pour la Préfecture (touche
    proposée : T), dans la carte des ordres selon la sélection, avec curseur de visée, portée montrée, refus expliqué ;
-   le jet du canon vise aussi un feu. Touches réassignables, sans conflit avec A, S, H, R, G, L, C, B, X, E, V, J, Y, P.
+   le jet du canon vise aussi un feu. Touches réassignables, sans conflit avec A, F, H, R, G, L, C, B, X, E, V, J, Y, P
+   ni avec Z, Q, S, D (la vue, depuis la 0.3c).
 3. **Bandeau.** Selon le mode : forces restantes par camp (barres) et compte à rebours de la déroute d'un camp sans
    base ; temps restant ; points et cible. « Mixte » montre les trois, serrés.
 4. **Alertes** : feu près de vos unités ou de votre base, gaz, « votre QG est occupé : déroute dans 30 s », avant-poste
@@ -497,6 +598,15 @@ contrôle la passe des débuts d'état ; les mesures.
 8. **L'horizon** (remarque de L2) : l'inclinaison de la caméra (42 à 60°) ne montre jamais Notre-Dame de la Garde, et les
    forts seulement au zoom le plus lointain, au bord ouest. Envisager une inclinaison plus basse, ou un plan large du
    réalisateur de la démo ; en mesurer le coût.
+9. **Pompiers** (D9) : production des types 13 et 14 (U et I) ; « Éteindre » au clic droit sur un immeuble en feu ou un
+   foyer, et dans la carte des ordres ; alertes (un immeuble brûle près de votre base, trois immeubles en feu dans une
+   rue) ; minicarte : immeubles en feu et calcinés ; bilan : immeubles brûlés et sauvés ; le réalisateur de la démo va
+   aussi aux immeubles en feu et suit l'arrivée des camions.
+10. **Les camps et le ton** (D1, D10) : les textes de la préparation, du titre et de l'aide disent « les casseurs », « les
+    patriotes », « la police et les pompiers » ; la phrase du titre (« Une bousculade géante où l'on ne blesse
+    personne ») et la description de la page ne disent plus le contraire de la 0.3.
+11. **Touches** : depuis la 0.3c (D11), Z Q S D sont à la vue et Arrêt est sur F ; les nouvelles touches (M, T, U, I…)
+    restent sans conflit avec elles.
 
 **Recette** : `interface.test.mjs` étendu (remise en forme des options, touches sans conflit, bandeau par mode) ; un
 essai Chrome par mode à 20 000 unités, mené jusqu'à l'écran de fin en vitesse 8 ; captures de la préparation, du
@@ -523,6 +633,9 @@ caméra, et un séquenceur de rue calé sur la musique.
 4. **La tension de la musique** tient compte des foyers et des charges.
 5. **Provenance** : corriger l'ancien nom dans `PROVENANCE-SON.md` (le commit `4ce2271` cité comme
    `github.com/M4D135/FERRO` est celui du jeu METAL, aujourd'hui `M4D135/METAL` ; l'autre adresse ne mène plus nulle part).
+6. **Pompiers** (D9) : la sirène deux-tons des camions qui roulent, en boucle, distincte des sirènes de la police ; le
+   jet des lances (souffle, ruissellement sur la façade) ; l'incendie d'un immeuble (grondement, vitres qui éclatent,
+   toiture qui s'effondre quand il est calciné).
 
 **Budget** : les plafonds de voix actuels (32, 40, 48) ; le préchauffage de la banque au coût d'aujourd'hui à 20 % près.
 **Le Spark** : fiche de `audio.js` (77 Ko) avant de le lire ; premier jet de chaque bruitage calculé, un par demande, à
@@ -554,13 +667,19 @@ Un agent à la fois (consigne d'économie). Les durées sont des estimations d'a
 | 4 | L4 Simulation | — | 60 min | |
 | 5 | IB | 3, 4 | 15 min | |
 | 6 | L5 Feu à l'écran | 5 | 60 min | |
-| 7 | L6 Animations | 5 | 60 min | |
-| 8 | L7 Interface | 5 | 60 min | |
-| 9 | L8 Sons | 5 | 45 min | |
-| 10 | IC | 6 à 9 | 45 min | **mise en ligne de la 0.3** |
+| 7 | L9 Immeubles et pompiers (simulation) | 4 | 60 min | |
+| 8 | L5b Immeubles en feu à l'écran | 6, 7 | 45 min | mise en ligne intermédiaire |
+| 9 | L6 Animations, pompiers et camions | 5, 7 | 75 min | |
+| 10 | L7 Interface, pompiers | 5, 7 | 75 min | |
+| 11 | L8 Sons, sirènes | 5, 7 | 50 min | |
+| 12 | IC | 6 à 11 | 45 min | **mise en ligne de la 0.3** |
 
-Sept à huit heures bout à bout. Si David le demande, les lots sans fichier commun peuvent aller par deux (L2 avec L3 ou
-L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
+Neuf à dix heures bout à bout. Si David le demande, les lots sans fichier commun peuvent aller par deux (L2 avec L3 ou
+L4 ; L5 avec L6 ; L7 avec L8) : six à sept heures. Quand un lot fini montre à David quelque chose de neuf, une mise en
+ligne intermédiaire le lui donne à voir (0.3d, 0.3e…), avec sa lettre (§ 5.5).
+
+Dans les faits, le 12/11 au soir : L5 est parti de l'intégration B provisoire (`706eb9f`, la simulation de L4 encore en
+premier jet) pendant que DeepSeek fait les premières passes de L3 et de L4 ; L4 et L9 suivront, puis L5b.
 
 ## 9. Risques
 
@@ -587,11 +706,15 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 | Réparation du test du noyau | fait | `a4cfed3` | |
 | L1 Rendu | fait | `71f99a6`, `d871672` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
 | L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
-| L3 Musique | à reprendre | `2dc9248` | |
+| L3 Musique | en cours | `681cac7` | 12/11 au soir : premier jet de DeepSeek committé (test aux nouveaux tempos, outils de mesure rangés), `musique` et `son` verts. Reste : le préchauffage (872 ms de médiane contre 502 en 0.2), La Préfecture plus claire qu'avant au lieu de plus grave, la relecture des morceaux, l'écoute. |
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
-| L4 Simulation | à reprendre | `4020ac6` | |
-| IB | à faire | | |
-| L5 Feu à l'écran | fait, branche `v03-feu-ecran` | `ffa4c74`, `c8ec75f` | 12/11 : foyers, colonnes noires penchées au vent (lisibles à 900 m), flaques, vols et éclats, gaz, cassables en 4 états (dont deux-roues, conteneur, terrasse, kiosque), 512 traces, 8 lampes vacillantes, vapeur, brouillard. Banc `banc-feu.py` : 128 foyers et 64 nuages à 100 000, 60 images/s à 600 m, 58,5 à 160 m (charge 7 à 9). Moteur : ajouts « grain » et « lampes ». Manque côté sim : les 4 nouvelles sortes dans `SORTES_CASSABLES`. |
+| Version à l'écran titre | fait, en ligne | `3601ca6` | 12/11 : essai 0.3b, « 03 / MARSEILLE V0.3b » ; `construire.py` écrit version et édition dans la page. |
+| ZQSD et pancartes (D11) | fait, en ligne | `5f9c3b7` | 12/11, vers 21 h 45 : essai 0.3c en ligne (empreinte de la page servie `470ac778935bbd86` vérifiée), aperçu republié. Réglages en version 2 (migration testée, et vérifiée dans Chrome avec de vraies touches), une banderole ou pancarte sur huit (captures de près). Suites vertes. |
+| L4 Simulation | en cours | `dd1a161` | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Le reste du lot est pour Opus. |
+| L9 Immeubles et pompiers | à faire | | Ajouté le 12/11 au soir (D9). |
+| IB | provisoire | `706eb9f`, puis `integration-c` | `706eb9f` : `main` + la simulation en premier jet (`a73a2dd`), la base de L5. 12/11 vers 21 h 50 : `integration-c` = `main` (0.3c) + `dd1a161` + L5, la base de la fin de L4. À refaire après L4 et L9. |
+| L5 Feu à l'écran | fait | `ffa4c74`, `c8ec75f`, `717d1b5` | 12/11 : foyers, colonnes noires penchées au vent (lisibles à 900 m), flaques, vols et éclats, gaz, cassables en 4 états (dont deux-roues, conteneur, terrasse, kiosque), 512 traces, 8 lampes vacillantes, vapeur, brouillard. Banc `banc-feu.py` : 128 foyers et 64 nuages à 100 000, 60 images/s à 600 m, 58,5 à 160 m (charge 7 à 9). Moteur : ajouts « grain » et « lampes ». Manque côté sim : les 4 nouvelles sortes dans `SORTES_CASSABLES`. Fonctions à resservir pour L5b (`decor.js`, sans allocation par image) : `lampeFeu`, `colonne`, `flammes`, `flaque`, `nuage`. |
+| L5b Immeubles en feu | à faire | | Ajouté le 12/11 au soir (D9). |
 | L6 Animations | à faire | | |
 | L7 Interface | à faire | | |
 | L8 Sons | à faire | | |
