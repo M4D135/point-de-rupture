@@ -9,6 +9,14 @@ En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus b
 
 ## Essai 0.3 (en cours)
 
+Étape « essai-0.3d » (12 novembre 2026) : le feu à l'écran, sur la simulation 0.3 encore en premier jet. Ce qui est
+cassé prend feu ; les cocktails Molotov volent en cloche, éclatent et laissent une flaque en flammes ; chaque foyer
+dresse une colonne de fumée noire penchée au vent, visible de loin ; le gaz fait des nuages blancs ; les objets cassés
+roussissent puis finissent calcinés et laissent des traces de brûlure ; les huit foyers les plus proches éclairent la
+rue. La partie va désormais jusqu'au dernier camp debout, avec 40 % de manifestants, et la démo ne s'arrête plus aux
+points. Restent à venir : l'équilibre, les grenades et le canon à eau des IA (fin du lot de la simulation), les
+immeubles qui brûlent et les pompiers, l'interface des nouveaux ordres et du choix de victoire.
+
 Étape « essai-0.3c » (12 novembre 2026) : Z Q S D font défiler la vue, en plus des flèches et du bouton du milieu, et
 Maj + Q ou D la tourne ; Arrêt passe donc de S à F, et la première production de Q à A. Des réglages déjà enregistrés
 reçoivent ces touches sans perdre ce que le joueur avait choisi. Un Cortège sur huit porte la banderole, un Piquet sur

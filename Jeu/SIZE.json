@@ -1,8 +1,8 @@
 {
-  "version": "essai-0.3c",
+  "version": "essai-0.3d",
   "raw": 1479578,
   "gzip": 506740,
-  "sha256": "b5f7f351ff76e7d3cb1dde0e2f33042c2f14f6c5e0e74256e011b4dcafbe0b41",
+  "sha256": "d33bbeacb3a2c70c67283f46f6ba99e7106d416c4d6064c4602902b4849c3f99",
   "sources": {
     "moteur/renderer.js": 137799,
     "sim/regles.js": 21842,
