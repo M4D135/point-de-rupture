@@ -1,7 +1,9 @@
 // Vérifie le noyau JavaScript contre les valeurs du modèle et du C++ de l'étape A1.
 //   node Jeu/verifications/noyau.test.mjs
+// Le modèle Python (Outils/modele/modele_a1.py) a quitté le dépôt avec la partie Unreal (commit 5ac0066) : le texte
+// de la relecture se compare désormais à son empreinte, relevée le 12/11/2026 sur le modèle repris de l'historique
+// (git show 5ac0066^:Outils/modele/modele_a1.py), auquel le noyau était alors identique à l'octet près.
 import { createRequire } from 'node:module';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -66,11 +68,12 @@ verifier('soumettre : verdicts et ordre canonique', () => {
   assert.throws(() => s.soumettre([2.5, 0, 0, 1, 0, 0, 0]));
 });
 
-verifier('texte d’une relecture identique au modèle Python', () => {
-  const modele = path.join(ici, '..', '..', 'Outils', 'modele');
-  const script = 'import sys; sys.path.insert(0, sys.argv[1]); import modele_a1 as m; sys.stdout.write(m.generer(7, 3000).texte())';
-  const attendu = execFileSync('python3', ['-I', '-c', script, modele], { encoding: 'utf8', maxBuffer: 1 << 26 });
-  assert.equal(N.generer(7, 3000).texte(), attendu);
+verifier('texte d’une relecture : l’empreinte relevée sur le modèle Python', () => {
+  const texte = N.generer(7, 3000).texte(), octets = new TextEncoder().encode(texte);
+  assert.equal(octets.length, 32345);
+  assert.equal(texte.split('\n').length, 1026);
+  assert.ok(texte.startsWith('pdr-relecture 1\ngraine 7\niterations 3000\ncmd 0 0 0 1 64165 126352 -1\n'));
+  assert.equal(N.fnv(octets, octets.length), '107e033f63b42f4b');
 });
 
 const debut = performance.now();
