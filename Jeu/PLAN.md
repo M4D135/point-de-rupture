@@ -591,7 +591,7 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
 | L4 Simulation | à reprendre | `4020ac6` | |
 | IB | à faire | | |
-| L5 Feu à l'écran | à faire | | |
+| L5 Feu à l'écran | fait, branche `v03-feu-ecran` | `ffa4c74`, `c8ec75f` | 12/11 : foyers, colonnes noires penchées au vent (lisibles à 900 m), flaques, vols et éclats, gaz, cassables en 4 états (dont deux-roues, conteneur, terrasse, kiosque), 512 traces, 8 lampes vacillantes, vapeur, brouillard. Banc `banc-feu.py` : 128 foyers et 64 nuages à 100 000, 60 images/s à 600 m, 58,5 à 160 m (charge 7 à 9). Moteur : ajouts « grain » et « lampes ». Manque côté sim : les 4 nouvelles sortes dans `SORTES_CASSABLES`. |
 | L6 Animations | à faire | | |
 | L7 Interface | à faire | | |
 | L8 Sons | à faire | | |
