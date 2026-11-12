@@ -35,3 +35,6 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Jeu dans le navigateur : la page autonome et SIZE.json sont suivis ; le fragment publié en artefact se régénère.
+/Jeu/dist/artefact.html

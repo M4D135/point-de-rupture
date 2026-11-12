@@ -1,0 +1,16 @@
+{
+  "version": "essai-0.1",
+  "raw": 211407,
+  "gzip": 64829,
+  "sha256": "c1466e9030cb74c8b13e36d357981872b7fdce83e07e4ac00f8ab56b67195499",
+  "sources": {
+    "moteur/renderer.js": 111994,
+    "noyau.js": 13929,
+    "ville.js": 28215,
+    "foule.js": 11181,
+    "camera.js": 15390,
+    "jeu.js": 18370,
+    "index.html": 4519,
+    "style.css": 7159
+  }
+}

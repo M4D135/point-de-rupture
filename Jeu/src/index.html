@@ -1,0 +1,100 @@
+<title>Point de rupture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Essai de RTS entièrement procédural : une ville, trois factions et des centaines d'escouades, rendues par le moteur FERRO.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/*STYLE*/
+</style>
+<main id="jeu">
+  <canvas id="scene" aria-label="La ville vue de dessus. Clic gauche pour choisir des escouades, clic droit pour les envoyer."></canvas>
+  <div id="cadre" hidden></div>
+
+  <div id="hud">
+    <header class="bandeau">
+      <div class="marque panneau">
+        <span class="titre">Point de rupture</span>
+        <span class="sous">Essai procédural · moteur FERRO 0.6 · aucun fichier de décor</span>
+      </div>
+      <form class="reglages panneau" id="reglages" onsubmit="return false">
+        <label for="nombre">Escouades
+          <select id="nombre">
+            <option value="60">60</option>
+            <option value="240">240</option>
+            <option value="960">960</option>
+            <option value="2400">2 400</option>
+          </select>
+        </label>
+        <label for="faction">Vous jouez
+          <select id="faction">
+            <option value="0">La Convergence</option>
+            <option value="1">Le Bastion</option>
+            <option value="2">La Préfecture</option>
+          </select>
+        </label>
+        <label for="qualite">Qualité
+          <select id="qualite">
+            <option value="auto">Auto</option>
+            <option value="low">Basse</option>
+            <option value="high">Haute</option>
+          </select>
+        </label>
+        <button type="button" id="recommencer">Recommencer</button>
+      </form>
+    </header>
+
+    <aside class="mesures panneau" id="mesures" aria-live="off">
+      <div class="compteur">
+        <span class="grand" id="ips">–</span>
+        <span class="unite">images/s</span>
+        <span class="cpu"><span id="ms">–</span> ms de calcul par image</span>
+      </div>
+      <dl>
+        <dt>Escouades</dt><dd id="m-escouades">–</dd>
+        <dt>En vue</dt><dd id="m-vues">–</dd>
+        <dt>Instances</dt><dd id="m-instances">–</dd>
+        <dt class="detail">Appels de dessin</dt><dd class="detail" id="m-appels">–</dd>
+        <dt class="detail">Triangles</dt><dd class="detail" id="m-triangles">–</dd>
+        <dt class="detail">Image</dt><dd class="detail" id="m-resolution">–</dd>
+        <dt class="detail">Rendu</dt><dd class="detail" id="m-effets">–</dd>
+        <dt>Itération</dt><dd id="m-iteration">–</dd>
+        <dt class="detail">Empreinte</dt><dd class="detail code" id="m-empreinte">–</dd>
+      </dl>
+      <p class="note">Les factions n’ont pas encore de règles propres : l’essai mesure la ville, le rendu et les déplacements.</p>
+    </aside>
+
+    <footer class="pied">
+      <div class="gauche">
+        <ul class="factions panneau" aria-label="Factions">
+          <li data-faction="0" style="--c: var(--convergence)">La Convergence</li>
+          <li data-faction="1" style="--c: var(--bastion)">Le Bastion</li>
+          <li data-faction="2" style="--c: var(--prefecture)">La Préfecture</li>
+        </ul>
+        <p id="selection" class="selection panneau" data-vide="oui">Aucune sélection</p>
+      </div>
+      <details class="aide panneau" id="aide">
+        <summary>Commandes</summary>
+        <dl>
+          <dt>Clic gauche</dt><dd>choisir une escouade (Maj : ajouter)</dd>
+          <dt>Glisser</dt><dd>encadrer plusieurs escouades</dd>
+          <dt>Double-clic</dt><dd>toutes vos escouades en vue</dd>
+          <dt>Clic droit</dt><dd>y aller ; glissé : tourner la vue</dd>
+          <dt>Molette, pincement</dt><dd>zoom vers le curseur</dd>
+          <dt>Deux doigts</dt><dd>déplacer la carte (trackpad)</dd>
+          <dt>Espace + glisser</dt><dd>saisir la carte</dd>
+          <dt>ZQSD, WASD, flèches</dt><dd>déplacer la vue</dd>
+          <dt>A / E (Q / E)</dt><dd>tourner la vue</dd>
+          <dt>Ctrl ou ⌘ + A, Échap</dt><dd>tout choisir, tout lâcher</dd>
+          <dt>Écran tactile</dt><dd>un doigt déplace, un toucher choisit ou envoie, deux doigts zooment et tournent</dd>
+        </dl>
+      </details>
+    </footer>
+  </div>
+
+  <div id="echec" class="echec" hidden>
+    <div class="panneau">
+      <h1>WebGL 2 requis</h1>
+      <p id="echec-texte"></p>
+    </div>
+  </div>
+</main>
+<!--MODULES-->

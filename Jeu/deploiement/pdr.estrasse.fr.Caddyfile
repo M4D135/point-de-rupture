@@ -1,0 +1,11 @@
+# Point de rupture (github.com/M4D135/point-de-rupture, dépôt privé) : RTS procédural, une seule page HTML autonome.
+# Fichiers : /home/ddd/apps/pdr/current -> releases/<commit>. La page est déposée depuis le Mac par Jeu/deposer.sh,
+# sans timer : le VPS n'a pas accès au dépôt privé. Certificat : l'applicateur caddy-shared déclare ce domaine
+# en ACME, d'après le nom de ce fichier.
+pdr.estrasse.fr {
+	import security_headers
+	root * /home/ddd/apps/pdr/current
+	encode zstd gzip
+	header Cache-Control "no-cache"
+	file_server
+}

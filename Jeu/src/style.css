@@ -1,0 +1,102 @@
+/* Calque de commandement posé sur la ville : bandeaux d'ardoise translucides, chiffres en colonnes,
+   une couleur par faction, l'ambre des panneaux de chantier pour ce qui répond au joueur. Un seul thème, sombre,
+   choisi pour rester lisible sur la ville en plein jour comme sur l'écran noir d'un échec. */
+:root {
+  --ardoise: rgba(15, 19, 26, 0.82);
+  --ardoise-dense: rgba(10, 13, 18, 0.94);
+  --filet: rgba(236, 233, 226, 0.14);
+  --encre: #ece9e2;
+  --encre-pale: #a7afb8;
+  --signal: #f0be4a;
+  --convergence: #e6452f;
+  --bastion: #eda326;
+  --prefecture: #4d86f0;
+  --fond: #0b0e12;
+  --police-titre: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --police: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html { height: 100%; box-sizing: border-box; }
+*, *::before, *::after { box-sizing: inherit; }
+body { height: 100%; margin: 0; background: var(--fond); color: var(--encre); font-family: var(--police); font-size: 14px; overflow: hidden; }
+
+#jeu { position: relative; height: 100%; overflow: hidden; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; outline: none; }
+#cadre { position: absolute; border: 1px solid var(--signal); background: rgba(240, 190, 74, 0.12); pointer-events: none; }
+
+#hud {
+  position: absolute; inset: 0; pointer-events: none;
+  display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); gap: 10px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#hud > * { min-width: 0; }
+.panneau { pointer-events: auto; background: var(--ardoise); border: 1px solid var(--filet); border-radius: 4px; }
+
+.bandeau { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.marque { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 9px; border-left: 3px solid var(--signal); }
+.titre { font-family: var(--police-titre); font-weight: 700; font-size: 22px; line-height: 1; letter-spacing: 0.08em; text-transform: uppercase; }
+.sous { font-size: 12px; color: var(--encre-pale); letter-spacing: 0.01em; }
+
+.reglages { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; padding: 7px 10px; }
+.reglages label { display: flex; flex-direction: column; gap: 3px; font-family: var(--police-titre); font-weight: 600; font-size: 11px;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--encre-pale); }
+select, button { font: 500 13px/1.2 var(--police); color: var(--encre); background: var(--ardoise-dense); border: 1px solid var(--filet);
+  border-radius: 3px; padding: 5px 8px; min-height: 30px; }
+select { padding-right: 22px; }
+button { cursor: pointer; border-color: rgba(240, 190, 74, 0.55); color: var(--signal); font-weight: 600; }
+button:hover { background: rgba(240, 190, 74, 0.12); }
+select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+.mesures { grid-row: 2; justify-self: end; align-self: start; width: min(300px, 100%); padding: 10px 12px 11px; }
+.compteur { display: grid; grid-template-columns: auto 1fr; align-items: baseline; column-gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--filet); }
+.grand { font-family: var(--police-titre); font-weight: 700; font-size: 40px; line-height: 0.95; font-variant-numeric: tabular-nums; color: var(--signal); }
+.unite { font-family: var(--police-titre); font-weight: 600; font-size: 13px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--encre-pale); }
+.cpu { grid-column: 1 / -1; font-size: 12px; color: var(--encre-pale); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.mesures dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin: 8px 0 0; }
+.mesures dt { font-family: var(--police-titre); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--encre-pale); padding-top: 1px; }
+.mesures dd { margin: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.mesures .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; }
+.note { margin: 9px 0 0; padding-top: 8px; border-top: 1px solid var(--filet); font-size: 12px; line-height: 1.4; color: var(--encre-pale); }
+
+.pied { grid-row: 3; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.gauche { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.factions { list-style: none; margin: 0; padding: 7px 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.factions li { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--encre-pale); }
+.factions li::before { content: ""; width: 11px; height: 11px; border-radius: 2px; background: var(--c); }
+.factions li[data-moi="oui"] { color: var(--encre); font-weight: 600; }
+.factions li[data-moi="oui"]::after { content: "à vous"; font-family: var(--police-titre); font-weight: 600; font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fond); background: var(--c); border-radius: 2px; padding: 1px 5px; }
+.selection { margin: 0; padding: 7px 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.selection[data-vide="non"] { border-color: rgba(240, 190, 74, 0.6); color: var(--signal); }
+
+.aide { max-width: min(430px, 100%); padding: 0; }
+.aide summary { cursor: pointer; padding: 7px 12px; font-family: var(--police-titre); font-weight: 600; font-size: 12px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--encre-pale); list-style-position: inside; }
+.aide dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; padding: 2px 12px 11px; font-size: 12.5px; }
+.aide dt { color: var(--encre); font-weight: 600; white-space: nowrap; }
+.aide dd { margin: 0; color: var(--encre-pale); }
+
+.echec { position: absolute; inset: 0; display: grid; place-items: center; background: var(--fond);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.echec .panneau { max-width: 520px; padding: 20px 22px; border-left: 3px solid var(--signal); }
+.echec h1 { margin: 0 0 8px; font-family: var(--police-titre); font-weight: 700; font-size: 26px; letter-spacing: 0.06em; text-transform: uppercase; text-wrap: balance; }
+.echec p { margin: 0; line-height: 1.5; color: var(--encre-pale); }
+
+@media (max-width: 720px) {
+  .mesures { width: min(250px, 100%); }
+  .mesures .detail, .note { display: none; }
+  .grand { font-size: 32px; }
+  .sous { display: none; }
+  .aide dl { grid-template-columns: minmax(0, 1fr); }
+  .aide dt { white-space: normal; }
+}
+@media (max-width: 480px) {
+  .reglages { width: 100%; }
+  .reglages label { flex: 1 1 40%; }
+  .reglages select { width: 100%; }
+  .mesures { justify-self: stretch; width: auto; }
+  .mesures dl { display: none; }
+}
