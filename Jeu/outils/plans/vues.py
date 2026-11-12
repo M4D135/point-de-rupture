@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Vues du décor d'une ville dans Chrome sans écran, piloté par tube (ni port ni réseau) : la page assemblée, l'écran
 de préparation (la ville d'accueil reste derrière, sans démo ni partie), interface cachée, caméra posée à la main.
-    python3 vues.py PAGE.html SORTIE_DIR EFFECTIFS VUES.json
-VUES.json : [[nom, x, z, D, lacet], …] ; lacet en radians (0 regarde le nord, π/2 l'est).
-Env : LARGEUR, HAUTEUR, MOBILE=1 ; LIBRE=1 retire la limite d'images (mesure du débit réel du GPU)."""
+    python3 Jeu/outils/plans/vues.py Jeu/dist/point-de-rupture.html SORTIE_DIR EFFECTIFS Jeu/outils/plans/vues.json
+VUES.json : [[nom, x, z, D, lacet], …] ; lacet en radians (0 regarde le nord, π/2 l'est). Les neuf premières vues de
+vues.json sont celles de la comparaison avant / après du lot L2 (0.3).
+Env : LARGEUR, HAUTEUR, MOBILE=1 ; LIBRE=1 retire la limite d'images (mesure du débit réel du GPU) ; PARTIE=1 lance
+une partie (ses EFFECTIFS unités, IA contre IA) avant les vues : la ville d'accueil n'a que le décor fixe, les
+cassables, la foule et les effets ne se dessinent que dans une partie. Chaque vue rend ses images/s sur 3 s."""
 import base64
 import fcntl
 import json
@@ -131,6 +134,10 @@ try:
     evaluer("document.getElementById('titre-jouer').click(), true")
     attendre("PDR.page.ui.ecran === 'preparation'", 5)
     resultats['ville'] = evaluer("(v => ({ nom: v.nom, ilots: v.ilots, objets: v.objets.length, ms: v.mesures && v.mesures.ms.total, cassables: v.sites.cassables.length }))(PDR.page.monde.ville)")
+    if os.environ.get('PARTIE') == '1':
+        evaluer("document.getElementById('prep-lancer').click(), true")
+        resultats['partie'] = attendre("PDR.page.ui.ecran === 'partie'", 120)
+        time.sleep(4)
     # L'interface s'efface : il ne reste que la scène.
     evaluer("""(() => { const s = document.createElement('style');
       s.textContent = '#jeu > :not(canvas) { visibility: hidden !important; }'; document.head.appendChild(s); return true; })()""")

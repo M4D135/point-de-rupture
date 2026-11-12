@@ -1810,11 +1810,12 @@
     const TOILES = [[0.92, 0.90, 0.84], [0.80, 0.22, 0.18], [0.20, 0.30, 0.42], [0.86, 0.76, 0.52], [0.30, 0.42, 0.30]];
     const terrasse = (x, z, lacet) => {
       const p = repere(x, z, lacet), bois = rc() < 0.5 ? [0.40, 0.30, 0.20] : [0.30, 0.31, 0.33], toile = rc.choix(TOILES), pieces = [];
-      for (const u of [-0.95, 0.95]) {
+      // Trois guéridons en ligne le long de la façade, deux chaises chacun, deux parasols.
+      for (const u of [-1.9, 0, 1.9]) {
         pieces.push(p('cylinder', u, 0, 0.72, 0.75, 0.04, 0.75, [0.86, 0.85, 0.82], MAT.LAQUE), p('cylinder', u, 0, 0, 0.07, 0.72, 0.07, [0.2, 0.2, 0.21], MAT.METAL));
         for (const v of [-0.62, 0.62]) pieces.push(p('box', u, v, 0, 0.42, 0.88, 0.40, bois, MAT.ECORCE));
       }
-      pieces.push(p('cylinder', 0, 0, 0, 0.07, 2.35, 0.07, [0.85, 0.85, 0.82], MAT.METAL), p('cone', 0, 0, 2.05, 3.4, 0.55, 2.6, toile, MAT.TISSU));
+      for (const u of [-1.0, 1.0]) pieces.push(p('cylinder', u, 0, 0, 0.07, 2.35, 0.07, [0.85, 0.85, 0.82], MAT.METAL), p('cone', u, 0, 2.05, 2.6, 0.5, 2.4, toile, MAT.TISSU));
       casser('terrasse', x, z, lacet, pieces);
     };
     const COULEURS_2R = [[0.12, 0.12, 0.13], [0.85, 0.85, 0.83], [0.55, 0.08, 0.08], [0.18, 0.28, 0.48], [0.62, 0.62, 0.64], [0.80, 0.62, 0.18]];
@@ -1828,6 +1829,15 @@
       const q = accrocher(x, z, marge);
       return longueur(q[0] - x, q[1] - z) <= 12 ? q : null;
     };
+    /** Lacet d'un objet posé le long de la façade la plus proche (8 directions, 10 m au plus) ; sinon, celui donné. */
+    const leLongDeLaFacade = (x, z, sinon) => {
+      let best = 11, lacet = sinon;
+      for (let d = 0; d < 8; d++) {
+        const a = d * PI / 4, cx = cosinus(a), sz = sinus(a);
+        for (let t = 1; t < best; t += 1) if (!ouvertEn(x + cx * t, z + sz * t)) { best = t; lacet = lacetDe(-sz, cx); break; }
+      }
+      return lacet;
+    };
     let nbMobilier = 0;
     (() => { for (let k = 0; k < P.mobilier.length; k++) {
       const m = P.mobilier[k], dans = dedans(m.x, m.z, -2);
@@ -1837,7 +1847,7 @@
         const q = ancrer(m.x, m.z, s === 'terrasse' || s === 'kiosque' ? 2.2 : 1.2);
         if (!q || !praticable(q[0], q[1])) continue;
         const [x, z] = q;
-        if (s === 'terrasse') terrasse(x, z, lacet);
+        if (s === 'terrasse') terrasse(x, z, leLongDeLaFacade(x, z, lacet));
         else if (s === 'conteneur') conteneur(x, z, lacet);
         else if (s === 'kiosque') kiosque(x, z, lacet);
         else if (s === 'corbeille') { if (corbeilles.some(([u, w]) => longueur(u - x, w - z) < 3)) continue; corbeilles.push([x, z]); poubelle(x, z); }
