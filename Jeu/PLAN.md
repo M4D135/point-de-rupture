@@ -200,6 +200,9 @@ L'API `PDR.musique` (clés, lecteur, rappel à chaque rangée, export MOD, préc
 - Commits fréquents, en français, sur la branche du lot ; dernière ligne : `Co-Authored-By: Claude Opus 5.5
   <noreply@anthropic.com>` (ou le modèle qui écrit vraiment). Ni push ni fusion par un lot.
 - Dire ce qui est vérifié, comment, et ce qui ne l'est pas.
+- Chaque page mise en ligne a sa version : avant `Jeu/deposer.sh`, passer `VERSION` à la lettre suivante dans
+  `Jeu/construire.py` (0.3b, 0.3c… puis 0.3) et, si l'étape change, `EDITION`. L'écran titre les affiche, comme dans METAL
+  (David, 12/11 : « je veux voir la version sur l'ecran titre comme on a fait pour metal »).
 
 ## 6. Organisation
 
@@ -589,6 +592,7 @@ L4 ; L5 avec L6 ; L7 avec L8) : quatre à cinq heures.
 | L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
 | L3 Musique | à reprendre | `2dc9248` | |
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
+| Version à l'écran titre | fait, en ligne | `3601ca6` | 12/11 : essai 0.3b, « 03 / MARSEILLE V0.3b » ; `construire.py` écrit version et édition dans la page. |
 | L4 Simulation | à reprendre | `4020ac6` | |
 | IB | à faire | | |
 | L5 Feu à l'écran | à faire | | |
