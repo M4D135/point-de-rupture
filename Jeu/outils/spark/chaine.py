@@ -211,7 +211,7 @@ def mener(fiche_chemin, a):
         if ajouts:
             demande += '\n## Extraits ajoutés : les lignes que cite l\'erreur\n' + '\n'.join(extrait(d) for d in ajouts)
         if echec:
-            reste = 29000 - len(demande) - len(echec) - 400
+            reste = 20000 - len(demande) - len(echec) - 400  # au-delà de ~24 000 caractères, le Spark dépasse 900 s
             demande += (f'\n## Ta réponse précédente a échoué ; corrige-la (les fichiers sont revenus à l\'état des '
                         f'extraits)\n{echec}\n\n### Ta réponse précédente\n{reponse[:max(reste, 0)]}\n')
         if len(demande) > 30000:
