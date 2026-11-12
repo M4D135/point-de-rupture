@@ -276,7 +276,7 @@
     // En démo, les renforts ne tarissent pas : tous les revenus sont multipliés (§1.11).
     if (DEMO) for (let f = 0; f < 3; f++) facteurRevenu[f] *= K.DEMO_RENFORTS;
     const bilan = [0, 1, 2].map(() => ({ produites: 0, horsJeu: 0, infliges: 0, barricadesPosees: 0, barricadesLevees: 0,
-      casses: 0, lieuxPris: 0, recolte: 0, molotovs: 0, grenades: 0, pierres: 0, charges: 0, aTerre: 0, feux: 0, eteints: 0 }));
+      casses: 0, lieuxPris: 0, recolte: 0, molotovs: 0, grenades: 0, pierres: 0, charges: 0, aTerre: 0, feux: 0, eteints: 0, immeublesBrules: 0, immeublesSauves: 0 }));
     // D'où viennent les coups de chaque camp (millièmes) : contact, salve, jet, pierres, charge, souffle, feu, gaz.
     const sources = new Float64Array(3 * 8);
     for (let f = 0; f < 3; f++) {
@@ -288,6 +288,9 @@
     depart[0] += E - depart[0] - depart[1] - depart[2];
 
     const sites = ville.sites;
+    // 0.3, PLAN D9 : les immeubles qui brûlent
+    const IMM = PDR.immeubles.creer(sites.immeubles || []), evIm = [];
+    let versionImm = 0, immEnvoyes = 0;
     const mm = v => Math.round(v * 1000);
     const disqueCases8 = (x, z, rayon) => {
       const liste = [];
@@ -966,6 +969,12 @@
           if (k >= 0) allumerCassable(k, fCamp[q], fGen[q] + 1);
         }
       }
+      if (IMM.n > 0) {
+        for (let q = 0; q < NFEUX; q++) {
+          if (!fActif[q]) continue;
+          PDR.immeubles.chauffer(IMM, fX[q] / 1000, fZ[q] / 1000, Math.min(1, (fAge[q] + 6) / (fDelai[q] + 12), fReste[q] / (3 * IT_S)), 1 / IT_S, fCamp[q], evIm);
+        }
+      }
       if (grilleFeux) majGrilleFeux();
     }
     /** Une fois par seconde : une structure en feu perd une part de ses points ; à zéro, le feu l'a détruite. */
@@ -1142,6 +1151,7 @@
     /** Le cocktail tombe : un souffle (les hostiles à moins de 3 m, huit au plus, repoussés hors du foyer, les trois
      *  premiers jetés au sol), puis le feu, qui prend aussi aux barricades, aux avant-postes et à deux objets. */
     function molotovTombe(x, z, f, tireur) {
+      if (IMM.n > 0) PDR.immeubles.cocktail(IMM, x / 1000, z / 1000, f, (Math.imul(it + 1, 0x9E3779B1) ^ Math.imul(x | 0, 0x85EBCA6B) ^ (z | 0)) >>> 0, evIm);
       const c0 = nav.caseDe(x, z), ci = c0 % nx, cj = (c0 / nx) | 0, r2 = MO_RAYON * MO_RAYON;
       const lanceur = tireur >= 0 && ufac[tireur] === f ? tireur : -1;
       let n = 0;
@@ -1507,6 +1517,30 @@
     const horloge = options && typeof options.horloge === 'function' ? options.horloge : null;
     const mesure = { msNav: 0, champs: 0 };
 
+    function allumerImmeuble(k, camp) {
+      if (k >= 0 && k < IMM.n) PDR.immeubles.allumer(IMM, k, camp, evIm);
+    }
+    function viderImmeubles() {
+      for (let i = 0; i < evIm.length; i++) {
+        const e = evIm[i];
+        const k = e.a;
+        const x = Math.round(IMM.x[k] * 1000);
+        const z = Math.round(IMM.z[k] * 1000);
+        if (e.type === 38) {
+          evenement(EV.IMMEUBLE_FEU, x, z, e.b, e.a, 0);
+        } else if (e.type === 39) {
+          if (e.b === 0) {
+            evenement(EV.IMMEUBLE_ETEINT, x, z, PREF, e.a, 1);
+            bilan[PREF].immeublesSauves++;
+          } else if (e.b === 1) {
+            evenement(EV.IMMEUBLE_ETEINT, x, z, -1, e.a, 0);
+            if (IMM.origine[k] >= 0) bilan[IMM.origine[k]].immeublesBrules++;
+          }
+        }
+      }
+      versionImm++;
+      evIm.length = 0;
+    }
     function iterer() {
       if (vainqueur !== P.VAINQUEUR.EN_COURS) return;
       nev = 0;
@@ -1522,6 +1556,7 @@
       avancerProjectiles();
       avancerFeux();
       avancerNuages();
+      if (IMM.n > 0 && it % IT_S === 11) PDR.immeubles.avancer(IMM, 1, evIm);
       const t0 = horloge ? horloge() : 0;
       mesure.champs = nav.avancer(3);
       if (horloge) mesure.msNav = horloge() - t0;
@@ -1545,6 +1580,7 @@
       if (phaseSoin === 7) brulerStructures();
       if (colereAllumee && it - derniereColere >= IT_S) { derniereColere = it; evenement(EV.COLERE, structures[BAST].x, structures[BAST].z, BAST, K.COLERE_S, 0); }
       if (phaseSoin === 5) victoire();
+      if (evIm.length) viderImmeubles();
       it++;
       if (it % 100 === 0) lancerEmpreinte(); else avancerEmpreinte();
     }
@@ -2489,7 +2525,7 @@
       get it() { return it; }, get n() { return nHaut; }, get vainqueur() { return vainqueur; },
       get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colere; },
       get delaiAlliance() { return delaiAlliance; },
-      soumettre, injecter, iterer, etat, empreinte,
+      soumettre, injecter, iterer, etat, empreinte, immeubles: IMM, allumerImmeuble,
       enregistrement: () => ({ version: P.VERSION, options: { ...opt }, commandes: journal.slice(), empreintes: empreintes.slice() }),
       bilan: () => bilan.map((b, f) => ({ ...b, infliges: Math.round(b.infliges / 1000),
         sources: Array.from(sources.subarray(f * 8, f * 8 + 8), v => Math.round(v / 1000)) })),
