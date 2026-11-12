@@ -18,6 +18,10 @@
     sunDirection: SOLEIL, sunColor: [1.62, 1.44, 1.16], ambient: [0.16, 0.185, 0.225],
     wind: 0.5, fogDensity: 0.00025, biome: 'ville',
   };
+  // Réglages de création de FERRO 0.2 (FRender.create) pour une ville vue de haut, en plein jour : anticrénelage ×4 de la
+  // scène, atlas d'ombre doublé (un seul soleil couvre le sol visible), bords de l'écran peu assombris (les unités doivent
+  // y rester lisibles), halo réservé au feu et aux reflets francs (un toit clair ne voile pas l'image).
+  const REGLAGES_MOTEUR = { msaa: 4, shadowMapScale: 2, vignette: 0.84, bloomThreshold: [0.86, 0.98] };
   // Écrans sans partie vivante : la ville d'accueil tourne lentement derrière eux.
   const FOND = { chargement: 1, titre: 1, reglages: 1, preparation: 1, echec: 1 };
   const LIMITES_ACCUEIL = { x0: -1000, z0: -1000, x1: 1000, z1: 1000 };
@@ -249,7 +253,7 @@
     // ---- Démarrage. ----
     async function boot() {
       ui.chargement(0.04, 'Le moteur démarre.');
-      try { renderer = window.FRender.create(canvas); }
+      try { renderer = window.FRender.create(canvas, REGLAGES_MOTEUR); }
       catch (err) { ui.echec('Le moteur n’a pas pu démarrer : ' + (err && err.message || err)); return; }
       if (!renderer || !renderer.stats || renderer.stats.backend !== 'webgl2') {
         if (renderer && renderer.dispose) renderer.dispose();

@@ -22,6 +22,12 @@ résolution, pour lire la marge à 1440 × 900. Dans ce passage, le temps CPU pa
 de commandes saturé : seul le passage limité donne le coût CPU.
 
   python3 Jeu/verifications/banc-rendu.py --sortie DOSSIER [--unites 100000] [--duree 6] [--repetitions 3] [--libre]
+                                         [--moteur AUTRE/renderer.js]
+
+Le moteur est créé avec les réglages de jeu.js (REGLAGES_MOTEUR, lus dans le fichier). --moteur mesure un autre
+renderer.js à la place de celui du jeu, par exemple la copie d'avant un changement de version de FERRO
+(git show COMMIT:Jeu/src/moteur/renderer.js > AUTRE/renderer.js) : deux passages de suite, l'un avec, l'autre sans, donnent
+l'avant et l'après sous la même charge.
 
 Rien n'est écrit hors de DOSSIER (page, profil de Chrome, journal, captures, resultats.json). Code de sortie 1 si une
 vue reste sous 55 images par seconde dans le passage limité.
@@ -31,6 +37,7 @@ import base64
 import fcntl
 import json
 import os
+import re
 import select
 import shutil
 import statistics
@@ -177,7 +184,7 @@ BANC_JS = r'''/* Banc du rendu : page écrite par Jeu/verifications/banc-rendu.p
     const ville = PDR.ville.creerVille(1, { ilots });
     const msVille = performance.now() - t;
     const canvas = document.getElementById('scene');
-    const renderer = window.FRender.create(canvas);
+    const renderer = window.FRender.create(canvas, __REGLAGES__);   // les réglages de création de jeu.js
     if (renderer.stats.backend !== 'webgl2') throw new Error('pas de WebGL 2 : ' + renderer.stats.backend);
     renderer.resize('auto');
     t = performance.now();
@@ -418,7 +425,7 @@ BANC_JS = r'''/* Banc du rendu : page écrite par Jeu/verifications/banc-rendu.p
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       return {
         gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), fournisseur: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
-        chronoGpu: !!chrono, adaptatif, navigateur: navigator.userAgent, unites: N, ilots, etendue: e, objetsVille: ville.objets.length, cassables: ville.sites.cassables.length,
+        chronoGpu: !!chrono, adaptatif, reglages: __REGLAGES__, navigateur: navigator.userAgent, unites: N, ilots, etendue: e, objetsVille: ville.objets.length, cassables: ville.sites.cassables.length,
         structures: structures.length, groupes: groupes.length, combattants: combattants.length, ecran: [innerWidth, innerHeight, devicePixelRatio],
         toile: [canvas.width, canvas.height], ms: { ville: arrondi(msVille, 1), monde: arrondi(msMonde, 1), decor: arrondi(msDecor, 1), camera: arrondi(msCamera, 1), population: arrondi(msPopulation, 1) },
         visees: { defaut: [arrondi(cible[0], 1), arrondi(cible[1], 1), meilleur], proche: [arrondi(contact.x, 1), arrondi(contact.z, 1), contact.taille] },
@@ -610,6 +617,7 @@ def principal():
     p.add_argument('--vues', default=','.join(VUES))
     p.add_argument('--libre', action='store_true', help='ajoute un passage sans limite d\'images')
     p.add_argument('--chrome', default=os.environ.get('CHROME'))
+    p.add_argument('--moteur', type=Path, default=None, help='un autre renderer.js à mesurer à la place de celui du jeu')
     args = p.parse_args()
     chrome = args.chrome or next((c for c in CHROMES if Path(c).exists()), None)
     if not chrome:
@@ -620,14 +628,21 @@ def principal():
     for v in vues:
         if v not in VUES:
             sys.exit('vue inconnue : ' + v)
-    scripts = '\n'.join('<script src="%s"></script>' % (SRC / f).as_uri() for f in SCRIPTS)
+    moteur = (args.moteur or SRC / 'moteur/renderer.js').resolve()
+    if not moteur.is_file():
+        sys.exit('moteur introuvable : ' + str(moteur))
+    # Les réglages de création sont ceux du jeu : on les lit dans jeu.js plutôt que de les recopier ici.
+    reglages = re.search(r'const REGLAGES_MOTEUR = (\{[^}]*\});', (SRC / 'jeu.js').read_text(encoding='utf-8'))
+    if not reglages:
+        sys.exit('REGLAGES_MOTEUR introuvable dans jeu.js')
+    scripts = '\n'.join('<script src="%s"></script>' % (moteur if f == 'moteur/renderer.js' else SRC / f).as_uri() for f in SCRIPTS)
     page = sortie / 'banc.html'
     page.write_text(PAGE.replace('__SCRIPTS__', scripts), encoding='utf-8')
-    (sortie / 'banc.js').write_text(BANC_JS, encoding='utf-8')
+    (sortie / 'banc.js').write_text(BANC_JS.replace('__REGLAGES__', reglages.group(1)), encoding='utf-8')
     version = subprocess.run([chrome, '--version'], capture_output=True, text=True).stdout.strip()
     charge = os.getloadavg()
     resultats = {'chrome': version, 'chargeAvant': [round(x, 2) for x in charge], 'unites': args.unites, 'duree': args.duree,
-                 'repetitions': args.repetitions, 'passages': []}
+                 'repetitions': args.repetitions, 'moteur': str(moteur), 'reglages': reglages.group(1), 'passages': []}
     for libre in ([False, True] if args.libre else [False]):
         r = passage(chrome, sortie, page, args, libre, vues)
         resultats['passages'].append(r)
