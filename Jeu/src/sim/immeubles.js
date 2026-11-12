@@ -337,5 +337,135 @@
     I.chauffe.fill(0);
   }
 
-  PDR.immeubles = Object.freeze({ creer, distFacade, chauffer, allumer, cocktail, avancer });
+  // Arroser les immeubles en feu à distance ≤ rayon. Rend le nombre d'immeubles atteints.
+  function arroser(I, x, z, rayon, debit, dt, evts) {
+    const R = PDR.regles.CONSTANTES.IMMEUBLES;
+    const gx0 = Math.floor((x - rayon) / TAILLE) - I.gx0;
+    const gx1 = Math.floor((x + rayon) / TAILLE) - I.gx0;
+    const gz0 = Math.floor((z - rayon) / TAILLE) - I.gz0;
+    const gz1 = Math.floor((z + rayon) / TAILLE) - I.gz0;
+    let nb = 0;
+    for (let gz = Math.max(0, gz0); gz <= Math.min(I.gnz - 1, gz1); gz++) {
+      for (let gx = Math.max(0, gx0); gx <= Math.min(I.gnx - 1, gx1); gx++) {
+        const c = gz * I.gnx + gx;
+        for (let i = I.debutG[c]; i < I.debutG[c + 1]; i++) {
+          const k = I.G[i];
+          if (I.etat[k] !== 1) continue;
+          if (distFacade(I, k, x, z) > rayon) continue;
+          nb++;
+          I.intensite[k] -= debit * dt * R.eteint;
+          if (I.intensite[k] <= 0) {
+            I.etat[k] = 2;
+            I.intensite[k] = 0;
+            I.chaleur[k] = 0;
+            I.enFeu--;
+            const gx1k = Math.max(0, Math.floor((I._aMinX[k] - R.recul) / TAILLE) - I.gx0);
+            const gx2k = Math.min(I.gnx - 1, Math.floor((I._aMaxX[k] + R.recul) / TAILLE) - I.gx0);
+            const gz1k = Math.max(0, Math.floor((I._aMinZ[k] - R.recul) / TAILLE) - I.gz0);
+            const gz2k = Math.min(I.gnz - 1, Math.floor((I._aMaxZ[k] + R.recul) / TAILLE) - I.gz0);
+            for (let gz2 = gz1k; gz2 <= gz2k; gz2++) {
+              for (let gx2 = gx1k; gx2 <= gx2k; gx2++) {
+                I.brulants[gz2 * I.gnx + gx2]--;
+              }
+            }
+            evts.push({ type: 39, a: I.id[k], b: 0 });
+          }
+        }
+      }
+    }
+    return nb;
+  }
+
+  // Indice de l’immeuble en feu le plus intense de la case (x, z) dont distFacade ≤ R.recul, ou -1.
+  function pres(I, x, z) {
+    const R = PDR.regles.CONSTANTES.IMMEUBLES;
+    const gx = Math.floor(x / TAILLE) - I.gx0;
+    const gz = Math.floor(z / TAILLE) - I.gz0;
+    if (gx < 0 || gx >= I.gnx || gz < 0 || gz >= I.gnz) return -1;
+    const c = gz * I.gnx + gx;
+    if (I.brulants[c] === 0) return -1;
+    let meilleur = -1, maxInt = -1;
+    for (let i = I.debutG[c]; i < I.debutG[c + 1]; i++) {
+      const k = I.G[i];
+      if (I.etat[k] !== 1) continue;
+      if (distFacade(I, k, x, z) > R.recul) continue;
+      if (I.intensite[k] > maxInt) {
+        maxInt = I.intensite[k];
+        meilleur = k;
+      }
+    }
+    return meilleur;
+  }
+
+  // Indice de l’immeuble en feu le plus proche (distFacade ≤ rayon), ou -1.
+  function proche(I, x, z, rayon) {
+    const gx0 = Math.floor((x - rayon) / TAILLE) - I.gx0;
+    const gx1 = Math.floor((x + rayon) / TAILLE) - I.gx0;
+    const gz0 = Math.floor((z - rayon) / TAILLE) - I.gz0;
+    const gz1 = Math.floor((z + rayon) / TAILLE) - I.gz0;
+    let meilleur = -1, dMin = Infinity;
+    for (let gz = Math.max(0, gz0); gz <= Math.min(I.gnz - 1, gz1); gz++) {
+      for (let gx = Math.max(0, gx0); gx <= Math.min(I.gnx - 1, gx1); gx++) {
+        const c = gz * I.gnx + gx;
+        for (let i = I.debutG[c]; i < I.debutG[c + 1]; i++) {
+          const k = I.G[i];
+          if (I.etat[k] !== 1) continue;
+          const d = distFacade(I, k, x, z);
+          if (d <= rayon && d < dMin) {
+            dMin = d;
+            meilleur = k;
+          }
+        }
+      }
+    }
+    return meilleur;
+  }
+
+  // Exporter les immeubles d’état non nul dans sortie (Float32Array). Rend le nombre écrit.
+  function exporter(I, sortie) {
+    let off = 0;
+    const n = I.n;
+    for (let k = 0; k < n; k++) {
+      if (I.etat[k] === 0) continue;
+      if (off >= 1024 * 4) break;
+      sortie[off++] = I.id[k];
+      sortie[off++] = I.etat[k];
+      sortie[off++] = I.intensite[k];
+      sortie[off++] = I.avancee[k];
+    }
+    return off / 4;
+  }
+
+  // Compter les immeubles par état et par origine pour les calcinés.
+  function compter(I) {
+    let enFeu = 0, eteints = 0, calcines = 0;
+    const calcinesPar = [0, 0, 0];
+    const n = I.n;
+    for (let k = 0; k < n; k++) {
+      const e = I.etat[k];
+      if (e === 1) enFeu++;
+      else if (e === 2) eteints++;
+      else if (e === 3) {
+        calcines++;
+        const o = I.origine[k];
+        if (o >= 0 && o < 3) calcinesPar[o]++;
+      }
+    }
+    return { enFeu: enFeu, eteints: eteints, calcines: calcines, calcinesPar: calcinesPar };
+  }
+
+  // Empreinte FNV-1a sur l’état des immeubles.
+  function empreinte(I) {
+    let h = 2166136261;
+    const n = I.n;
+    for (let k = 0; k < n; k++) {
+      h ^= I.etat[k]; h = Math.imul(h, 16777619);
+      h ^= Math.round(I.intensite[k] * 1000); h = Math.imul(h, 16777619);
+      h ^= Math.round(I.avancee[k] * 1000); h = Math.imul(h, 16777619);
+      h ^= Math.round(I.chaleur[k] * 100); h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  PDR.immeubles = Object.freeze({ creer, distFacade, chauffer, allumer, cocktail, avancer, arroser, pres, proche, exporter, compter, empreinte });
 })(globalThis.PDR = globalThis.PDR || {});
