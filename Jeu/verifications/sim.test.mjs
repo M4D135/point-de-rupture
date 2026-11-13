@@ -412,6 +412,29 @@ verifier('élimination et victoire : QG occupés, sans avant-poste ni effectifs,
   assert.equal(m.it, it, 'la partie finie ne bouge plus');
 });
 
+verifier('alliance : un camp sans base tient tant que son allié tient la sienne', () => {
+  const m = creer({ vide: true, joueur: 0, alliance: [C, B] });
+  const qC = m.ville.sites.qg[C], qB = m.ville.sites.qg[B];
+  // Le Bastion tient sa base et la Convergence garde assez d'unités pour que seule la déroute puisse l'éliminer.
+  grappe(m, B, 1, 400, qB.sortie[0], qB.sortie[1]);
+  grappe(m, C, 1, Math.ceil(m.depart[C] * 0.3), qB.sortie[0] + 20, qB.sortie[1] + 20);
+  grappe(m, F, 1, 30, qC.sortie[0], qC.sortie[1]);
+  courir(m, 90 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.structures[C].occupe ? 1 : 0, 1, 'le QG de la Convergence est occupé par la Préfecture');
+  assert.equal(m.elimine[C], 0, 'sans base, la Convergence tient tant que le Bastion tient la sienne');
+  assert.equal(m.maintenu[C], 1);
+  assert.equal(m.maintenu[B], 0, 'le Bastion, qui a une base, n\'est pas sous protection');
+  assert.equal(m.sansBase[C], 0, 'le compte à rebours est gelé tant que l\'alliance tient');
+  // L'alliance rompue, la déroute reprend depuis le début et mène à l'élimination.
+  m.soumettre(cmd(CMD.DIPLOMATIE, C, { action: 'rompre', avec: B }));
+  courir(m, 20 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.maintenu[C], 0, 'rompre l\'alliance retire la protection');
+  assert.equal(m.sansBase[C], 20 * IT_S, 'les 30 s courent depuis la rupture, pas depuis la perte du QG');
+  assert.equal(m.elimine[C], 0, 'à vingt secondes, la Convergence tient encore');
+  courir(m, 20 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.elimine[C], 1, 'la déroute menée à son terme élimine le camp');
+});
+
 // ---- 0.3 : le feu, le gaz, les projectiles, les chutes, la fin de partie. ----
 /** Le foyer actif qui couvre l'unité i (tous les foyers sont lus, même ceux qui se chevauchent), ou -1. */
 function foyerDe(m, i) {

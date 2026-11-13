@@ -360,6 +360,7 @@
     const plafondIt = limiteTemps ? 0 : (DEMO ? K.VICTOIRE.DEMO_PLAFOND_S : K.VICTOIRE.PLAFOND_S) * IT_S;
     const DEROUTE_IT = K.DEROUTE_S * IT_S;
     const sansBase = new Int32Array(3);         // itérations passées sans base (0 : le camp en a une)
+    const maintenu = new Int32Array(3);         // 1 : sans base mais tenu en vie par un allié qui tient la sienne
     let raison = 0;                              // indice dans P.RAISONS_FIN
     let alliance = opt.alliance, proposition = null, delaiAlliance = 0, colere = 0, derniereColere = -1000;
     let vainqueur = P.VAINQUEUR.EN_COURS;
@@ -696,9 +697,9 @@
       quitterOrdre(i);
       uord[i] = O.REPLI; uetat[i] = ET.REPLI;
       if (auto) umode[i] |= M_REPLI_AUTO;
-      const q = structures[ufac[i]];
+      const b = baseDeRepli(ufac[i]), q = structures[b];
       ubx[i] = q.sortieX; ubz[i] = q.sortieZ;
-      viser(i, cleBase(ufac[i]));
+      viser(i, cleBase(b));
     }
     function envoyerRecolter(i, g) {
       quitterOrdre(i);
@@ -2273,6 +2274,18 @@
       }
       return false;
     }
+    /** L'allié du camp f qui tient encore une base, ou -1 : sans lui, un camp sans base est éliminé. */
+    function allieQuiTient(f) {
+      if (!alliance || !alliance.includes(f)) return -1;
+      const p = alliance[0] === f ? alliance[1] : alliance[0];
+      return !elimine[p] && aUneBase(p) ? p : -1;
+    }
+    /** Le camp dont les unités de f doivent rejoindre la base : le sien s'il en tient une, sinon celui de son allié. */
+    function baseDeRepli(f) {
+      if (aUneBase(f)) return f;
+      const p = allieQuiTient(f);
+      return p >= 0 && structures[p].vivante && !structures[p].occupe ? p : f;
+    }
     /** Le camp f quitte la partie : ses unités se dispersent, ses avant-postes tombent, ses lieux redeviennent neutres. */
     function eliminer(f) {
       elimine[f] = 1; sansBase[f] = 0;
@@ -2286,22 +2299,28 @@
     /**
      * Une fois par seconde : la déroute, l'élimination, puis la fin de la partie selon options.victoire (§1.7).
      * Élimination, dans tous les modes : un camp resté 30 s sans base (QG occupé, aucun avant-poste achevé et libre), ou
-     * aussitôt s'il est sans base avec moins de 2 % de ses effectifs de départ. Fin : le dernier camp (ou la dernière
+     * aussitôt s'il est sans base avec moins de 2 % de ses effectifs de départ. Un camp sans base tenu par un allié qui
+     * tient une base n'est pas éliminé : il tient tant que l'alliance tient, et ses unités se replient sur le QG de
+     * l'allié. Fin : le dernier camp (ou la dernière
      * alliance) debout ; la cible de points (« points », « mixte ») ; la limite de temps (« temps », « mixte » : le
      * meilleur score) ; sinon la limite de sécurité (« dernier », démo : le plus d'unités ; « points » : le meilleur score).
      */
-    function victoire() {
-      for (let f = 0; f < 3; f++) {
-        if (elimine[f]) continue;
-        const q = structures[f];
-        if (aUneBase(f)) {
-          if (sansBase[f] > 0) { sansBase[f] = 0; evenement(EV.BASE_REPRISE, q.x, q.z, f, 0, 0); }
-          continue;
-        }
-        if (sansBase[f] === 0) evenement(EV.DEROUTE, q.x, q.z, f, K.DEROUTE_S, 0);
-        sansBase[f] += IT_S;
-        if (sansBase[f] >= DEROUTE_IT || vivantes[f] * 100 < depart[f] * K.ELIMINATION_PART * 100) eliminer(f);
-      }
+     function victoire() {
+       for (let f = 0; f < 3; f++) {
+         if (elimine[f]) { maintenu[f] = 0; continue; }
+         const q = structures[f];
+         if (aUneBase(f)) {
+           maintenu[f] = 0;
+           if (sansBase[f] > 0) { sansBase[f] = 0; evenement(EV.BASE_REPRISE, q.x, q.z, f, 0, 0); }
+           continue;
+         }
+         // Un camp sans base reste en vie tant que son allié tient la sienne : le compte à rebours est gelé, et
+         // repart de zéro le jour où l'alliance casse ou où l'allié tombe.
+         maintenu[f] = allieQuiTient(f) >= 0 ? 1 : 0;
+         if (sansBase[f] === 0 && !maintenu[f]) evenement(EV.DEROUTE, q.x, q.z, f, K.DEROUTE_S, 0);
+         sansBase[f] = maintenu[f] ? 0 : sansBase[f] + IT_S;
+         if (!maintenu[f] && (sansBase[f] >= DEROUTE_IT || vivantes[f] * 100 < depart[f] * K.ELIMINATION_PART * 100)) eliminer(f);
+       }
       const enJeu = [0, 1, 2].filter(f => !elimine[f]);
       const cotes = [];
       for (const f of enJeu) {
@@ -2466,7 +2485,8 @@
             score: score[f], revenu: { moyens: Math.round(rm / 1000), materiaux: Math.round(rx / 1000) }, oisifs: oisifs[f],
             elimine: !!elimine[f], qgOccupe: q.occupe ? 1 : Math.min(1, q.occupation / (K.OCCUPATION_QG_S * IT_S)), vivantes: vivantes[f],
             depart: depart[f], force: depart[f] > 0 ? vivantes[f] / depart[f] : 0,
-            deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1 };
+            deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1,
+            maintenu: !!maintenu[f] };
         }),
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
@@ -2548,7 +2568,7 @@
       res, score, pop, popMax, vivantes, depart, elimine, structures, lieuProp, lieuPreneur, lieuProgres, lieuConteste, lieux,
       gis, stock, actifs, casX, casZ, casEtat, empreintes, estIA, echelle, mesure,
       // 0.3 : lecture pour l'IA et les essais. feux et nuages : tableaux par foyer ou nuage, « actif » dit lesquels servent.
-      urech, urech2, uterre, uimm, ulance, uassaut, usal, jetons, sansBase, demo: DEMO,
+      urech, urech2, uterre, uimm, ulance, uassaut, usal, jetons, sansBase, maintenu, demo: DEMO,
       feux: { max: NFEUX, actif: fActif, x: fX, z: fZ, r: fR, reste: fReste, age: fAge, sorte: fSorte, cible: fCible, camp: fCamp, id: fId },
       nuages: { max: NNUAGES, actif: gActif, x: gX, z: gZ, r: gRc, reste: gReste, camp: gCamp, id: gId },
       get nFeux() { return nFeux; }, get nNuages() { return nNuages; }, get nVols() { return nVols; }, get nGisants() { return nGisants; },
