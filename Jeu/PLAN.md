@@ -716,20 +716,21 @@ premier jet) pendant que DeepSeek fait les premières passes de L3 et de L4 ; L4
 | Réparation du test du noyau | fait | `a4cfed3` | |
 | L1 Rendu | fait | `71f99a6`, `d871672` | 12/11 : provenance et tests défaits du dépôt FERRO (point 2), premier jet de DeepSeek, vérifié. Points 1 et 3 faits dans IA. |
 | L2 Marseille | fait | `ce67c66` | 12/11 : vraie Marseille, monuments, mobilier, lointain, quatre sortes cassables (§ 5.3). |
-| L3 Musique | en cours | `681cac7` | 12/11 au soir : premier jet de DeepSeek committé (test aux nouveaux tempos, outils de mesure rangés), `musique` et `son` verts. Reste : le préchauffage (872 ms de médiane contre 502 en 0.2), La Préfecture plus claire qu'avant au lieu de plus grave, la relecture des morceaux, l'écoute. |
+| L3 Musique | en cours | `681cac7`, fusionné en `e0d27d8` | 12/11 au soir : premier jet de DeepSeek committé (test aux nouveaux tempos, outils de mesure rangés), `musique` et `son` verts. `v03-musique` fusionné dans `v03-feu-sim` (`a592bf4`) puis dans `main`. Reste : le préchauffage (872 ms de médiane contre 502 en 0.2), La Préfecture plus claire qu'avant au lieu de plus grave, la relecture des morceaux, l'écoute. Les deux fiches du Spark qui devaient corriger le festif et la gravité (`01-neutraliser-festif`, `02-prefecture-grave`) sont rouges sans avoir tourné : « extrait impossible : désignation illisible ». |
 | IA + mise en ligne | fait, en ligne | `94d7aaf` | 12/11 : `main` + `ferro-rendu` + `v03-marseille`, sans conflit ; sans `v03-musique` (plus tard). Version « essai-0.3a ». Suites vertes ; essais Chrome Marseille et damier à 100 000, téléphone à 20 000 : 60 images/s, 0 lente, console vide ; sans WebGL 2 : message de refus ; son, réglages, export « M.K. », crédit OSM (`essai-page.py`). Mise en ligne : session principale. En ligne le 12/11 à 21 h (commit `94d7aaf`, empreinte de la page servie vérifiée) ; aperçu republié. |
 | Version à l'écran titre | fait, en ligne | `3601ca6` | 12/11 : essai 0.3b, « 03 / MARSEILLE V0.3b » ; `construire.py` écrit version et édition dans la page. |
 | ZQSD et pancartes (D11) | fait, en ligne | `5f9c3b7` | 12/11, vers 21 h 45 : essai 0.3c en ligne (empreinte de la page servie `470ac778935bbd86` vérifiée), aperçu republié. Réglages en version 2 (migration testée, et vérifiée dans Chrome avec de vraies touches), une banderole ou pancarte sur huit (captures de près). Suites vertes. |
-| L4 Simulation | en cours | `dd1a161`, `05714ee`, `31cc352`, `bdef367` (`v03-feu-sim`) | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Puis l'agent Opus, sur `v03-feu-sim` avancée à `integration-c` : quatre sortes cassables au protocole, démo sans cible ni limite dès « pret », foyers et nuages qui se chevauchent (`05714ee`) ; jet et gaz qui ne pèsent plus selon la densité de la foule, Convergence qui casse sans manquer de Matériaux (`31cc352`) ; CONCEPTION § 1 (`bdef367`). Agent arrêté vers 23 h (« go full spark ») ; le Spark a repris CONCEPTION et ce plan (`731a21d`, `9135e35`). Reste : voir « Reprise » plus bas. |
-| L9 Immeubles et pompiers | en cours (Spark) | `fe98ebc` (`v03-feu-sim`) | Ajouté le 12/11 au soir (D9). Constantes faites (`fe98ebc`). Le reste en seize fiches pour la chaîne du Spark (`Jeu/outils/spark/fiches/l9/`), menées sans Claude par `pilote.sh` depuis le 12/11, 23 h 30. Voir « Reprise ». |
+| L4 Simulation | fait, sauf mesure | `dd1a161`, `05714ee`, `31cc352`, `bdef367`, `31cc352` (`v03-feu-sim`) | 12/11 au soir : premier jet de DeepSeek committé (l'objet cassé prend feu ; `sim.test.mjs` vert, 17 contrôles), arrêté après 55 min. Puis l'agent Opus, sur `v03-feu-sim` avancée à `integration-c` : quatre sortes cassables au protocole, démo sans cible ni limite dès « pret », foyers et nuages qui se chevauchent (`05714ee`) ; jet et gaz qui ne pèsent plus selon la densité de la foule (`JET.max`, `GAZ.plein`), Convergence qui casse sans manquer de Matériaux (`31cc352`) ; CONCEPTION § 1 (`bdef367`). Agent arrêté vers 23 h (« go full spark ») ; le Spark a repris CONCEPTION et ce plan (`731a21d`, `9135e35`). **Reste** : le coût de la simulation (+26 à 28 % mesurés, correction de la navigation à faire), la démo de 60 min à vérifier, l'essai Chrome. |
+| L9 Immeubles et pompiers | fait (simulation) | `fe98ebc` … `949833b`, relu `42d1afb` (`v03-feu-sim`) | Ajouté le 12/11 au soir (D9). Mené par la chaîne du Spark (`Jeu/outils/spark/fiches/l9/`, `autonome.py`) : `sim/immeubles.js` (boîtes orientées, voisins, propagation, cocktail, plafond, empreinte), les immeubles des deux villes, l'ordre ETEINDRE (18) et les évènements 38 et 39, la lance des pompiers, le recul devant une façade en feu, l'arrosage par le Canon à eau. **Relu ligne à ligne le 13/11** : le module et le branchement sont justes et déterministes (`Math.cos` et `Math.sin` remplacés par une série de Taylor), la suite `immeubles.test.mjs` (202 lignes) est vraie. |
+| Pompiers produits | fait | `35f66f8` (`v03-feu-sim`) | Trouvé à la relecture : le L9 avait posé les types 13 et 14 et tout le mécanisme, mais **rien ne les fabriquait** — `COMPOSITION[2]` s'arrêtait au type 12 et le panneau du QG ne montrait que cinq types. Une partie de 20 min sur le damier à 20 000 unités : 94 immeubles calcinés, **aucun éteint**. Avec 2,8 % de Pompiers et 1 % de Camions et le panneau ouvert aux sept types : 53 calcinés, **11 sauvés**. Premier réglage, pas un équilibre : à reprendre au banc (`Jeu/verifications/equilibre.mjs`). |
 | IB | provisoire | `706eb9f`, puis `integration-c` | `706eb9f` : `main` + la simulation en premier jet (`a73a2dd`), la base de L5. 12/11 vers 21 h 50 : `integration-c` (`3069e2e`) = `main` (0.3c) + `dd1a161` + L5, suites vertes, essai Chrome sans erreur : la base de la fin de L4 et de l'essai 0.3d. À refaire après L4 et L9. |
 | L5 Feu à l'écran | fait | `ffa4c74`, `c8ec75f`, `717d1b5` | 12/11 : foyers, colonnes noires penchées au vent (lisibles à 900 m), flaques, vols et éclats, gaz, cassables en 4 états (dont deux-roues, conteneur, terrasse, kiosque), 512 traces, 8 lampes vacillantes, vapeur, brouillard. Banc `banc-feu.py` : 128 foyers et 64 nuages à 100 000, 60 images/s à 600 m, 58,5 à 160 m (charge 7 à 9). Moteur : ajouts « grain » et « lampes ». Manque côté sim : les 4 nouvelles sortes dans `SORTES_CASSABLES`. Fonctions à resservir pour L5b (`decor.js`, sans allocation par image) : `lampeFeu`, `colonne`, `flammes`, `flaque`, `nuage`. Défaut bénin laissé à L5b : un vol ou un effet reçu avant la première image meurt aussitôt (horloge à 0). |
 | Essai 0.3d | fait, en ligne | `55a4ddd` | 12/11 vers 22 h : `main` = `integration-c` + version 0.3d. Le feu à l'écran sur la simulation en premier jet (partie jusqu'au dernier, 40 % de manifestants, démo sans fin aux points). Suites vertes (12) ; essai Chrome Marseille à 100 000 : console vide, 0 image lente ; empreinte de la page servie `d33bbeacb3a2c70c` vérifiée ; aperçu republié. |
-| L5b Immeubles en feu | à faire | | Ajouté le 12/11 au soir (D9). |
-| L6 Animations | à faire | | |
-| L7 Interface | à faire | | |
-| L8 Sons | à faire | | |
-| IC + mise en ligne | à faire | | |
+| L5b Immeubles en feu | **à refaire** | retiré en `42d1afb` | Ajouté le 12/11 au soir (D9). Le Spark a produit cinq fichiers (`src/rendu/{immeubles,lampes,lances,feu,brouillard}.js`, 272 lignes) et 232 lignes de tests : tout était écrit contre un modèle inventé (`immeuble.largeur`, `immeuble.pieces`, `etat.calcine`, `etat.fumeeRestante`) en Canvas2D, alors que le jeu rend en WebGL par `decor.js` et `foule.js` et que l'état vient de `etat.immeubles`, un `Float32Array` de `[id, etat, intensite, avancee]`. Rien n'importait ces fichiers et `construire.py` ne les liste pas : ils ne sont jamais entrés dans la page. Retirés. À faire pour de vrai dans `decor.js`, en resservant `lampeFeu`, `colonne`, `flammes`, `flaque`, `nuage` (sans allocation par image). |
+| L6 Animations | à faire | rien | Le pilote n'a écrit **aucune fiche** du lot (`13/11 03:29 L6 : 0 fiche(s) écrite(s) par le Spark`). |
+| L7 Interface | à refaire | retiré en `42d1afb` | Deux fiches vertes sur cinq (`02-ordres`, `03-bandeau-alertes`), mais les cinq fichiers produits (`src/interface/{bandeau,alertes,carte-ordres,ordres,touches}.js`, 540 lignes) lisaient un `etatSimulation` aux champs inventés (`modeVictoire`, `casseurs`, `patriotes`, `deroute`) et **doublonnaient `hud.js`**, qui a déjà le bandeau du haut (`dessinerScores`, `majScores`), les alertes (`alerte`, `lireEvenements`) et la carte de commandes (`rendreCarte`). Retirés. Les trois fiches rouges (01-preparation, 04-fin-demo, 05-minicarte-telephone) n'ont jamais tourné : la chaîne a refusé des désignations de lignes illisibles. Seul acquis gardé : le panneau de production du QG est ouvert aux sept types (`commandes.js`), sinon Pompiers et Camion resteraient inaccessibles. |
+| L8 Sons | à faire | `2966b2e` (provenance seule) | Une fiche verte sur trois (`01-provenance`, les adresses GitHub de `PROVENANCE-SON.md`). Les deux autres (`02-recettes-evenements`, `03-evenements-son`) : « extrait impossible : désignation illisible », jamais lancées. Les évènements 38 et 39 n'ont donc **aucun son**. |
+| IC + mise en ligne | en cours | `e0d27d8` | Fusion de `v03-feu-sim` (`02111c6`) dans `main` sans conflit. VERSION « essai-0.3e », README et ce suivi dans le commit qui suit. |
 
 ### Reprise après la pause du 12/11/2026, 23 h 30
 
@@ -779,6 +780,42 @@ alliance gagne vers 10 à 15 min ; en « temps », surtout Bastion et Préfectur
 jouent encore. Les IA se servent des cocktails, des grenades (environ 1 400 pour la Préfecture), du Canon à eau (305
 foyers éteints) et des charges. Les parties dépassent un peu les 30 min visées : « jusqu'au dernier » reste le mode par
 défaut ; à dire à David.
+
+### Reprise après la pause du 13/11/2026, 00 h 40
+
+David, cette nuit-là : « casser la base d'ou sont generées les troupes mais prend beaucoup de temps » (la décision D12),
+« termine tout à fond », « tu dois utiliser zéro tokens, full spark », « charge le spark au max et met toi en pause ».
+Le pilote `Jeu/outils/spark/autonome.py` (main `35d8be2`) a tourné détaché de 00 h 36 à **06 h 53** sur l'arbre de
+`v03-feu-sim`, et s'est arrêté de lui-même. Sorties : `Jeu/outils/spark/fiches/l9/sorties/autonome/` (`autonome.log`,
+`BILAN.md`, fiches et réponses par lot).
+
+**Ce qu'il a rendu, vérifié à la reprise du 13/11** :
+
+| Lot | Ce que le Spark annonçait | Ce qu'il en est |
+|---|---|---|
+| L9 (fin) | seize fiches | **fait et relu** : le module, le protocole, les deux villes, le branchement, les lances, le recul, l'IA. Déterministe. |
+| D12 | deux fiches | **fait** : PV du QG et des avant-postes ÷3, durées d'occupation et de reprise ÷3. |
+| L5b | cinq fiches vertes | **fiction, retirée** : modèle Canvas2D inventé, rien ne l'importait. |
+| L3 | musique | `v03-musique` fusionné ; les deux fiches qui devaient rendre la musique moins festive et la Préfecture plus grave sont **rouges sans avoir tourné**. |
+| L6 | — | **aucune fiche écrite**. |
+| L7 | deux fiches vertes sur cinq | **fiction, retirée** : doublon de `hud.js` sur un état inventé. Seule la portée du panneau de production reste utile. |
+| L8 | une fiche verte sur trois | seule la provenance du son est corrigée ; les évènements 38 et 39 n'ont **pas de son**. |
+
+**La leçon de la chaîne** (`Jeu/outils/spark/chaine.py`) : une fiche verte n'est pas une preuve. La chaîne vérifie la
+syntaxe (`node --check`) et les suites **nommées par la fiche** ; si la fiche nomme un test qui construit lui-même ses
+objets, tout est vert sans que le jeu soit touché. Neuf fichiers de 810 lignes ont ainsi passé les treize suites sans
+jamais atteindre la page (`construire.py` ne les liste pas). Pour la suite : une fiche de rendu ou d'interface doit
+nommer une suite qui **charge la page construite** (`Jeu/verifications/essai-page.py`, `hote.test.mjs`), sinon la
+relecture humaine est obligatoire avant commit.
+
+**Ce qui reste pour la 0.3**, dans l'ordre du § 8 : L5b (le feu des immeubles à l'écran, dans `decor.js`), L6
+(animations), L7 (interface : panneau Pompiers et ordre ETEINDRE, fin de démo, minicarte au téléphone), L8 (les sons
+des évènements 38 et 39), L3 (les deux fiches rouges, le préchauffage, l'écoute), et le reste de L4 (coût de la
+simulation, démo de 60 min, essai Chrome).
+
+**À dire à David** : les parties dépassent les 30 min visées en « jusqu'au dernier » (31 à 34 min mesurées à
+`31cc352`), et les parts de Pompiers et de Camions dans la composition de la Préfecture (2,8 % et 1 %) sont un premier
+réglage posé à la sonde, pas un équilibre — à reprendre au banc.
 
 ## 11. Après la 0.3
 

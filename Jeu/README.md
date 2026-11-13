@@ -9,6 +9,20 @@ En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus b
 
 ## Essai 0.3 (en cours)
 
+Étape « essai-0.3e » (13 novembre 2026) : la simulation 0.3 est entière dans `main`. Les immeubles prennent feu — une
+façon chauffée par un foyer voisin s'embrase, propage à ses voisins par façades orientées, se consume, finit calcinée
+et fume ; un cocktail lancé à moins de deux mètres et demi en allume un sur trois. La Préfecture a des **Pompiers** et
+des **Camions de pompiers** (types 13 et 14), une lance, un ordre ETEINDRE et des lances oisives qui arrosent seules :
+un immeuble éteint à temps reste debout, noirci. Quatre sortes de cassables de plus ont leur feu propre (deux-roues,
+conteneur, terrasse, kiosque) ; le jet du Canon à eau et le gaz ne pèsent plus davantage sur une foule dense ; la
+Convergence casse toutes les dix secondes, qu'elle manque ou non de Matériaux ; les points de structure du QG et des
+avant-postes et leurs durées d'occupation sont divisés par trois ; la musique du lot L3 est là (premier jet). Le panneau
+de production du QG montre désormais les sept types du camp. **Ce qui ne se voit pas encore** : les immeubles en feu ne
+sont pas dessinés (le lot L5b est à faire — ce que le Spark en avait produit était du code mort, retiré), les
+évènements du feu n'ont pas de son (L8), et les animations (L6) comme l'interface des nouveaux ordres (L7) attendent.
+Mesuré sur le damier à 20 000 unités, 20 minutes simulées : 53 immeubles calcinés et 11 sauvés par la Préfecture,
+contre 94 calcinés et aucun sauvé quand rien ne produit les pompiers.
+
 Étape « essai-0.3d » (12 novembre 2026) : le feu à l'écran, sur la simulation 0.3 encore en premier jet. Ce qui est
 cassé prend feu ; les cocktails Molotov volent en cloche, éclatent et laissent une flaque en flammes ; chaque foyer
 dresse une colonne de fumée noire penchée au vent, visible de loin ; le gaz fait des nuages blancs ; les objets cassés

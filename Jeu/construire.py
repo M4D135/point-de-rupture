@@ -55,7 +55,7 @@ OUVERTURE = {
     'partage': '<script data-travailleur>',
     'simulation': '<script type="text/plain" data-travailleur>',
 }
-VERSION = 'essai-0.3d'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3d »)
+VERSION = 'essai-0.3e'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3e »)
 EDITION = '03 / MARSEILLE'    # le nom de l'étape, à gauche de la version sur l'écran titre
 BUDGET = 3_000_000     # octets : la page reste bien sous la limite des artefacts (16 Mo)
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
