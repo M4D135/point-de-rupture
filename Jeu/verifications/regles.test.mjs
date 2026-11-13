@@ -73,7 +73,8 @@ verifier('seule la Préfecture lève les avant-postes ; un QG ne se lève pas', 
 
 verifier('codage des unités : aller-retour exact en Float32 sur tout le domaine', () => {
   const f32 = new Float32Array(1);
-  for (let f = 0; f < 4; f++) for (let t = 0; t < 13; t++) for (const e of [0, 5, 11]) for (const n of [0, 31, 63]) for (const d of [0, 1, 31, 255]) {
+  // Seize types possibles (13 et 14 réservés aux pompiers de la 0.3, 15 libre), seize états (12 à 15 depuis la 0.3).
+  for (let f = 0; f < 4; f++) for (let t = 0; t < 16; t++) for (const e of [0, 5, 11, 12, 13, 14, 15]) for (const n of [0, 31, 63]) for (const d of [0, 1, 31, 255]) {
     f32[0] = R.coder(f, t, e, n, d);
     const c = f32[0];
     assert.deepEqual([R.codeFaction(c), R.codeType(c), R.codeEtat(c), R.codeNiveau(c), R.codeDrapeaux(c)], [f, t, e, n, d]);
@@ -81,7 +82,7 @@ verifier('codage des unités : aller-retour exact en Float32 sur tout le domaine
 });
 
 verifier('tables : 13 types, factions et listes cohérentes, chiffres finis', () => {
-  assert.equal(R.TYPES.length, 13);
+  assert.equal(R.TYPES.length, 15);
   R.TYPES.forEach((t, k) => {
     assert.equal(t.id, k);
     assert.ok(R.TYPES_PAR_FACTION[t.faction].includes(k));
@@ -118,6 +119,91 @@ verifier('protocole : forme des commandes, évènements, tampons', () => {
   const f32 = new Float32Array(P.EV_TAILLE * 2);
   f32.set([P.EV.REFUS, 0, 0, 1, P.RAISONS.INTERDIT, P.CMD.CASSER], P.EV_TAILLE);
   assert.deepEqual(P.lireEvenement(f32, 1), { type: P.EV.REFUS, x: 0, z: 0, faction: 1, a: P.RAISONS.INTERDIT, b: P.CMD.CASSER });
+});
+
+// ---- 0.3 ----
+verifier('0.3 : victoire au choix, remise en forme et valeurs par défaut', () => {
+  const V = R.CONSTANTES.VICTOIRE;
+  assert.deepEqual(V.MODES, ['dernier', 'temps', 'points', 'mixte']);
+  assert.deepEqual(R.victoire(undefined), { mode: 'dernier', points: 3000, duree: 20 });
+  assert.deepEqual(R.victoire(null), R.victoire({}));
+  assert.deepEqual(R.victoire({ mode: 'mixte' }), { mode: 'mixte', points: 3000, duree: 40 }, 'la règle de la 0.2');
+  assert.deepEqual(R.victoire({ mode: 'temps', duree: 15 }), { mode: 'temps', points: 3000, duree: 15 });
+  assert.deepEqual(R.victoire({ mode: 'points', points: 1500.4 }), { mode: 'points', points: 1500, duree: 20 });
+  assert.equal(R.victoire({ mode: 'au hasard' }).mode, 'dernier');
+  assert.deepEqual(R.victoire({ mode: 'temps', duree: NaN, points: -5 }), { mode: 'temps', points: 100, duree: 20 }, 'bornes');
+  assert.equal(R.victoire({ mode: 'temps', duree: 1e9 }).duree, 180);
+  for (const m of V.MODES) assert.equal(R.victoire({ mode: m }).mode, m);
+  for (const p of V.POINTS) assert.equal(R.victoire({ mode: 'points', points: p }).points, p);
+  for (const d of V.DUREES) assert.equal(R.victoire({ mode: 'temps', duree: d }).duree, d);
+  assert.ok(V.PLAFOND_S === 5400 && V.DEMO_PLAFOND_S === 3600, 'limites de sécurité : 90 et 60 minutes');
+});
+
+verifier('0.3 : part des manifestants (peu, moyen par défaut, beaucoup), cent pour cent à chaque fois', () => {
+  assert.deepEqual(R.parts(), [40, 32, 28]);
+  assert.deepEqual(R.parts('peu'), [34, 35, 31]);
+  assert.deepEqual(R.parts('beaucoup'), [50, 27, 23], 'la 0.2');
+  assert.deepEqual(R.parts('toString'), [40, 32, 28], 'une clé héritée n\'est pas un choix');
+  assert.equal(R.manifestants('n importe quoi'), 'moyen');
+  for (const k of Object.keys(R.CONSTANTES.MANIFESTANTS)) assert.equal(R.parts(k).reduce((a, b) => a + b, 0), 100, k);
+  assert.deepEqual(R.FACTIONS.map(f => Math.round(f.part * 100)), R.parts());
+});
+
+verifier('0.3 : durées de vol, feu des objets et de leurs sortes, capacités de lancer et de charge', () => {
+  assert.equal(R.dureeVol('pierre', 10), 0.6);
+  assert.ok(Math.abs(R.dureeVol('molotov', 20) - 1.5) < 1e-9 && Math.abs(R.dureeVol('lacrymo', 22) - 1.6) < 1e-9);
+  assert.equal(R.dureeVol('fusee', 10), 0);
+  // Par les points de structure : la voiture (300) brûle 38 s sur 4,5 m ; la poubelle (40), 12 s sur 2 m.
+  assert.deepEqual(R.feuObjet(300), { duree: 38, rayon: 4.5 });
+  assert.deepEqual(R.feuObjet(40, undefined, 'poubelle'), { duree: 12, rayon: 2 });
+  assert.deepEqual(R.feuObjet(undefined), R.feuObjet(60), 'pv absents : 60');
+  // Les sortes de la ville réelle ont leur feu ; « feu » sur l'objet passe avant tout.
+  const S = R.CONSTANTES.FEU.objet.sortes;
+  assert.deepEqual(Object.keys(S), ['deux-roues', 'conteneur', 'terrasse', 'kiosque']);
+  for (const k of Object.keys(S)) {
+    assert.deepEqual(R.feuObjet(100, undefined, k), { duree: S[k].duree, rayon: S[k].rayon }, k);
+    assert.ok(S[k].duree >= 12 && S[k].duree <= 40 && S[k].rayon >= 2 && S[k].rayon <= 4.5, k);
+  }
+  assert.deepEqual(R.feuObjet(120, 0, 'kiosque'), { duree: 0, rayon: 0 }, 'feu : 0, il ne brûle pas');
+  assert.deepEqual(R.feuObjet(120, 50, 'kiosque'), { duree: 50, rayon: S.kiosque.rayon });
+  assert.equal(R.feuObjet(120, 500).duree, 120);
+  assert.equal(R.feuObjet(120, undefined, 'hasOwnProperty').duree, 15, 'une clé héritée n\'est pas une sorte');
+  // Qui lance quoi : pierres (Cortège, Piquets), cocktails (Furets), grenades (Compagnie), charges (Béliers, Patrouille).
+  const avec = c => R.TYPES.filter(t => t.capacites[c]).map(t => t.cle);
+  assert.deepEqual(avec('pierres'), ['cortege', 'piquets']);
+  assert.deepEqual(avec('molotov'), ['furets']);
+  assert.deepEqual(avec('lacrymo'), ['compagnie']);
+  assert.deepEqual(avec('charge'), ['beliers', 'patrouille']);
+  for (const t of R.TYPES) for (const c of ['pierres', 'molotov', 'charge', 'lacrymo']) {
+    const x = t.capacites[c];
+    if (x) for (const v of Object.values(x)) assert.ok(typeof v === 'boolean' || (Number.isFinite(v) && v >= 0), t.cle + ' ' + c);
+    if (x && x.porteeMin !== undefined) assert.ok(x.porteeMin < x.portee, t.cle + ' ' + c);
+  }
+});
+
+verifier('0.3 : protocole version 2, sortes de cassables, numéros laissés aux pompiers (types 13 et 14, ordre 18, évènements 38 et 39)', () => {
+  assert.equal(P.VERSION, 2);
+  assert.deepEqual(P.SORTES_CASSABLES, ['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere', 'deux-roues', 'conteneur', 'terrasse', 'kiosque']);
+  assert.deepEqual(Object.values(P.SORTES_FEU), [0, 1, 2, 3]);
+  assert.equal(P.SOURCES_COUPS.length, 8);
+  assert.deepEqual(P.RAISONS_FIN, ['', 'dernier', 'points', 'temps', 'plafond', 'nul']);
+  assert.equal(new Set(Object.values(P.CMD)).size, Object.keys(P.CMD).length);
+  assert.equal(Math.max(...Object.values(P.CMD)), 18);
+  assert.equal(Math.max(...Object.values(P.EV)), 39);
+  assert.equal(R.TYPES.length, 15);
+  assert.deepEqual(Object.values(R.ETATS), Array.from({ length: 16 }, (_, k) => k), 'les seize états servent');
+  const ids = Int32Array.of(4);
+  assert.equal(P.forme(P.commande(P.CMD.MOLOTOV, 0, { ids, x: 1, z: 2 })), '');
+  assert.notEqual(P.forme(P.commande(P.CMD.MOLOTOV, 0, { ids, x: 1 })), '');
+  assert.notEqual(P.forme({ t: P.CMD.MOLOTOV, j: 0, ids: [4], x: 1, z: 2 }), '');
+  assert.equal(P.forme(P.commande(P.CMD.ETEINDRE, 2, { ids, x: 1, z: 2 })), '');
+  assert.notEqual(P.forme(P.commande(P.CMD.ETEINDRE, 2, { ids, z: 2 })), '');
+  assert.deepEqual(P.lireImmeuble(new Float32Array([7, 1, 0.5, 0.25]), 0), { id: 7, etat: 1, intensite: 0.5, avancee: 0.25 });
+  assert.equal(P.forme(P.commande(P.CMD.CAPACITE, 2, { ids, capacite: 'lacrymo', x: 1, z: 2 })), '');
+  const feux = Float32Array.of(7, 1, 2, 4, 0.5, 9, P.SORTES_FEU.OBJET, 12), nuages = Float32Array.of(3, 1, 2, 7, 1, 14);
+  assert.deepEqual(P.lireFeu(feux, 0), { id: 7, x: 1, z: 2, rayon: 4, intensite: 0.5, reste: 9, sorte: 1, cible: 12 });
+  assert.deepEqual(P.lireNuage(nuages, 0), { id: 3, x: 1, z: 2, rayon: 7, densite: 1, reste: 14 });
+  assert.equal(P.FEU_TAILLE * R.CONSTANTES.FEU.max, 1024);
 });
 
 console.log(`REGLES  REUSSI : ${ok} vérifications`);

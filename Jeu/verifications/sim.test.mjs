@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 const ici = path.dirname(fileURLToPath(import.meta.url));
 const src = f => path.join(ici, '..', 'src', f);
 const exiger = createRequire(import.meta.url);
-for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
 const { ville: V, regles: R, protocole: P, monde: M, ia: IA, travailleur: TR } = globalThis.PDR;
 const { CMD, EV, RAISONS } = P;
 const { CONVERGENCE: C, BASTION: B, PREFECTURE: F } = R;
@@ -81,7 +81,7 @@ verifier('empreinte FNV-1a 64 : valeurs de référence (les mêmes que noyau.js)
 });
 
 verifier('le pas ne lit ni Math.sin, ni Math.cos, ni horloge, ni hasard non semé', () => {
-  for (const f of ['sim/monde.js', 'sim/nav.js', 'sim/ia.js']) {
+  for (const f of ['sim/immeubles.js', 'sim/monde.js', 'sim/nav.js', 'sim/ia.js']) {
     const texte = fs.readFileSync(src(f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     assert.ok(!/Math\.(sin|cos|tan|atan2?|random|exp|log|pow|hypot)\b|\bDate\b|performance\.|\*\*/.test(texte), f);
   }
@@ -209,7 +209,7 @@ verifier('seule la Convergence casse et barricade ; elle y gagne des Matériaux'
   // 0.3, « foutre le feu quand on casse » : l'objet cassé s'embrase (2), brûle le temps que lui donnent ses points de
   // structure, puis reste calciné (3). Les casseurs s'écartent pendant qu'il s'embrase : le feu ne les touche pas.
   assert.equal(m2.casEtat[k], 2, 'en feu');
-  const objet = m2.ville.sites.cassables[k], feu = R.feuObjet(objet.pv, objet.feu);
+  const objet = m2.ville.sites.cassables[k], feu = R.feuObjet(objet.pv, objet.feu, objet.sorte);
   const allume = de(vus, EV.FEU_ALLUME)[0];
   assert.deepEqual([allume.faction, allume.b, m2.nFeux], [C, P.SORTES_FEU.OBJET, 1]);
   assert.ok(Math.hypot(allume.x - cx, allume.z - cz) < 0.01);
@@ -412,6 +412,230 @@ verifier('élimination et victoire : QG occupés, sans avant-poste ni effectifs,
   assert.equal(m.it, it, 'la partie finie ne bouge plus');
 });
 
+// ---- 0.3 : le feu, le gaz, les projectiles, les chutes, la fin de partie. ----
+/** Le foyer actif qui couvre l'unité i (tous les foyers sont lus, même ceux qui se chevauchent), ou -1. */
+function foyerDe(m, i) {
+  const f = m.feux;
+  for (let q = 0; q < f.max; q++) if (f.actif[q] && Math.hypot(m.ux[i] - f.x[q], m.uz[i] - f.z[q]) <= f.r[q]) return q;
+  return -1;
+}
+/** n itérations ; rend les évènements et le nombre d'itérations où chaque unité de ids était dans l'état « etat ». */
+function compterEtat(m, ids, etat, n) {
+  const vus = [];
+  let k = 0;
+  for (let q = 0; q < n; q++) { vus.push(...courir(m, 1)); for (const i of ids) if (m.uetat[i] === etat) k++; }
+  return { vus, k };
+}
+
+verifier('0.3, cocktail sur ordre : Furets seulement, 4 Matériaux pièce, vol en cloche, souffle, foyer au sol', () => {
+  const m0 = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m0.ville);
+  m0.ressources(C, 1000, 3);
+  const f0 = grappe(m0, C, 2, 3, r.x, r.z), c0 = grappe(m0, C, 1, 3, r.x, r.z + 3), p0 = grappe(m0, F, 10, 3, r.x, r.z - 40);
+  m0.soumettre(cmd(CMD.MOLOTOV, F, { ids: p0, x: r.x, z: r.z }));
+  m0.soumettre(cmd(CMD.MOLOTOV, C, { ids: c0, x: r.x, z: r.z + 12 }));
+  m0.soumettre(cmd(CMD.CAPACITE, C, { ids: f0, capacite: 'molotov', x: r.x, z: r.z + 12 }));
+  const refus = de(courir(m0, 1), EV.REFUS).map(e => [e.faction, e.a, e.b]).sort((a, b) => a[0] - b[0] || a[2] - b[2]);
+  assert.deepEqual(refus, [[C, RAISONS.RESSOURCES, CMD.CAPACITE], [C, RAISONS.INTERDIT, CMD.MOLOTOV], [F, RAISONS.INTERDIT, CMD.MOLOTOV]],
+    '3 Matériaux : pas de quoi en lancer un ; ni le Cortège ni la Préfecture n\'en lancent');
+
+  const m = creer({ vide: true, joueur: 0 });
+  m.ressources(C, 1000, 1000);
+  const furets = grappe(m, C, 2, 5, r.x, r.z - 8), piquets = grappe(m, B, 5, 8, r.x, r.z + 8);
+  m.soumettre(cmd(CMD.TENIR, B, { ids: piquets }));
+  m.soumettre(cmd(CMD.MOLOTOV, C, { ids: furets, x: r.x, z: r.z + 8 }));
+  const vus = courir(m, 60);
+  const lances = de(vus, EV.MOLOTOV);
+  assert.equal(lances.length, 5, 'un cocktail par Furet, aussitôt : la cible est à portée');
+  assert.ok(lances.every(e => e.faction === C && e.it === 1));
+  assert.equal(m.res[C * 2 + 1], 1000000 - 5 * R.TYPES[2].capacites.molotov.cout * 1000, '4 Matériaux pièce');
+  assert.equal(m.bilan()[C].molotovs, 5);
+  const sol = de(vus, EV.FEU_ALLUME).filter(e => e.b === P.SORTES_FEU.SOL);
+  assert.equal(sol.length, 5);
+  for (const e of lances) {
+    const f = sol.find(s => Math.hypot(s.x - e.x - e.a, s.z - e.z - e.b) < 0.01);
+    assert.ok(f && f.faction === C, 'le foyer s\'allume où le cocktail tombe');
+    assert.ok(Math.hypot(f.x - r.x, f.z - r.z - 8) < 2, 'il tombe à 1,3 m près du point visé');
+    assert.ok(Math.abs(f.it - e.it - R.dureeVol('molotov', Math.hypot(e.a, e.b)) * IT_S) <= 1, 'durée du vol');
+  }
+  const chutes = de(vus, EV.A_TERRE);
+  assert.ok(chutes.length >= 3 && chutes.every(e => e.faction === B && e.a === 5 && e.b === P.CAUSES_A_TERRE.MOLOTOV), 'le souffle jette au sol');
+  const b = m.bilan()[C];
+  assert.ok(b.sources[5] > 0 && b.aTerre === chutes.length && b.feux >= 5);
+  for (const i of piquets) if (m.uetat[i] !== ET.HORS_JEU) assert.equal(foyerDe(m, i), -1, 'personne ne reste dans le feu, même où les foyers se chevauchent');
+});
+
+verifier('0.3, feu au sol : il presse qui s\'y trouve, même les siens, qui en sortent, même à terre ; qui y tombe disparaît', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m.ville);
+  const corteges = grappe(m, C, 1, 12, r.x, r.z);
+  m.soumettre(cmd(CMD.TENIR, C, { ids: corteges }));
+  courir(m, 1);
+  const couche = corteges[0], faible = corteges[1];
+  assert.equal(m.renverser(couche), true);
+  m.ucoh[faible] = 100;
+  m.incendier(C, r.x, r.z);                       // leur propre cocktail : pas de souffle sur eux, mais le feu presse
+  const dedans = corteges.filter(i => foyerDe(m, i) >= 0);
+  assert.ok(m.nFeux >= 1 && dedans.length >= 10 && dedans.includes(couche) && dedans.includes(faible));
+  const vus = courir(m, 40);
+  assert.deepEqual(de(vus, EV.HORS_JEU).map(e => [e.faction, e.a, e.b]), [[C, 1, -1]], 'le plus faible est mis hors jeu');
+  assert.equal(m.ufac[faible], R.LIBRE, 'hors jeu dans un foyer, il disparaît aussitôt : personne n\'est montré en feu');
+  for (const i of corteges) {
+    if (i === faible) continue;
+    assert.equal(foyerDe(m, i), -1, 'deux secondes plus tard, plus personne dans le foyer');
+    assert.equal(m.uterre[i], 0);
+    if (dedans.includes(i)) assert.ok(m.ucoh[i] < R.TYPES[1].coh * 1000, 'pressé');
+  }
+  assert.ok(distance(m, couche, r.x, r.z) > K.FEU.rayon, 'à terre dans le feu, il se relève et en sort');
+  assert.equal(m.bilan()[C].infliges, 0, 'le feu des siens ne rapporte rien');
+});
+
+verifier('0.3, Canon à eau : il éteint de lui-même le foyer à sa portée, et sur ordre celui qu\'on lui désigne', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m.ville);
+  const canon = m.ajouter(F, 12, r.x, r.z - 12);
+  m.incendier(C, r.x, r.z);
+  let id = -1;
+  for (let q = 0; q < m.feux.max; q++) if (m.feux.actif[q] && m.feux.sorte[q] === P.SORTES_FEU.SOL) id = m.feux.id[q];
+  const n0 = m.nFeux;
+  const vus = courir(m, 600, null, x => x.nFeux === 0);
+  assert.equal(m.nFeux, 0);
+  const eteints = de(vus, EV.FEU_ETEINT);
+  assert.ok(eteints.length === n0 && eteints.every(e => e.faction === F && e.b === 1), 'éteints à l\'eau, par la Préfecture');
+  assert.ok(eteints.find(e => e.a === id).it < K.FEU.duree * IT_S / 2, 'bien avant de s\'être consumé');
+  assert.ok(de(vus, EV.JET).length > 0 && m.bilan()[F].eteints === n0);
+  // Un foyer à 36 m, hors de sa portée : de lui-même, il ne bouge pas ; sur ordre, il s'approche et l'éteint.
+  m.incendier(C, r.x, r.z + 24);
+  const n1 = m.nFeux;
+  courir(m, 40);
+  assert.ok(distance(m, canon, r.x, r.z - 12) < 0.5 && m.nFeux === n1);
+  m.soumettre(cmd(CMD.CAPACITE, F, { ids: [canon], capacite: 'jet', x: r.x, z: r.z + 24 }));
+  const vus2 = courir(m, 600, null, x => x.nFeux === 0);
+  assert.equal(m.nFeux, 0);
+  assert.ok(de(vus2, EV.FEU_ETEINT).every(e => e.faction === F && e.b === 1) && m.bilan()[F].eteints === n0 + n1);
+  assert.ok(distance(m, canon, r.x, r.z + 24) <= R.TYPES[12].capacites.jet.portee + 0.5);
+});
+
+verifier('0.3, gaz : Convergence et Bastion suffoquent et en sortent au pas ; la Préfecture et ses alliés portent le masque', () => {
+  const r = rueEntreMurs(creer({ vide: true, joueur: 0 }).ville);
+  const dans = (m, ids) => ids.filter(i => distance(m, i, r.x, r.z) <= K.GAZ.rayon).length;
+  // La Convergence : elle suffoque, ne frappe plus, sort du nuage.
+  const m = creer({ vide: true, joueur: 0 });
+  const conv = grappe(m, C, 1, 8, r.x, r.z);
+  m.soumettre(cmd(CMD.TENIR, C, { ids: conv }));
+  courir(m, 1);
+  m.gazer(F, r.x, r.z);
+  const a = compterEtat(m, conv, ET.SUFFOQUE, 200);
+  assert.ok(a.k > 0, 'elle suffoque');
+  assert.equal(dans(m, conv), 0, 'dix secondes plus tard, elle est sortie du nuage');
+  assert.ok(conv.every(i => m.ucoh[i] < R.TYPES[1].coh * 1000) && m.bilan()[F].sources[7] > 0);
+  // Le Bastion aussi, et le gaz de la Préfecture le met en colère.
+  const m2 = creer({ vide: true, joueur: 0 });
+  const bast = grappe(m2, B, 5, 8, r.x, r.z);
+  m2.soumettre(cmd(CMD.TENIR, B, { ids: bast }));
+  courir(m2, 1);
+  m2.gazer(F, r.x, r.z);
+  assert.ok(compterEtat(m2, bast, ET.SUFFOQUE, 40).k > 0 && m2.colere > 0);
+  // Allié de la Préfecture, le Bastion porte le masque comme elle.
+  const m3 = creer({ vide: true, joueur: 0, alliance: [B, F] });
+  const masques = Int32Array.from([...grappe(m3, B, 5, 6, r.x, r.z), ...grappe(m3, F, 9, 6, r.x, r.z + 1)]);
+  m3.soumettre(cmd(CMD.TENIR, B, { ids: masques.subarray(0, 6) })); m3.soumettre(cmd(CMD.TENIR, F, { ids: masques.subarray(6) }));
+  courir(m3, 1);
+  m3.gazer(F, r.x, r.z);
+  assert.equal(compterEtat(m3, masques, ET.SUFFOQUE, 100).k, 0);
+  assert.ok(masques.every(i => m3.ucoh[i] === R.TYPES[m3.utyp[i]].coh * 1000) && dans(m3, masques) === 12, 'rien, ils restent');
+});
+
+verifier('0.3, mise à terre : trois secondes au sol sans rien faire, puis six sans retomber ; un véhicule ne tombe pas', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m.ville);
+  const i = m.ajouter(C, 1, r.x, r.z), canon = m.ajouter(F, 12, r.x, r.z + 24);
+  const SOL = K.A_TERRE_S * IT_S, IMM = K.A_TERRE_IMMUNITE_S * IT_S;
+  assert.equal(m.renverser(i), true);
+  assert.deepEqual([m.uterre[i], m.uetat[i]], [SOL, ET.A_TERRE]);
+  m.soumettre(cmd(CMD.DEPLACER, C, { ids: [i], x: r.x, z: r.z + 12, mode: 0 }));
+  const x0 = m.ux[i], z0 = m.uz[i];
+  courir(m, SOL - 1);
+  assert.deepEqual([m.uterre[i], m.uetat[i], m.ux[i], m.uz[i]], [1, ET.A_TERRE, x0, z0], 'au sol, il ne bouge pas');
+  courir(m, 1);
+  assert.deepEqual([m.uterre[i], m.uimm[i]], [0, IMM], 'relevé');
+  assert.equal(m.renverser(i), false, 'relevé depuis moins de six secondes, il ne retombe pas');
+  courir(m, IMM);
+  assert.equal(m.uimm[i], 0);
+  assert.ok(Math.hypot(m.ux[i] - x0, m.uz[i] - z0) > 5000, 'il a repris sa marche');
+  assert.equal(m.renverser(i), true);
+  assert.ok(!m.renverser(canon) && m.uterre[canon] === 0, 'un véhicule ne tombe pas');
+});
+
+verifier('0.3, charge : les Béliers foncent entre 4 et 12 m ; le choc repousse et jette au sol', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m.ville);
+  const beliers = grappe(m, B, 7, 4, r.x, r.z - 5), corteges = grappe(m, C, 1, 10, r.x, r.z + 4);
+  m.soumettre(cmd(CMD.TENIR, C, { ids: corteges }));
+  m.soumettre(cmd(CMD.DEPLACER, B, { ids: beliers, x: r.x, z: r.z + 4, mode: 1 }));
+  const { vus, k } = compterEtat(m, beliers, ET.ASSAUT, 120);
+  const charges = de(vus, EV.CHARGE);
+  assert.ok(charges.length >= 1 && charges.every(e => e.faction === B && e.b === 7));
+  assert.ok(k > 0, 'en assaut pendant l\'élan');
+  const chutes = de(vus, EV.A_TERRE).filter(e => e.b === P.CAUSES_A_TERRE.CHARGE);
+  assert.ok(chutes.length >= 1 && chutes.every(e => e.faction === C && e.a === 1), 'le choc jette au sol');
+  const b = m.bilan()[B];
+  assert.ok(b.charges >= 2 && b.sources[4] > 0 && b.aTerre >= chutes.length);
+});
+
+verifier('0.3, pierres : à 10 m, Cortège et Piquets qui tiennent se lancent des pierres ; le coup porte 0,6 s plus tard', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const r = rueEntreMurs(m.ville);
+  const corteges = grappe(m, C, 1, 6, r.x, r.z - 5), piquets = grappe(m, B, 5, 6, r.x, r.z + 5);
+  m.soumettre(cmd(CMD.TENIR, C, { ids: corteges })); m.soumettre(cmd(CMD.TENIR, B, { ids: piquets }));
+  const vus = [];
+  let premierCoup = -1;
+  for (let q = 0; q < 100; q++) {
+    vus.push(...courir(m, 1));
+    if (premierCoup < 0 && m.bilan()[C].sources[3] > 0) premierCoup = m.it;
+  }
+  const pierres = de(vus, EV.PIERRE);
+  for (const f of [C, B]) {
+    const z = f === C ? r.z + 5 : r.z - 5, siennes = pierres.filter(e => e.faction === f);
+    assert.ok(siennes.length >= 6, 'chacun lance');
+    assert.ok(siennes.every(e => Math.hypot(e.x + e.a - r.x, e.z + e.b - z) < 4), 'vers l\'autre groupe');
+    const b = m.bilan()[f];
+    assert.ok(b.pierres >= siennes.length && b.sources[3] > 0 && b.sources[0] === 0, 'des pierres, aucun contact');
+  }
+  const premier = pierres.find(e => e.faction === C).it;
+  assert.equal(premierCoup - premier, Math.round(K.PROJECTILES.pierre.vol * IT_S));
+});
+
+verifier('0.3, déroute : un camp sans base tient 30 s, puis il est éliminé ; la partie continue à deux', () => {
+  const m = creer({ vide: true, joueur: 0 });
+  const qb = m.ville.sites.qg[B], L = m.ville.sites.lieux[0], p = m.ville.accrocher(L.x, L.z);
+  grappe(m, C, 1, 30, qb.sortie[0], qb.sortie[1]);
+  grappe(m, B, 5, 150, p[0], p[1]);                 // loin de son QG, plus de 2 % de ses effectifs de départ
+  const vus = courir(m, 2400, null, x => x.elimine[B] === 1);
+  const occ = de(vus, EV.QG_OCCUPE), der = de(vus, EV.DEROUTE), elim = de(vus, EV.ELIMINATION);
+  assert.deepEqual(occ.map(e => [e.faction, e.a]), [[B, C]]);
+  assert.deepEqual(der.map(e => [e.faction, e.a]), [[B, K.DEROUTE_S]]);
+  assert.ok(der[0].it >= occ[0].it && der[0].it - occ[0].it <= IT_S, 'la déroute commence avec l\'occupation');
+  assert.deepEqual(elim.map(e => e.faction), [B]);
+  assert.ok(Math.abs((elim[0].it - der[0].it) / IT_S - K.DEROUTE_S) <= 1, '30 s de déroute : ' + (elim[0].it - der[0].it) / IT_S);
+  assert.equal(m.vainqueur, -1, 'la Convergence et la Préfecture restent en jeu');
+});
+
+verifier('0.3, modes de victoire : la cible de points finit la partie ; la limite de temps donne le meilleur score', () => {
+  const m = creer({ vide: true, joueur: 0, victoire: { mode: 'points', points: 1500 } });
+  assert.deepEqual(m.victoire, { mode: 'points', points: 1500, limiteTemps: 0, plafond: K.VICTOIRE.PLAFOND_S * IT_S });
+  m.score[B] = 1500;
+  const vus = courir(m, IT_S + 1, null, x => x.vainqueur !== -1);
+  assert.deepEqual(de(vus, EV.VICTOIRE).map(e => [e.a, e.b]), [[B, P.RAISONS_FIN.indexOf('points')]]);
+  assert.equal(m.raison, 'points');
+  const m2 = creer({ vide: true, joueur: 0, victoire: { mode: 'temps', duree: 10 } });
+  assert.deepEqual([m2.victoire.points, m2.victoire.limiteTemps, m2.victoire.plafond], [0, 10 * 60 * IT_S, 0]);
+  m2.score[F] = 5; m2.score[C] = 3;
+  courir(m2, 10 * 60 * IT_S + IT_S, null, x => x.vainqueur !== -1);
+  assert.deepEqual([m2.vainqueur, m2.raison], [F, 'temps']);
+  assert.ok(m2.it >= 10 * 60 * IT_S && m2.it <= 10 * 60 * IT_S + IT_S);
+});
+
 // ---- Le travailleur : messages, réserve de tampons, vitesse, démo. ----
 function horlogeFactice() {
   let maintenant = 0, suivant = 1;
@@ -446,8 +670,9 @@ verifier('travailleur : pret, un état par itération, tampons rendus, vitesse, 
   assert.equal(recus[0].m.type, 'pret');
   assert.deepEqual(Object.keys(recus[0].m.options).sort(), ['alliance', 'brouillard', 'coalitions', 'difficulte', 'effectifs', 'enregistrer', 'graine', 'joueur',
     'manifestants', 'victoire', 'ville']);
-  // 0.3 : une démo ne finit ni aux points ni au temps ; la part des manifestants par défaut est « moyen ».
-  assert.deepEqual(recus[0].m.options.victoire, { mode: 'dernier', points: 3000, duree: 20 });
+  // 0.3 : une démo ne finit ni aux points ni au temps (0 : ni cible ni limite, dès « pret » comme dans l'état) ; la
+  // part des manifestants par défaut est « moyen ».
+  assert.deepEqual(recus[0].m.options.victoire, { mode: 'dernier', points: 0, duree: 0 });
   assert.equal(recus[0].m.options.manifestants, 'moyen');
   assert.deepEqual(recus[0].m.carte.parts, [40, 32, 28]);
   assert.deepEqual(recus[0].m.carte.depart, [8000, 6400, 5600]);
@@ -558,6 +783,9 @@ verifier('partie de 10 minutes à trois IA, 20 000 unités : aucune exception ni
   assert.ok((compte[EV.BARRICADE_POSEE] || 0) >= 1 && (compte[EV.BARRICADE_LEVEE] || 0) >= 1, 'des barricades posées puis levées');
   assert.ok((compte[EV.PRODUCTION] || 0) >= 10 && (compte[EV.HORS_JEU] || 0) >= 100);
   assert.ok(!compte[EV.REFUS] || compte[EV.REFUS] < 200, 'l\'IA ne s\'obstine pas sur des ordres refusés');
+  // 0.3 : les IA se servent des cocktails, du gaz, du Canon à eau (qui éteint), des charges, des pierres.
+  for (const t of ['MOLOTOV', 'FEU_ALLUME', 'LACRYMO', 'GAZ', 'JET', 'A_TERRE', 'CHARGE', 'PIERRE']) assert.ok(compte[EV[t]] >= 1, '0.3 : ' + t);
+  assert.ok(m.bilan()[F].eteints >= 1, 'des feux éteints à l\'eau');
 });
 
 console.log(`SIM  REUSSI : ${ok} vérifications`);

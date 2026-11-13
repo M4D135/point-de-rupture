@@ -136,7 +136,8 @@ si le lot L4 change un format, il corrige ce paragraphe.
 - **Options.** `victoire: { mode: 'dernier' | 'temps' | 'points' | 'mixte', points, duree (minutes) }`, remise en forme
   par `PDR.regles.victoire` (absente : `{ mode: 'dernier', points: 3000, duree: 20 }`) ; choix proposés dans
   `regles.CONSTANTES.VICTOIRE`. `manifestants: 'peu' | 'moyen' | 'beaucoup'` (`regles.parts` : 34/35/31, 40/32/28,
-  50/27/23 %). En démo, `victoire` est ignorée et rendue `{ mode: 'dernier' }`. `CARTE.parts` donne les parts retenues.
+  50/27/23 %). En démo, `victoire` est ignorée et rendue `{ mode: 'dernier', points: 0, duree: 0 }`, dès le message
+  « pret ». `CARTE.parts` donne les parts retenues.
 - **Unités.** Le tampon garde quatre nombres par unité, `[x, z, cap, code]`. États (`regles.ETATS`, bits 6 à 9 du code) :
   0 OISIF, 1 MARCHE, 2 ATTAQUE, 3 RECOLTE, 4 CHARGE (porte une charge), 5 CONSTRUIT, 6 LEVE, 7 CASSE, 8 REPLI, 9 TIENT,
   10 HORS_JEU, 11 CAPACITE, et depuis la 0.3 : 12 A_TERRE, 13 LANCE, 14 SUFFOQUE, 15 ASSAUT. Les seize valeurs sont
@@ -163,8 +164,10 @@ si le lot L4 change un format, il corrige ce paragraphe.
   sécurité arrête la partie à 90 minutes (60 en démo, raison `plafond`).
 - **Chiffres des capacités** (`regles.js`) : pierres, portée 14 m, pression 3, recharge 5 s ; molotov, portée 22 m, rayon
   3 m, pression 12, 8 unités au plus, mise à terre 3 s, recharge 25 s ; charge, portée 12 m, 2 s, pression 8 à 10, recul
-  1,5 à 2 m ; salve, mise à terre 4 s ; lacrymogène, portée 26 m, recharge 35 s. Ce sont des chiffres de premier jet :
-  L4 les règle.
+  1,5 à 2 m ; salve, mise à terre 4 s ; lacrymogène, portée 26 m, recharge 35 s. `jet.max` = 8 (le jet du canon à eau
+  ne touche que les 8 unités les plus proches à chaque impulsion) ; `GAZ.plein` = 20 (un nuage presse à plein 20 unités
+  et partage sa pression au-delà) ; `RYTHME` = 1 (multiplie toutes les pressions : contact, salve, jet, pierres, charge,
+  souffle du cocktail). Ce sont des chiffres de premier jet : L4 les règle.
 - **Ajouts prévus par L9** (D9 ; contrat que L5b, L6, L7 et L8 attendent, que L9 précise s'il le faut) :
   - **Types** 13 `pompiers` (« Pompiers », à pied) et 14 `camion-pompiers` (« Camion de pompiers », véhicule), à la
     Préfecture : `TYPES_PAR_FACTION[2]` devient `[8, 9, 10, 11, 12, 13, 14]`. Le code d'unité garde ses 4 bits de type,
@@ -207,8 +210,9 @@ donne des valeurs par défaut à une sorte inconnue, et le décor (L5) doit la d
 L2 remet donc à L5 la liste des sortes et leur dessin.
 
 Remis par L2 (commit `ce67c66`) : quatre sortes nouvelles, `'deux-roues'`, `'conteneur'`, `'terrasse'`, `'kiosque'`
-(`casser(...)` dans `ville-reelle.js`), à ajouter en fin de `SORTES_CASSABLES` (`protocole.js`) par L4 : sur `main`, une
-sorte inconnue donne 255 dans l'évènement CASSE et le son retombe sur « metal ». Comptes pour 9 / 13 / 15 îlots :
+(`casser(...)` dans `ville-reelle.js`). C'est fait (commit 05714ee) : `SORTES_CASSABLES` compte 10 sortes, et deux-roues,
+conteneur, terrasse et kiosque ont les indices 6 à 9, que l'évènement CASSE rend dans son champ `b`. Comptes pour 9 / 13
+/ 15 îlots :
 
 | Sorte | 9 | 13 | 15 | | Sorte | 9 | 13 | 15 |
 |---|---|---|---|---|---|---|---|---|

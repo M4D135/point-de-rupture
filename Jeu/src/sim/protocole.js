@@ -24,8 +24,8 @@
                manifestants: 'peu' | 'moyen' | 'beaucoup' (0.3 ; facultatif, 'moyen' par défaut) : la part de la
                  Convergence dans les effectifs — 34, 40 ou 50 % (regles.parts) ; le total ne change pas }
    « pret ».options rend la ville vraiment construite (villeDe(options, ilots) la refait à l'identique dans la page),
-   la victoire et les manifestants remis en forme. En démo, options.victoire est ignoré et rendu { mode: 'dernier' } :
-   une démo ne finit ni aux points ni au temps (voir VICTOIRE).
+   la victoire et les manifestants remis en forme. En démo, options.victoire est ignoré et rendu { mode: 'dernier',
+   points: 0, duree: 0 } (0 : ni cible ni limite de temps) : une démo ne finit ni aux points ni au temps (voir VICTOIRE).
 
    CARTE = { ilots, etendue: { x0, z0, x1, z1 } (m),
              nav: { nx, nz, x0, z0, cellule }, voile: { nx, nz, x0, z0, cellule },
@@ -68,13 +68,16 @@
      nuages: null ou Float32Array (k × NUAGE_TAILLE) : les nuages de gaz, [id, x (m), z (m), rayon (m, il grossit
              pendant 2 s), densite (0..1 : baisse sur les quatre dernières secondes), reste (s)] ; mêmes envois que
              feux ; 64 nuages au plus,
+     immeubles: null ou Float32Array (k × IMMEUBLE_TAILLE) : les immeubles touchés par le feu, [id (ville.sites.immeubles),
+                etat (ETATS_IMMEUBLE : 1 en feu, 2 éteint, 3 calciné), intensite (0..1), avancee (0..1 : la part déjà
+                brûlée)] ; mêmes envois que feux ; 1 024 au plus,
      minicarte: null ou Uint16Array (taille × taille × 3 : unités par case et par camp ; toutes les 10 itérations),
      combats: null ou Uint16Array (taille × taille : coups portés par case depuis l'envoi précédent ; toutes les
               2 itérations),
      evenements: Float32Array (k × EV_TAILLE) depuis l'état précédent ; le travailleur y ajoute un REFUS (raison
                  INTERDIT, x = z = 0) pour toute commande d'un autre camp que le joueur, et pour toutes en démo,
      vainqueur: VAINQUEUR, raison: RAISONS_FIN ('' tant que la partie dure),
-     mesure: { msIteration, msIA, msNav, vivantes, champs, feux, nuages, aTerre, gisants }
+     mesure: { msIteration, msIA, msNav, vivantes, champs, feux, nuages, immeubles, aTerre, gisants }
    }
    STRUCTURE = { id, sorte: 'qg' | 'avant-poste' | 'barricade', faction, x, z, x2, z2 (bout de barricade, sinon = x, z),
                  pv, pvMax, chantier (booléen), feu (booléen : elle brûle — un foyer de etat.feux la désigne),
@@ -82,7 +85,8 @@
                  ralliement: [x, z] ou null }
    BILAN = [ { produites, horsJeu, infliges, barricadesPosees, barricadesLevees, casses, lieuxPris, recolte,
                molotovs, grenades (lacrymogènes), pierres, charges, aTerre (mises à terre infligées), feux (foyers
-               allumés : cocktails, casse, propagation), eteints (foyers éteints à l'eau),
+               allumés : cocktails, casse, propagation), eteints (foyers éteints à l'eau), immeublesBrules (immeubles
+               calcinés que le camp avait allumés), immeublesSauves (immeubles éteints par le camp),
                sources: [8] (les points de « infliges » par origine, dans l'ordre de SOURCES_COUPS) } × 3 ]
    FIN = { type: 'fin', vainqueur: VAINQUEUR, raison: RAISONS_FIN, temps (s de partie), victoire (celle de l'état),
            eco (celle du dernier état), bilan: BILAN, enregistrement (null si options.enregistrer est faux) }
@@ -102,7 +106,9 @@
 (function (PDR) {
   'use strict';
 
-  const CAPACITE = 262144, FLOATS_PAR_UNITE = 4, LARGEUR_TEXTURE = 1024, EV_TAILLE = 6, FEU_TAILLE = 8, NUAGE_TAILLE = 6;
+  const CAPACITE = 262144, FLOATS_PAR_UNITE = 4, LARGEUR_TEXTURE = 1024, EV_TAILLE = 6, FEU_TAILLE = 8, NUAGE_TAILLE = 6,
+        IMMEUBLE_TAILLE = 4;
+  const ETATS_IMMEUBLE = Object.freeze({ INTACT: 0, EN_FEU: 1, ETEINT: 2, CALCINE: 3 });
 
   /** Types de commande. Champs communs : t (type), j (camp qui ordonne). ids : Int32Array d'emplacements d'unités
    *  du camp j. Positions en mètres. */
@@ -127,6 +133,9 @@
     MOLOTOV: 17,      // { ids, x, z }        (0.3) les Furets de la sélection s'approchent à 22 m et lancent chacun un
                       // cocktail sur le point (sol, barricade, avant-poste, objet) : 4 Matériaux pièce ; Convergence
                       // seulement. Raccourci de { t: CAPACITE, capacite: 'molotov' }.
+    ETEINDRE: 18,     // { ids, x, z }        (0.3) les unités de la sélection qui ont une lance (Pompiers, Camion de
+                      // pompiers) vont à portée de lance du point et arrosent foyers et immeubles en feu ; Préfecture
+                      // seulement.
   });
   const NOMS_CMD = Object.freeze(Object.fromEntries(Object.entries(CMD).map(([k, v]) => [v, k])));
 
@@ -177,11 +186,18 @@
     BASE_REPRISE: 35,       // x, z du QG, faction qui retrouve une base : la déroute s'arrête
     POSTE_OCCUPE: 36,       // x, z, faction de l'avant-poste, a : id, b : occupant
     POSTE_REPRIS: 37,       // x, z, faction de l'avant-poste, a : id
+    IMMEUBLE_FEU: 38,       // x, z de l'immeuble, faction qui l'a allumé (-1 : un feu sans camp), a : id de l'immeuble
+                            // (ville.sites.immeubles, etat.immeubles), b : 0
+    IMMEUBLE_ETEINT: 39,    // x, z, faction qui l'éteint (-1 : il a brûlé jusqu'au bout), a : id, b : 1 éteint à l'eau,
+                            // 0 calciné (comme FEU_ETEINT)
   });
   const RAISONS = Object.freeze({ RESSOURCES: 1, PLAFOND: 2, INTERDIT: 3, EMPLACEMENT: 4, INJOIGNABLE: 5, FILE_PLEINE: 6, DELAI: 7 });
-  /** Sortes de cassables connues de la page. La simulation n'en dépend pas : pv, rendement et feu viennent de chaque
-   *  objet de ville.sites.cassables (regles.feuObjet) ; une sorte absente d'ici donne b = -1 dans CASSE. */
-  const SORTES_CASSABLES = Object.freeze(['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere']);
+  /** Sortes de cassables connues de la page : les six de la 0.2, puis, depuis la 0.3, les quatre de la ville réelle
+   *  (deux-roues, conteneur, terrasse, kiosque), dans l'ordre de ville-reelle.js. Les points de structure et le
+   *  rendement viennent de chaque objet de ville.sites.cassables ; le feu aussi, ou de sa sorte (regles.feuObjet). Une
+   *  sorte absente d'ici brûle selon ses points de structure et donne b = -1 dans CASSE. */
+  const SORTES_CASSABLES = Object.freeze(['voiture', 'abribus', 'vitrine', 'poubelle', 'banc', 'barriere',
+    'deux-roues', 'conteneur', 'terrasse', 'kiosque']);
   /** Sorte d'un foyer (etat.feux, FEU_ALLUME). */
   const SORTES_FEU = Object.freeze({ SOL: 0, OBJET: 1, BARRICADE: 2, POSTE: 3 });
   /** D'où viennent les coups d'un camp (BILAN.sources). */
@@ -229,6 +245,10 @@
     const o = k * NUAGE_TAILLE;
     return { id: f32[o], x: f32[o + 1], z: f32[o + 2], rayon: f32[o + 3], densite: f32[o + 4], reste: f32[o + 5] };
   };
+  const lireImmeuble = (f32, k) => {
+    const o = k * IMMEUBLE_TAILLE;
+    return { id: f32[o], etat: f32[o + 1], intensite: f32[o + 2], avancee: f32[o + 3] };
+  };
 
   /** Construit une commande. Les ids sont recopiés en Int32Array. */
   function commande(t, j, champs = {}) {
@@ -243,17 +263,19 @@
     if (!(c.j === 0 || c.j === 1 || c.j === 2)) return 'camp invalide';
     const fini = v => typeof v === 'number' && Number.isFinite(v);
     const avecIds = [CMD.DEPLACER, CMD.ATTAQUER, CMD.ARRETER, CMD.TENIR, CMD.REPLIER, CMD.REGROUPER, CMD.RECOLTER,
-      CMD.CASSER, CMD.LEVER, CMD.BARRICADER, CMD.CONSTRUIRE, CMD.CAPACITE, CMD.MOLOTOV];
+      CMD.CASSER, CMD.LEVER, CMD.BARRICADER, CMD.CONSTRUIRE, CMD.CAPACITE, CMD.MOLOTOV, CMD.ETEINDRE];
     if (avecIds.includes(c.t) && !(c.ids instanceof Int32Array)) return 'ids manquants';
     const positions = { [CMD.DEPLACER]: ['x', 'z'], [CMD.REGROUPER]: ['x', 'z'], [CMD.BARRICADER]: ['x', 'z', 'x2', 'z2'],
-      [CMD.CONSTRUIRE]: ['x', 'z'], [CMD.RALLIEMENT]: ['x', 'z'], [CMD.CAPACITE]: ['x', 'z'], [CMD.MOLOTOV]: ['x', 'z'] }[c.t] || [];
+      [CMD.CONSTRUIRE]: ['x', 'z'], [CMD.RALLIEMENT]: ['x', 'z'], [CMD.CAPACITE]: ['x', 'z'], [CMD.MOLOTOV]: ['x', 'z'],
+      [CMD.ETEINDRE]: ['x', 'z'] }[c.t] || [];
     for (const k of positions) if (!fini(c[k])) return 'position ' + k + ' invalide';
     return '';
   }
 
   PDR.protocole = Object.freeze({
-    VERSION: 2, CAPACITE, FLOATS_PAR_UNITE, LARGEUR_TEXTURE, EV_TAILLE, FEU_TAILLE, NUAGE_TAILLE,
+    VERSION: 2, CAPACITE, FLOATS_PAR_UNITE, LARGEUR_TEXTURE, EV_TAILLE, FEU_TAILLE, NUAGE_TAILLE, IMMEUBLE_TAILLE,
+    ETATS_IMMEUBLE,
     CMD, NOMS_CMD, EV, RAISONS, SORTES_CASSABLES, SORTES_FEU, CAUSES_A_TERRE, SOURCES_COUPS, VAINQUEUR, RAISONS_FIN,
-    VILLES, villeDe, tamponUnites, lireUnite, lireEvenement, lireFeu, lireNuage, commande, forme,
+    VILLES, villeDe, tamponUnites, lireUnite, lireEvenement, lireFeu, lireNuage, lireImmeuble, commande, forme,
   });
 })(globalThis.PDR = globalThis.PDR || {});

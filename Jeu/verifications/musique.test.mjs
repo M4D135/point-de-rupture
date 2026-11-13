@@ -71,7 +71,7 @@ function relire(o) {
   return { ordre, motifs, echantillons, notes, tempo, vitesse };
 }
 
-const TEMPOS = { titre: 108, convergence: 132, bastion: 92, prefecture: 120 };
+const TEMPOS = { titre: 100, convergence: 126, bastion: 88, prefecture: 124 };
 const lus = {};
 for (const cle of M.CLES) {
   await verifier(`« ${cle} » : module M.K. bien formé, PCM bipolaire, tempo ${TEMPOS[cle]}`, () => {
@@ -161,10 +161,10 @@ function jouer(lecteur, ctx, secondes, pas = 1 / 60) { for (let t = 0; t < secon
 await verifier('lecteur : voix bornées à 28, rien dans le passé, tempo du morceau', () => {
   const ctx = new Contexte(), sortie = ctx.createGain(), l = M.creer(ctx, sortie);
   l.choisir('convergence'); l.volume(0.6); l.jouer(true);
-  jouer(l, ctx, 12);
+  jouer(l, ctx, 40);
   assert.ok(l.stats.notes > 50, 'notes : ' + l.stats.notes);
   assert.ok(l.stats.picVoix <= 28 && l.stats.picVoix > 3, 'pic de voix : ' + l.stats.picVoix);
-  assert.equal(l.stats.tempo, 132);
+  assert.equal(l.stats.tempo, 126);
   assert.equal(l.stats.morceau, 'convergence');
   l.liberer();
   assert.ok(ctx.noeuds.filter(n => n !== sortie).every(n => n.detache), 'tout est détaché');
@@ -173,7 +173,7 @@ await verifier('lecteur : voix bornées à 28, rien dans le passé, tempo du mor
 await verifier('intensité : bascule vers la section tendue, puis retour au calme, en fin de motif', () => {
   const ctx = new Contexte(), l = M.creer(ctx, ctx.createGain());
   l.choisir('bastion'); l.jouer(true);
-  const motif = 64 * 2.5 * 6 / 92;            // secondes par motif à 92 BPM, vitesse 6
+  const motif = 64 * 2.5 * 6 / 88;            // secondes par motif à 88 BPM, vitesse 6
   jouer(l, ctx, motif * 1.5);
   assert.equal(l.stats.section, 'calme');
   l.intensite(1);
@@ -201,7 +201,7 @@ await verifier('pause, volume nul, changement de morceau et recalage après un r
   ctx.avancer(1.5); l.tick();                 // onglet caché : la musique se recale au lieu de rattraper
   assert.ok(l.stats.resynchronisations >= 1);
   l.choisir('titre'); l.tick();
-  assert.equal(l.stats.morceau, 'titre'); assert.equal(l.stats.tempo, 108); assert.ok(l.stats.position === 0 && l.stats.rangee < 7);
+  assert.equal(l.stats.morceau, 'titre'); assert.equal(l.stats.tempo, 100); assert.ok(l.stats.position === 0 && l.stats.rangee < 7);
   ctx.state = 'suspended'; const r3 = l.stats.rangees; jouer(l, ctx, 0.5); assert.equal(l.stats.rangees, r3, 'contexte suspendu : rien');
   l.liberer(); l.liberer(); l.tick(); l.jouer(true); l.choisir('bastion');
 });
@@ -210,12 +210,12 @@ await verifier('rythme : une rangée après l’autre, à l’heure audio, au te
   const ctx = new Contexte(), l = M.creer(ctx, ctx.createGain()), recus = [];
   l.rythme((temps, rangee, duree) => recus.push([temps, rangee, duree, ctx.currentTime]));
   l.choisir('convergence'); l.jouer(true); jouer(l, ctx, 6);
-  const duree = 2.5 * 6 / 132;
+  const duree = 2.5 * 6 / 126;
   assert.ok(recus.length > 45, 'rangées reçues : ' + recus.length);
   for (let i = 0; i < recus.length; i++) {
     const [temps, rangee, d, alors] = recus[i];
     assert.ok(temps >= alors - 1e-9 && temps <= alors + 0.3, 'programmée d’avance, jamais dans le passé');
-    assert.ok(Math.abs(d - duree) < 1e-12, 'durée d’une double-croche à 132 BPM');
+    assert.ok(Math.abs(d - duree) < 1e-12, 'durée d’une double-croche à 126 BPM');
     if (i) {
       assert.equal(rangee, (recus[i - 1][1] + 1) & 63, 'rangées consécutives');
       assert.ok(Math.abs(temps - recus[i - 1][0] - duree) < 1e-9, 'pas régulier');

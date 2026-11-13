@@ -52,7 +52,7 @@
   //            bouscule et la jette au sol ;
   //   lacrymo { portee, porteeMin (m), recharge (s) } : grenade lancée en cloche ; le nuage : CONSTANTES.GAZ.
   const sans = { recolter: false, construire: false, barricader: false, casser: 0, lever: 0, leverTout: false,
-    interpeller: false, salve: null, jet: null, soigner: 0, pierres: null, molotov: null, charge: null, lacrymo: null };
+    interpeller: false, salve: null, jet: null, soigner: 0, pierres: null, molotov: null, charge: null, lacrymo: null, lance: null };
   const PIERRES = Object.freeze({ portee: 14, porteeMin: 3.5, pression: 3, recharge: 5 });
   /** Un type d'unité. Vitesses en m/s, distances en m, pression en points de cohésion par seconde au contact,
    *  coût et durée par lot ; « lot » unités sortent ensemble d'un ordre de production. */
@@ -117,11 +117,20 @@
     type(12, 'canon-a-eau', 2, 'Canon à eau', 'Canons à eau', 'vehicule',
       { coh: 600, pression: 0, portee: 1.2, vitesse: 4.0, vision: 24, rayon: 1.6, vehicule: true, pop: 8,
         cout: { moyens: 300, materiaux: 120 }, duree: 30, lot: 1 },
-      { lever: 6, leverTout: true, jet: Object.freeze({ portee: 18, angle: 40, pression: 12, recul: 2.0, aTerre: 9 }) }, 'T',
+      { lever: 6, leverTout: true, jet: Object.freeze({ portee: 18, angle: 40, pression: 12, recul: 2.0, aTerre: 9, max: 8 }) }, 'T',
       'Jet : cône de 18 m qui repousse, jette au sol de près et éteint les feux ; lève six fois plus vite.'),
+    type(13, 'pompiers', 2, 'Pompiers', 'Pompiers', 'secours',
+      { coh: 40, pression: 0.3, portee: 1.2, vitesse: 3.6, vision: 16, cout: { moyens: 60, materiaux: 0 }, duree: 12, lot: 6 },
+      { lance: Object.freeze({ portee: 8, debit: 1 }) }, 'U',
+      'Six pompiers, lance à 8 m : éteignent les feux des objets et des immeubles.'),
+    type(14, 'camion-pompiers', 2, 'Camion de pompiers', 'Camions de pompiers', 'secours',
+      { coh: 400, pression: 0.3, portee: 1.2, vitesse: 5.0, vision: 20, rayon: 1.6, vehicule: true, pop: 6,
+        cout: { moyens: 150, materiaux: 20 }, duree: 20, lot: 1 },
+      { lance: Object.freeze({ portee: 16, debit: 4.5 }) }, 'I',
+      'Un camion, lance à 16 m, quatre à cinq fois le débit d’un pompier ; plus rapide sur la chaussée.'),
   ];
 
-  const TYPES_PAR_FACTION = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11, 12]];
+  const TYPES_PAR_FACTION = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14]];
   const OUVRIER = [0, 4, 8];     // l'Équipe de chaque camp
   const BASE = [1, 5, 9];        // l'unité de base, produite aussi aux avant-postes
 
@@ -132,7 +141,7 @@
     COLERE_S: 45, REPLI_SEUIL: 0.25, SOUTIEN_PAR_S: 5, SOIN_RAYON: 8, FLANC: 1.5, PROTEGE: 0.5, ARC_FRONTAL_DEG: 120,
     INTERPELLER_SEUIL: 0.30, REPLI_VITESSE: 1.3,
     CHARGE_RECOLTE: 10, RECOLTEURS_MAX: 40,
-    AVANT_POSTE: Object.freeze({ moyens: 150, materiaux: 100, pv: 1500, travail: 200 }),   // travail : secondes-Équipe
+    AVANT_POSTE: Object.freeze({ moyens: 150, materiaux: 100, pv: 500, travail: 200 }),   // travail : secondes-Équipe
     BARRICADE: Object.freeze({ materiauxParMetre: 6, pvParMetre: 40, longueurMin: 4, longueurMax: 20, rendement: 0.5,
       travailParMetre: 6 }),            // secondes-unité par mètre
     LEVER_PAR_S: 8,                      // points de structure levés par seconde et par unité au facteur 1
@@ -163,15 +172,29 @@
     // « usure » de ses points par seconde. Avant-poste : un foyer, il ne produit plus tant qu'il brûle. Propagation :
     // une fois par foyer, après « delai » secondes, une chance sur deux d'embraser l'objet le plus proche à « rayon »
     // mètres, sur « generations » au plus. Eau : chaque impulsion du jet (0,2 s) retire « eau » secondes au foyer.
+    // Les sortes de la ville réelle (0.3) ont leur propre feu (« sortes » : durée en s, rayon en m) : un deux-roues
+    // flambe vite et fort, un conteneur à ordures et un kiosque à journaux brûlent longtemps, une terrasse s'étale.
+    // Les six sortes de la 0.2 brûlent selon leurs points de structure (voiture : 38 s et 4,5 m ; poubelle : 12 s, 2 m).
     FEU: Object.freeze({ max: 128, rayon: 4, duree: 18, pression: 8, allumage: 1.5, marge: 2.5,
-      objet: Object.freeze({ dureeMin: 12, dureeMax: 40, parPv: 0.125, rayonMin: 2, rayonMax: 4.5 }),
+      objet: Object.freeze({ dureeMin: 12, dureeMax: 40, parPv: 0.125, rayonMin: 2, rayonMax: 4.5,
+        sortes: Object.freeze({ 'deux-roues': Object.freeze({ duree: 20, rayon: 2.6 }), conteneur: Object.freeze({ duree: 34, rayon: 3 }),
+          terrasse: Object.freeze({ duree: 16, rayon: 3.2 }), kiosque: Object.freeze({ duree: 36, rayon: 3.8 }) }) }),
       barricade: Object.freeze({ rayon: 3.2, duree: 30, pas: 7, foyers: 3, usure: 0.02 }),
       poste: Object.freeze({ rayon: 6, duree: 25, usure: 0.016 }),
       propagation: Object.freeze({ rayon: 7, delai: 6, chance: 0.5, generations: 2 }), eau: 3 }),
     // Le gaz lacrymogène : au plus « max » nuages. Le nuage grossit pendant « montee » secondes jusqu'à « rayon »,
     // dure « duree » ; qui s'y trouve (hors la Préfecture et ses alliés, et hors véhicules) perd « pression » points
-    // par seconde, ne frappe plus et en sort à « lenteur » × sa vitesse.
-    GAZ: Object.freeze({ max: 64, rayon: 7, duree: 14, pression: 3, lenteur: 0.5, montee: 2, marge: 2 }),
+    // par seconde, ne frappe plus et en sort à « lenteur » × sa vitesse. Un nuage presse à plein « plein » unités ; s'il
+    // en tient davantage, la pression se partage entre elles : une foule plus dense n'y perd pas davantage.
+    GAZ: Object.freeze({ max: 64, rayon: 7, duree: 14, pression: 3, lenteur: 0.5, montee: 2, marge: 2, plein: 20 }),
+    // Les immeubles : un foyer à moins de « chauffe » m d'une façade la chauffe ; après « prise » s à pleine
+    // intensité, l'immeuble prend. Un cocktail à moins de « cocktail » m l'allume une fois sur trois. L'intensité
+    // monte en « montee » s ; à pleine intensité, consume en « consume » s. Au-dessus de « propage », chauffe les
+    // voisins (à « voisinage » m) qui prennent après « voisinPrise » s. Calcine, fume « fumee » s. Max « max » en
+    // feu. Unité à moins de « recul » m s'écarte. Refroidit de « refroidit » /s si non chauffé. Lance (débit 1)
+    // ôte « eteint » /s. « lances » : jets d'eau rendus au dessin, au plus. (David 12/11/2026)
+    IMMEUBLES: Object.freeze({ chauffe: 3, prise: 15, cocktail: 2.5, montee: 40, consume: 240, propage: 0.6,
+      voisinPrise: 25, voisinage: 3, fumee: 60, max: 48, recul: 4, refroidit: 0.5, eteint: 0.01, lances: 96 }),
     // Projectiles : durée de vol = vol + distance / vitesse (secondes, mètres ; vitesse 0 : durée fixe). Voir dureeVol.
     PROJECTILES: Object.freeze({ pierre: Object.freeze({ vol: 0.6, vitesse: 0 }), molotov: Object.freeze({ vol: 0.5, vitesse: 20 }),
       lacrymo: Object.freeze({ vol: 0.6, vitesse: 22 }) }),
@@ -204,14 +227,16 @@
     const p = CONSTANTES.PROJECTILES[sorte];
     return p ? p.vol + (p.vitesse > 0 ? distance / p.vitesse : 0) : 0;
   }
-  /** Le feu d'un objet cassé : { duree (s), rayon (m) }, tirés de ses points de structure, quelle que soit sa sorte
-   *  (une sorte inconnue brûle donc comme les autres). Un cassable de la ville peut porter « feu » : 0, il ne brûle
-   *  pas ; un nombre de secondes, il brûle ce temps-là. */
-  function feuObjet(pv, feu) {
+  /** Le feu d'un objet cassé : { duree (s), rayon (m) }. Un cassable de la ville peut porter « feu » : 0 (ou faux), il
+   *  ne brûle pas ; un nombre de secondes, il brûle ce temps-là (120 s au plus). Sinon, sa sorte, si FEU.objet.sortes
+   *  la connaît ; sinon, ses points de structure (une sorte inconnue brûle donc comme les autres). */
+  function feuObjet(pv, feu, sorte) {
     const O = CONSTANTES.FEU.objet, p = typeof pv === 'number' && pv > 0 ? pv : 60;
     if (feu === 0 || feu === false) return { duree: 0, rayon: 0 };
-    const duree = typeof feu === 'number' && feu > 0 ? Math.min(120, feu) : Math.max(O.dureeMin, Math.min(O.dureeMax, Math.round(p * O.parPv)));
-    return { duree, rayon: Math.max(O.rayonMin, Math.min(O.rayonMax, 1.5 + p / 100)) };
+    const s = typeof sorte === 'string' && Object.prototype.hasOwnProperty.call(O.sortes, sorte) ? O.sortes[sorte] : null;
+    const duree = typeof feu === 'number' && feu > 0 ? Math.min(120, feu)
+      : s ? s.duree : Math.max(O.dureeMin, Math.min(O.dureeMax, Math.round(p * O.parPv)));
+    return { duree, rayon: s ? s.rayon : Math.max(O.rayonMin, Math.min(O.rayonMax, 1.5 + p / 100)) };
   }
 
   const DIFFICULTES = Object.freeze([

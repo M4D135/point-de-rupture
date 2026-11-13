@@ -1,7 +1,7 @@
 # Provenance du son
 
 Le son de Point de rupture n'a aucun fichier : ni enregistrement, ni échantillon, ni module téléchargé. Tout se calcule
-dans la page, en WebAudio et en JavaScript. Deux fichiers sont des portages de FERRO (`github.com/M4D135/FERRO`, dépôt
+dans la page, en WebAudio et en JavaScript. Deux fichiers sont des portages de FERRO (`github.com/M4D135/METAL`, dépôt
 privé), branche `campagne-18-mondes`, commit `4ce2271fe5a6db5d86042333f76b6b7baf76caea` du 12 novembre 2026 :
 
 | Fichier du jeu | Source dans FERRO | Taille | sha256 de la source |

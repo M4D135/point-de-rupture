@@ -258,8 +258,26 @@
       }
     };
 
-    /** Un immeuble sur l'emprise donnée ; rend la hauteur du toit. */
+    /** Liste des immeubles brûlables pour la simulation. */
+    const immeubles = [];
     const immeuble = (x0, z0, x1, z1, h, couleur, details = true) => {
+      const debut = objets.length;
+      const toit = immeubleSeul(x0, z0, x1, z1, h, couleur, details);
+      if (details) {
+        immeubles.push({
+          id: immeubles.length,
+          x: (x0 + x1) / 2,
+          z: (z0 + z1) / 2,
+          rayon: Math.hypot(x1 - x0, z1 - z0) / 2,
+          h: toit,
+          boites: [{ x: (x0 + x1) / 2, z: (z0 + z1) / 2, lx: x1 - x0, lz: z1 - z0, lacet: 0 }],
+          pieces: [debut, objets.length]
+        });
+      }
+      return toit;
+    };
+    /** Un immeuble sur l'emprise donnée ; rend la hauteur du toit. */
+    const immeubleSeul = (x0, z0, x1, z1, h, couleur, details = true) => {
       const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, lx = x1 - x0, lz = z1 - z0;
       poser('boite', cx, 0, cz, lx, h, lz, couleur, facade());
       poser('boite', cx, h, cz, lx + 0.3, 0.55, lz + 0.3, fois(couleur, 0.82), MAT.MAT, 0, true);
@@ -918,7 +936,7 @@
       return choix.map(([i, j]) => [LX[i].c, LZ[j].c]);
     }
 
-    const sites = { qg, lieux, gisements, cassables };
+    const sites = { qg, lieux, gisements, cassables, immeubles };
     return {
       graine, N, ilots: N, LX, LZ, types, etendue, objets, MAT, FACTIONS: factions, barricades: [], sites, obstacles,
       accrocher, praticable, surChaussee, sol, itineraire, departs, pointAuHasard, carrefours, centreCellule, hasard,

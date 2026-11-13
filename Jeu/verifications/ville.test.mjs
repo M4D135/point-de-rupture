@@ -156,7 +156,8 @@ verifier('cassables : six sortes, pièces hors des objets, chacun atteignable à
   for (const N of [9, 13, 15]) {
     const v = villes[N], { cassables } = v.sites, nav = globalThis.PDR.nav.creer(v);
     const sortes = new Set(cassables.map(c => c.sorte));
-    for (const s of SORTES_CASSABLES) assert.ok(sortes.has(s), N + ' îlots : ' + s);
+    // Les six sortes de la 0.2 ; les quatre que la 0.3 ajoute au protocole sont propres à la ville réelle.
+    for (const s of SORTES_CASSABLES.slice(0, 6)) assert.ok(sortes.has(s), N + ' îlots : ' + s);
     const dansObjets = new Set(v.objets);
     let loin = 0;
     for (const c of cassables) {

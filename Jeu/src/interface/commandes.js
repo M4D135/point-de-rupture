@@ -922,7 +922,7 @@
         }
       } else if (s === 'structure' && st && st.faction === joueur && estProducteur(R, st)) {
         const produits = typesProduits(R, st), liste = R.TYPES_PAR_FACTION[st.faction];
-        for (let k = 0; k < 5; k++) {
+        for (let k = 0; k < 7; k++) {
           const t = liste[k];
           if (t === undefined || !produits.includes(t)) { ctx.actions.push({ id: 'produire' + (k + 1), vide: true }); continue; }
           const T = R.TYPES[t], raison = raisonProduction(R, ctxOrdres(), st, t, 1);

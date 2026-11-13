@@ -857,6 +857,35 @@
     })();
     chrono('batiments');
 
+    const immeubles = [];
+    for (const bat of bats) {
+      if (bat.detail && !(bat.monument >= 0) && !bat.hote && bat.A >= 30) {
+        const boites = [];
+        let sumX = 0, sumZ = 0, sumAire = 0;
+        for (const bx of bat.boites) {
+          const aire = bx.a * bx.b;
+          sumX += bx.x * aire;
+          sumZ += bx.z * aire;
+          sumAire += aire;
+          const lacet = bx.uz >= 0 ? Math.acos(bx.ux) : -Math.acos(bx.ux);
+          boites.push({ x: bx.x, z: bx.z, lx: 2 * bx.a, lz: 2 * bx.b, lacet });
+        }
+        const x = sumAire > 0 ? sumX / sumAire : 0;
+        const z = sumAire > 0 ? sumZ / sumAire : 0;
+        let rayon = 0;
+        for (const bx of bat.boites) {
+          const dx = bx.x - x, dz = bx.z - z;
+          const d = Math.sqrt(dx * dx + dz * dz) + Math.sqrt(bx.a * bx.a + bx.b * bx.b);
+          if (d > rayon) rayon = d;
+        }
+        const id = immeubles.length;
+        immeubles.push({ id, x, z, rayon, h: bat.h, boites, pieces: [] });
+        bat.immeuble = id;
+      } else {
+        bat.immeuble = -1;
+      }
+    }
+
     // ---- 3. Dégagements : ruelles élargies, terrains des QG et des chantiers. ----
     const capsules = [];     // [ax, az, bx, bz, R]
     for (const rue of P.rues) {
@@ -2285,7 +2314,7 @@
 
     const ville = {
       type: 'reelle', nom, ville: P.nom, ilots, N: ilots, attribution: P.attribution, licence: P.licence, etendue, objets, MAT, FACTIONS: factions,
-      barricades: [], sites: { qg, lieux, gisements, cassables }, obstacles,
+      barricades: [], sites: { qg, lieux, gisements, cassables, immeubles }, obstacles,
       accrocher: (x, z) => accrocher(x, z), praticable, surChaussee, sol, itineraire, departs, pointAuHasard, carrefours, hasard, grillePraticable,
       place: placeCentre, rues: { noeuds, aretes }, eau: eaux.map(e => e.points), places, parcs, emprises,
       mesures: { ms, comptes },

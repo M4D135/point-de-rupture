@@ -61,6 +61,7 @@
   const HORS_JEU_IT = Math.round(K.HORS_JEU_S * IT_S), GISANT_IT = Math.round(K.GISANT_S * IT_S), GISANTS_MAX = K.GISANTS_MAX;
   const A_TERRE_IT = Math.round(K.A_TERRE_S * IT_S), IMMUNITE_IT = Math.round(K.A_TERRE_IMMUNITE_S * IT_S), LANCE_IT = 8;
   const CAUSE = P.CAUSES_A_TERRE, SF = P.SORTES_FEU;
+  const PLUSIEURS = 255;              // feuCase, gazCase : plusieurs foyers (128 au plus) ou nuages (64) s'y chevauchent
   const RECHERCHE_OISIF2 = 7000 * 7000, RECHERCHE_MVT2 = 12000 * 12000, LAISSE2 = 14000 * 14000;
   const JET_IT = 60, JET_PAS = 4;
   const PORTEE_TRAVAIL = 2600, PORTEE_POSTE = 7000;
@@ -92,6 +93,7 @@
     charge: new Uint8Array(NT), chMin2: new Float64Array(NT), chMax2: new Float64Array(NT), chPres: new Int32Array(NT), chRech: new Int32Array(NT),
     chElan: new Int32Array(NT), chDuree: new Int32Array(NT), chRecul: new Int32Array(NT), chPerce: new Uint8Array(NT),
     molotov: new Uint8Array(NT), lacrymo: new Uint8Array(NT),
+    lance: new Uint8Array(NT), lancePortee: new Int32Array(NT), lanceDebit: new Int32Array(NT),
   };
   for (const t of R.TYPES) {
     const k = t.id, c = t.capacites;
@@ -115,6 +117,7 @@
       T.chPerce[k] = c.charge.perce ? 1 : 0;
     }
     T.molotov[k] = c.molotov ? 1 : 0; T.lacrymo[k] = c.lacrymo ? 1 : 0;
+    T.lance[k] = c.lance ? 1 : 0; T.lancePortee[k] = c.lance ? Math.round(c.lance.portee * 1000) : 0; T.lanceDebit[k] = c.lance ? Math.round(c.lance.debit * 1000) : 0;
   }
   const SALVE = R.TYPES[10].capacites.salve, JET = R.TYPES[12].capacites.jet;
   const SALVE_PORTEE = SALVE.portee * 1000, SALVE_RAYON = SALVE.rayon * 1000, SALVE_COUPS = Math.round(SALVE.pression * RYTHME * 1000);
@@ -126,6 +129,10 @@
   ORDRE_SALVE.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
   const JET_PORTEE = JET.portee * 1000, JET_COUPS = Math.round(JET.pression * RYTHME * 1000 * JET_PAS / IT_S);
   const JET_RECUL = Math.round(JET.recul * 1000 * JET_PAS / IT_S), JET_COS1000 = 940;   // cos 20° (demi-angle de 40°)
+  // Le jet touche les plus proches d'abord, « max » unités par impulsion : une foule plus dense n'y perd pas davantage.
+  const JET_MAX = JET.max || 1e9, ORDRE_JET = [], JET_RC = Math.ceil(JET.portee / 4);
+  for (let dj = -JET_RC; dj <= JET_RC; dj++) for (let di = -JET_RC; di <= JET_RC; di++) ORDRE_JET.push([di * di + dj * dj, di, dj]);
+  ORDRE_JET.sort((a, b) => a[0] - b[0] || a[2] - b[2] || a[1] - b[1]);
   const SALVE_A_TERRE = SALVE.aTerre || 0, JET_A_TERRE2 = carre((JET.aTerre || 0) * 1000);
   // ---- 0.3 : le cocktail Molotov (Furets), la grenade lacrymogène (Compagnie), le feu, le gaz, les projectiles. ----
   const MOLOTOV = R.TYPES.find(t => t.capacites.molotov).capacites.molotov, LACRYMO = R.TYPES.find(t => t.capacites.lacrymo).capacites.lacrymo;
@@ -140,16 +147,18 @@
   const FEU_PROPAGE_CHANCE = Math.round(FEU.propagation.chance * 100), FEU_GENERATIONS = FEU.propagation.generations;
   const NNUAGES = GAZ.max, GAZ_RAYON = GAZ.rayon * 1000, GAZ_DUREE = GAZ.duree * IT_S, GAZ_PRES = Math.round(GAZ.pression * 1000 / IT_S);
   const GAZ_MONTEE = GAZ.montee * IT_S, GAZ_MARGE = GAZ.marge * 1000, GAZ_LENTEUR16 = Math.round(GAZ.lenteur * 16);
+  const GAZ_PLEIN = GAZ.plein || 1e9;
   const NVOLS = 256, NPIERRES = 16384, PIERRE_IT = Math.round(PJ.pierre.vol * IT_S);
   const EV_A_TERRE_MAX = 24, EV_PIERRE_MAX = 12;
   /** Durée de vol en itérations d'un cocktail ou d'une grenade lancés à d mm (regles.dureeVol, en entiers). */
   const volIt = (p, d) => Math.round(p.vol * IT_S) + Math.trunc(d * IT_S / (p.vitesse * 1000));
 
-  // Composition de départ (après les 4 % d'Équipes), en millièmes, par camp et par type.
+  // Composition de départ (après les 4 % d'Équipes), en millièmes, par camp et par type. La Préfecture garde 2,8 % de
+  // Pompiers et 1 % de Camions : sans eux rien ne les produit (D9), et les immeubles brûlent jusqu'au bout.
   const COMPOSITION = [
     [[1, 620], [2, 290], [3, 90]],
     [[5, 520], [6, 310], [7, 170]],
-    [[9, 480], [10, 345], [11, 172], [12, 3]],
+    [[9, 462], [10, 332], [11, 165], [12, 3], [13, 28], [14, 10]],
   ];
 
   /** FNV-1a 64 bits sur des octets [debut, fin[, en quatre membres de 16 bits (h[0] le plus bas) : tout reste en
@@ -181,8 +190,9 @@
       // Démo (joueur -1) : pas de brouillard, quoi que disent les options.
       brouillard: joueur >= 0 && o.brouillard !== false, coalitions: !!o.coalitions, enregistrer: o.enregistrer !== false, vide: !!o.vide,
       ia: Array.isArray(o.ia) ? o.ia.slice() : null,
-      // Démo : ni points ni temps, le dernier debout ou la limite de sécurité (CONCEPTION.md §1.11).
-      victoire: R.victoire(joueur < 0 ? { mode: 'dernier' } : o.victoire), manifestants: R.manifestants(o.manifestants),
+      // Démo : ni points ni temps, le dernier debout ou la limite de sécurité (CONCEPTION.md §1.11) ; points et durée à
+      // 0 disent qu'il n'y a ni cible ni limite de temps, comme dans etat.victoire.
+      victoire: joueur < 0 ? { mode: 'dernier', points: 0, duree: 0 } : R.victoire(o.victoire), manifestants: R.manifestants(o.manifestants),
     };
   }
 
@@ -269,7 +279,7 @@
     // En démo, les renforts ne tarissent pas : tous les revenus sont multipliés (§1.11).
     if (DEMO) for (let f = 0; f < 3; f++) facteurRevenu[f] *= K.DEMO_RENFORTS;
     const bilan = [0, 1, 2].map(() => ({ produites: 0, horsJeu: 0, infliges: 0, barricadesPosees: 0, barricadesLevees: 0,
-      casses: 0, lieuxPris: 0, recolte: 0, molotovs: 0, grenades: 0, pierres: 0, charges: 0, aTerre: 0, feux: 0, eteints: 0 }));
+      casses: 0, lieuxPris: 0, recolte: 0, molotovs: 0, grenades: 0, pierres: 0, charges: 0, aTerre: 0, feux: 0, eteints: 0, immeublesBrules: 0, immeublesSauves: 0 }));
     // D'où viennent les coups de chaque camp (millièmes) : contact, salve, jet, pierres, charge, souffle, feu, gaz.
     const sources = new Float64Array(3 * 8);
     for (let f = 0; f < 3; f++) {
@@ -281,6 +291,10 @@
     depart[0] += E - depart[0] - depart[1] - depart[2];
 
     const sites = ville.sites;
+    // 0.3, PLAN D9 : les immeubles qui brûlent
+    const IMM = PDR.immeubles.creer(sites.immeubles || []), evIm = [];
+    const sortieImm = new Float32Array(1024 * P.IMMEUBLE_TAILLE);
+    let versionImm = 0, immEnvoyes = 0;
     const mm = v => Math.round(v * 1000);
     const disqueCases8 = (x, z, rayon) => {
       const liste = [];
@@ -307,14 +321,14 @@
     const NK = sites.cassables.length;
     const casX = new Int32Array(NK), casZ = new Int32Array(NK), casPv = new Int32Array(NK), casEtat = new Uint8Array(NK);
     const casRend = new Int32Array(NK), casSorte = new Int8Array(NK), casAppro = new Int32Array(NK);
-    // Le feu de chaque objet (durée en itérations, rayon en mm), tiré de ses points de structure : la sorte n'y fait
-    // rien, une ville peut en ajouter d'inconnues.
+    // Le feu de chaque objet (durée en itérations, rayon en mm) : le sien s'il en porte un, sinon celui de sa sorte,
+    // sinon celui de ses points de structure (regles.feuObjet) ; une ville peut ajouter des sortes inconnues.
     const casFeuDuree = new Int32Array(NK), casFeuRayon = new Int32Array(NK);
     sites.cassables.forEach((c, k) => {
       casX[k] = mm(c.x); casZ[k] = mm(c.z); casPv[k] = c.pv * 1000; casRend[k] = c.rendement * 1000 * echelle;
       casSorte[k] = P.SORTES_CASSABLES.indexOf(c.sorte);
       casAppro[k] = nav.fineProche(casX[k], casZ[k], 6);
-      const feu = R.feuObjet(c.pv, c.feu);
+      const feu = R.feuObjet(c.pv, c.feu, c.sorte);
       casFeuDuree[k] = Math.round(feu.duree * IT_S); casFeuRayon[k] = Math.round(feu.rayon * 1000);
     });
     // Les cassables par case de 8 m, pour enchaîner la casse sur l'objet voisin.
@@ -647,11 +661,11 @@
           return;
         }
         case CMD.DIPLOMATIE: diplomatie(j, c.action, c.avec); return;
-        case CMD.CAPACITE: case CMD.MOLOTOV: {
-          // Salve et grenade (Compagnie), jet (Canon à eau), cocktail (Furets) : l'unité s'approche à portée du point,
+        case CMD.CAPACITE: case CMD.MOLOTOV: case CMD.ETEINDRE: {
+          // Salve et grenade (Compagnie), jet (Canon à eau), cocktail (Furets), arrosage (Pompiers) : l'unité s'approche à portée du point,
           // puis agit. Le cocktail coûte des Matériaux : sans de quoi en lancer un seul, l'ordre est refusé.
-          const cap = c.t === CMD.MOLOTOV ? 'molotov' : c.capacite, salve = cap === 'salve';
-          const table = salve ? T.salve : cap === 'jet' ? T.jet : cap === 'lacrymo' ? T.lacrymo : cap === 'molotov' ? T.molotov : null;
+          const cap = c.t === CMD.MOLOTOV ? 'molotov' : c.t === CMD.ETEINDRE ? 'lance' : c.capacite, salve = cap === 'salve';
+          const table = salve ? T.salve : cap === 'jet' ? T.jet : cap === 'lacrymo' ? T.lacrymo : cap === 'molotov' ? T.molotov : cap === 'lance' ? T.lance : null;
           if (!table) return;
           const k = filtrer(c, j, t => table[t] === 1);
           if (!k) { refus(j, RAISON.INTERDIT, c.t); return; }
@@ -798,12 +812,12 @@
     }
     function detruire(s, auteur) {
       s.vivante = false;
-      // Les foyers d'une structure détruite finissent de brûler au sol, six secondes au plus.
+      // Les foyers d'une structure détruite finissent de brûler au sol, deux secondes au plus.
       if (s.feux > 0) {
         for (let q = 0; q < NFEUX; q++) {
           if (!fActif[q] || fCible[q] !== s.id || (fSorte[q] !== SF.BARRICADE && fSorte[q] !== SF.POSTE)) continue;
           fSorte[q] = SF.SOL; fCible[q] = -1;
-          if (fReste[q] > 6 * IT_S) fReste[q] = 6 * IT_S;
+          if (fReste[q] > 2 * IT_S) fReste[q] = 2 * IT_S;
         }
         s.feux = 0; s.feu = false; versionFeux++;
       }
@@ -864,18 +878,37 @@
       if (eau && par >= 0) bilan[par].eteints++;
       evenement(EV.FEU_ETEINT, fX[q], fZ[q], eau ? par : -1, fId[q], eau ? 1 : 0);
     }
+    // feuCase (et gazCase plus bas) : 0 rien, q + 1 un seul foyer, PLUSIEURS des foyers qui se chevauchent : on les lit
+    // tous (liste des actifs), pour que personne ne reste dans l'un parce que sa case montre l'autre.
+    const feuxActifs = new Uint8Array(NFEUX);
+    let nFeuxListe = 0;
     function majGrilleFeux() {
       grilleFeux = false;
       feuCase.fill(0);
+      nFeuxListe = 0;
       for (let q = 0; q < NFEUX; q++) {
         if (!fActif[q]) continue;
+        feuxActifs[nFeuxListe++] = q;
         // Toute unité à moins de rayon + marge du foyer est dans une case marquée (demi-diagonale d'une case : 2,83 m).
         const r = fR[q] + FEU_MARGE + 3000, c0 = nav.caseDe(fX[q], fZ[q]), ci = c0 % nx, cj = (c0 / nx) | 0, rc = Math.ceil(r / 4000);
         for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let i = Math.max(0, ci - rc); i <= Math.min(nx - 1, ci + rc); i++) {
           const c = i + j * nx, dx = nav.centreX(c) - fX[q], dz = nav.centreZ(c) - fZ[q];
-          if (dx * dx + dz * dz <= r * r) feuCase[c] = q + 1;
+          if (dx * dx + dz * dz <= r * r) feuCase[c] = feuCase[c] === 0 ? q + 1 : PLUSIEURS;
         }
       }
+    }
+    /** Le foyer qui concerne un point (x, z) de case marquée k : celui où il est le plus avant (r² − d² le plus grand),
+     *  ou, s'il n'est dans aucun, celui dont il est le plus près d'entrer. */
+    function feuDe(k, x, z) {
+      if (k !== PLUSIEURS) return fActif[k - 1] ? k - 1 : -1;
+      let meilleur = -1, haut = -Infinity;
+      for (let n = 0; n < nFeuxListe; n++) {
+        const q = feuxActifs[n];
+        if (!fActif[q]) continue;                   // éteint pendant l'itération (la grille est refaite à la suivante)
+        const dx = x - fX[q], dz = z - fZ[q], p = fR[q] * fR[q] - (dx * dx + dz * dz);
+        if (p > haut) { haut = p; meilleur = q; }
+      }
+      return meilleur;
     }
     /** L'objet cassé (ou touché par un cocktail) s'embrase : il devient « en feu » (2), puis « calciné » (3). */
     function allumerCassable(k, camp, gen) {
@@ -940,6 +973,12 @@
           if (k >= 0) allumerCassable(k, fCamp[q], fGen[q] + 1);
         }
       }
+      if (IMM.n > 0) {
+        for (let q = 0; q < NFEUX; q++) {
+          if (!fActif[q]) continue;
+          PDR.immeubles.chauffer(IMM, fX[q] / 1000, fZ[q] / 1000, Math.min(1, (fAge[q] + 6) / (fDelai[q] + 12), fReste[q] / (3 * IT_S)), 1 / IT_S, fCamp[q], evIm);
+        }
+      }
       if (grilleFeux) majGrilleFeux();
     }
     /** Une fois par seconde : une structure en feu perd une part de ses points ; à zéro, le feu l'a détruite. */
@@ -973,6 +1012,15 @@
       return touche;
     }
     /** Le foyer le plus proche de (x, z) dont le bord est à moins de « portee » ; -1 s'il n'y en a pas. */
+    function arroserImmeubles(i, x, z, ax, az, la, debit) {
+      if (IMM.enFeu <= 0) return;
+      const p = T.lance[utyp[i]] ? T.lancePortee[utyp[i]] : JET_PORTEE;
+      const d = Math.min(la, p);
+      const px = x + ax * d / la;
+      const pz = z + az * d / la;
+      PDR.immeubles.arroser(IMM, px / 1000, pz / 1000, 3, debit, JET_PAS / IT_S, evIm);
+    }
+
     function feuProche(x, z, portee) {
       let meilleur = -1, md = Infinity;
       for (let q = 0; q < NFEUX; q++) {
@@ -987,34 +1035,55 @@
     const gX = new Int32Array(NNUAGES), gZ = new Int32Array(NNUAGES), gRc = new Int32Array(NNUAGES), gReste = new Int32Array(NNUAGES);
     const gAge = new Int32Array(NNUAGES), gCamp = new Int8Array(NNUAGES), gId = new Int32Array(NNUAGES), gActif = new Uint8Array(NNUAGES);
     const gazCase = new Uint8Array(NC);
+    // Un nuage presse à plein GAZ.plein unités ; s'il en tenait davantage à l'itération précédente (gN), la pression
+    // de l'itération (gPres) se partage entre elles : une foule plus dense n'y perd pas davantage.
+    const gN = new Int32Array(NNUAGES), gPres = new Int32Array(NNUAGES);
     let nNuages = 0, prochainNuage = 1, grilleGaz = false, versionGaz = 0, gazEnvoye = 0;
     function creerNuage(x, z, camp) {
       if (nNuages >= NNUAGES) return -1;
       let q = 0;
       while (gActif[q]) q++;
       gActif[q] = 1; gX[q] = x; gZ[q] = z; gRc[q] = 2000; gReste[q] = GAZ_DUREE; gAge[q] = 0; gCamp[q] = camp; gId[q] = prochainNuage++;
+      gN[q] = 0; gPres[q] = GAZ_PRES;
       nNuages++; grilleGaz = true; versionGaz++;
       evenement(EV.GAZ, x, z, camp, gId[q], GAZ.rayon);
       return q;
     }
+    const nuagesActifs = new Uint8Array(NNUAGES);
+    let nNuagesListe = 0;
     function avancerNuages() {
       for (let q = 0; q < NNUAGES; q++) {
         if (!gActif[q]) continue;
         const age = ++gAge[q];
         if (--gReste[q] <= 0) { gActif[q] = 0; nNuages--; grilleGaz = true; versionGaz++; continue; }
         gRc[q] = age >= GAZ_MONTEE ? GAZ_RAYON : 2000 + Math.trunc((GAZ_RAYON - 2000) * age / GAZ_MONTEE);
+        gPres[q] = gN[q] > GAZ_PLEIN ? Math.trunc(GAZ_PRES * GAZ_PLEIN / gN[q]) : GAZ_PRES; gN[q] = 0;
       }
       if (!grilleGaz) return;
       grilleGaz = false;
       gazCase.fill(0);
+      nNuagesListe = 0;
       for (let q = 0; q < NNUAGES; q++) {
         if (!gActif[q]) continue;
+        nuagesActifs[nNuagesListe++] = q;
         const r = GAZ_RAYON + GAZ_MARGE + 3000, c0 = nav.caseDe(gX[q], gZ[q]), ci = c0 % nx, cj = (c0 / nx) | 0, rc = Math.ceil(r / 4000);
         for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let i = Math.max(0, ci - rc); i <= Math.min(nx - 1, ci + rc); i++) {
           const c = i + j * nx, dx = nav.centreX(c) - gX[q], dz = nav.centreZ(c) - gZ[q];
-          if (dx * dx + dz * dz <= r * r) gazCase[c] = q + 1;
+          if (dx * dx + dz * dz <= r * r) gazCase[c] = gazCase[c] === 0 ? q + 1 : PLUSIEURS;
         }
       }
+    }
+    /** Le nuage hostile au camp f qui concerne un point (x, z) de case marquée k (comme feuDe), ou -1. */
+    function gazDe(k, x, z, f) {
+      if (k !== PLUSIEURS) return hostile[gCamp[k - 1] * 4 + f] ? k - 1 : -1;
+      let meilleur = -1, haut = -Infinity;
+      for (let n = 0; n < nNuagesListe; n++) {
+        const q = nuagesActifs[n];
+        if (!hostile[gCamp[q] * 4 + f]) continue;
+        const dx = x - gX[q], dz = z - gZ[q], p = gRc[q] * gRc[q] - (dx * dx + dz * dz);
+        if (p > haut) { haut = p; meilleur = q; }
+      }
+      return meilleur;
     }
 
     // ---- 0.3 : les projectiles. Cocktails et grenades : une liste de vols ; pierres : une file à durée fixe. ----
@@ -1095,6 +1164,7 @@
     /** Le cocktail tombe : un souffle (les hostiles à moins de 3 m, huit au plus, repoussés hors du foyer, les trois
      *  premiers jetés au sol), puis le feu, qui prend aussi aux barricades, aux avant-postes et à deux objets. */
     function molotovTombe(x, z, f, tireur) {
+      if (IMM.n > 0) PDR.immeubles.cocktail(IMM, x / 1000, z / 1000, f, (Math.imul(it + 1, 0x9E3779B1) ^ Math.imul(x | 0, 0x85EBCA6B) ^ (z | 0)) >>> 0, evIm);
       const c0 = nav.caseDe(x, z), ci = c0 % nx, cj = (c0 / nx) | 0, r2 = MO_RAYON * MO_RAYON;
       const lanceur = tireur >= 0 && ufac[tireur] === f ? tireur : -1;
       let n = 0;
@@ -1372,7 +1442,8 @@
     }
 
     // ---- Capacités de zone : la salve tombe 1,5 s après l'annonce et jette au sol les quatre premières unités
-    // touchées ; le jet pousse et presse dans un cône, jette au sol de près et éteint les foyers. ----
+    // touchées ; le jet pousse et presse dans un cône (les plus proches, JET.max par impulsion), jette au sol de près
+    // et éteint les foyers. ----
     function salve(i) {
       const f = ufac[i], x = usx[i], z = usz[i], r2 = SALVE_RAYON * SALVE_RAYON;
       const c0 = nav.caseDe(x, z), ci = c0 % nx, cj = (c0 / nx) | 0;
@@ -1400,10 +1471,18 @@
     function jet(i) {
       const f = ufac[i], x = ux[i], z = uz[i], ax = usx[i] - x, az = usz[i] - z, la = Math.sqrt(ax * ax + az * az) | 0;
       if (la === 0) return;
-      const c0 = uc4[i], ci = c0 % nx, cj = (c0 / nx) | 0, r2 = JET_PORTEE * JET_PORTEE, rc = Math.ceil(JET_PORTEE / 4000);
-      for (let j = Math.max(0, cj - rc); j <= Math.min(nz - 1, cj + rc); j++) for (let ii = Math.max(0, ci - rc); ii <= Math.min(nx - 1, ci + rc); ii++) {
+      if (T.lance[utyp[i]]) {
+        if (nFeux > 0) arroser(x, z, ax, az, la, f);
+        arroserImmeubles(i, x, z, ax, az, la, T.lanceDebit[utyp[i]] / 1000);
+        return;
+      }
+      const c0 = uc4[i], ci = c0 % nx, cj = (c0 / nx) | 0, r2 = JET_PORTEE * JET_PORTEE;
+      let n = 0;
+      for (let q = 0; q < ORDRE_JET.length && n < JET_MAX; q++) {
+        const ii = ci + ORDRE_JET[q][1], j = cj + ORDRE_JET[q][2];
+        if (ii < 0 || j < 0 || ii >= nx || j >= nz) continue;
         const cc = ii + j * nx;
-        for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin; p++) {
+        for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < JET_MAX; p++) {
           const u = tri[p];
           if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
@@ -1414,7 +1493,7 @@
           if (dot * 1000 < JET_COS1000 * la * d) continue;
           if (udeg[u] === 0) touches[nTouches++] = u;
           udeg[u] += JET_COUPS;
-          uagr[u] = i;
+          uagr[u] = i; n++;
           bilan[f].infliges += JET_COUPS; sources[f * 8 + 2] += JET_COUPS;
           if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
           deplacer(u, Math.trunc(dx * JET_RECUL / d), Math.trunc(dz * JET_RECUL / d));
@@ -1422,6 +1501,7 @@
         }
       }
       if (nFeux > 0) arroser(x, z, ax, az, la, f);
+      arroserImmeubles(i, x, z, ax, az, la, 2);
     }
 
     // ---- Hors jeu : l'unité reste couchée six secondes (1,5 s au-delà de 4 096 gisants, ou si « vite »), puis son
@@ -1431,9 +1511,9 @@
       quitterOrdre(i);
       uetat[i] = ET.HORS_JEU; ucoh[i] = 0; ucharge[i] = 0; usal[i] = 0; umode[i] = 0;
       uterre[i] = 0; uimm[i] = 0; ulance[i] = 0;
-      const kf = feuCase[uc4[i]];
+      const kf = feuCase[uc4[i]], q = kf ? feuDe(kf, ux[i], uz[i]) : -1;
       let dansLeFeu = false;
-      if (kf) { const dx = ux[i] - fX[kf - 1], dz = uz[i] - fZ[kf - 1], r = fR[kf - 1]; dansLeFeu = dx * dx + dz * dz <= r * r; }
+      if (q >= 0) { const dx = ux[i] - fX[q], dz = uz[i] - fZ[q], r = fR[q]; dansLeFeu = dx * dx + dz * dz <= r * r; }
       if (dansLeFeu) uminu[i] = 2;
       else if (vite || nGisants >= GISANTS_MAX) uminu[i] = HORS_JEU_IT;
       else { uminu[i] = GISANT_IT; umode[i] = M_GISANT; nGisants++; }
@@ -1456,6 +1536,30 @@
     const horloge = options && typeof options.horloge === 'function' ? options.horloge : null;
     const mesure = { msNav: 0, champs: 0 };
 
+    function allumerImmeuble(k, camp) {
+      if (k >= 0 && k < IMM.n) PDR.immeubles.allumer(IMM, k, camp, evIm);
+    }
+    function viderImmeubles() {
+      for (let i = 0; i < evIm.length; i++) {
+        const e = evIm[i];
+        const k = e.a;
+        const x = Math.round(IMM.x[k] * 1000);
+        const z = Math.round(IMM.z[k] * 1000);
+        if (e.type === 38) {
+          evenement(EV.IMMEUBLE_FEU, x, z, e.b, e.a, 0);
+        } else if (e.type === 39) {
+          if (e.b === 0) {
+            evenement(EV.IMMEUBLE_ETEINT, x, z, PREF, e.a, 1);
+            bilan[PREF].immeublesSauves++;
+          } else if (e.b === 1) {
+            evenement(EV.IMMEUBLE_ETEINT, x, z, -1, e.a, 0);
+            if (IMM.origine[k] >= 0) bilan[IMM.origine[k]].immeublesBrules++;
+          }
+        }
+      }
+      versionImm++;
+      evIm.length = 0;
+    }
     function iterer() {
       if (vainqueur !== P.VAINQUEUR.EN_COURS) return;
       nev = 0;
@@ -1471,6 +1575,7 @@
       avancerProjectiles();
       avancerFeux();
       avancerNuages();
+      if (IMM.n > 0 && it % IT_S === 11) PDR.immeubles.avancer(IMM, 1, evIm);
       const t0 = horloge ? horloge() : 0;
       mesure.champs = nav.avancer(3);
       if (horloge) mesure.msNav = horloge() - t0;
@@ -1494,6 +1599,7 @@
       if (phaseSoin === 7) brulerStructures();
       if (colereAllumee && it - derniereColere >= IT_S) { derniereColere = it; evenement(EV.COLERE, structures[BAST].x, structures[BAST].z, BAST, K.COLERE_S, 0); }
       if (phaseSoin === 5) victoire();
+      if (evIm.length) viderImmeubles();
       it++;
       if (it % 100 === 0) lancerEmpreinte(); else avancerEmpreinte();
     }
@@ -1518,9 +1624,9 @@
         // ---- Feu : dans un foyer, l'unité est pressée et fuit droit dehors (un véhicule reste, et encaisse) ; près
         // d'un foyer, elle le contournera (plus bas). Une unité à terre s'en relève aussitôt. ----
         let contourX = 0, contourZ = 0, contour = false;
-        const c4 = uc4[i], kf = feuCase[c4];
-        if (kf) {
-          const q = kf - 1, dx = x - fX[q], dz = z - fZ[q], d2 = dx * dx + dz * dz, r = fR[q];
+        const c4 = uc4[i], kf = feuCase[c4], q = kf ? feuDe(kf, x, z) : -1;
+        if (q >= 0) {
+          const dx = x - fX[q], dz = z - fZ[q], d2 = dx * dx + dz * dz, r = fR[q];
           if (d2 <= r * r) {
             if (fAge[q] >= fDelai[q]) {
               const camp = fCamp[q];
@@ -1550,16 +1656,17 @@
         if (uimm[i] > 0) uimm[i]--;
         // ---- Gaz : dans un nuage hostile, l'unité suffoque, ne frappe plus et en sort au pas ; elle contourne ceux
         // dont elle s'approche. La Préfecture et ses alliés portent le masque ; un véhicule passe. ----
-        const kg = gazCase[c4];
-        if (kg && hostile[gCamp[kg - 1] * 4 + f] && !T.vehicule[t]) {
-          const q = kg - 1, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
+        const kg = gazCase[c4], g = kg && !T.vehicule[t] ? gazDe(kg, x, z, f) : -1;
+        if (g >= 0) {
+          const q = g, dx = x - gX[q], dz = z - gZ[q], d2 = dx * dx + dz * dz, r = gRc[q];
           if (d2 <= r * r) {
-            const camp = gCamp[q];
-            bilan[camp].infliges += GAZ_PRES; sources[camp * 8 + 7] += GAZ_PRES;
+            const camp = gCamp[q], pg = gPres[q];
+            gN[q]++;
+            bilan[camp].infliges += pg; sources[camp * 8 + 7] += pg;
             if (camp === PREF && f === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
             const cb = combDeC8[uc8[i]];
             if (combats[cb] < 65535) combats[cb]++;
-            if (presser(i, t, GAZ_PRES, camp)) continue;
+            if (presser(i, t, pg, camp)) continue;
             ulance[i] = 0; uassaut[i] = 0;
             let vx = dx, vz = dz;
             if (d2 < 10000) { const h = Math.imul(i, 0x9E3779B1) >>> 24; vx = DX[h]; vz = DZ[h]; }
@@ -1613,6 +1720,17 @@
           if (((i + it) & 15) === 0) {
             if (T.jet[t]) {
               if (nFeux > 0 && usal[i] === 0) { const q = feuProche(x, z, JET_PORTEE - 1000); if (q >= 0) lancerJet(i, fX[q], fZ[q]); }
+              else if (IMM.enFeu > 0 && usal[i] === 0) {
+                const k = PDR.immeubles.proche(IMM, x / 1000, z / 1000, JET_PORTEE / 1000);
+                if (k >= 0) lancerJet(i, Math.round(IMM.x[k] * 1000), Math.round(IMM.z[k] * 1000));
+              }
+            } else if (T.lance[t] && usal[i] === 0) {
+              const q = nFeux > 0 ? feuProche(x, z, T.lancePortee[t]) : -1;
+              if (q >= 0) lancerJet(i, fX[q], fZ[q]);
+              else if (IMM.enFeu > 0) {
+                const k = PDR.immeubles.proche(IMM, x / 1000, z / 1000, T.lancePortee[t] / 1000 + 2);
+                if (k >= 0) lancerJet(i, Math.round(IMM.x[k] * 1000), Math.round(IMM.z[k] * 1000));
+              }
             } else if (T.molotov[t]) {
               if (urech[i] === 0 && jetons[f] >= JETON && nFeux + nVols < NFEUX_AUTO && res[f * 2 + 1] >= MO_RESERVE) {
                 const u = viserFoule(i, f, x, z, MO_MIN2, MO_MAX, 6, feuCase);
@@ -1728,8 +1846,9 @@
           // Sur ordre : 3 cocktail (Furets), 2 grenade (Compagnie, capacité seconde), 1 salve, 0 jet.
           const dx = usx[i] - x, dz = usz[i] - z, d2 = dx * dx + dz * dz;
           const sorte = T.molotov[t] ? 3 : (umode[i] & M_SECONDE) ? 2 : T.salve[t] ? 1 : 0;
-          const portee = sorte === 3 ? MO_MAX : sorte === 2 ? LA_MAX : sorte === 1 ? SALVE_PORTEE : JET_PORTEE;
-          if (d2 <= portee * portee) {
+          const portee = sorte === 3 ? MO_MAX : sorte === 2 ? LA_MAX : sorte === 1 ? SALVE_PORTEE : T.lance[t] ? T.lancePortee[t] : JET_PORTEE;
+          const ki = T.lance[t] && IMM.enFeu > 0 ? PDR.immeubles.pres(IMM, usx[i] / 1000, usz[i] / 1000) : -1;
+          if (d2 <= portee * portee || (ki >= 0 && PDR.immeubles.distFacade(IMM, ki, x / 1000, z / 1000) * 1000 <= portee)) {
             if (sorte >= 2) {
               // À portée, le lanceur attend sa recharge s'il le faut ; sans Matériaux, l'ordre du cocktail tombe.
               if ((sorte === 3 ? urech[i] : urech2[i]) > 0 && (sorte === 2 || res[f * 2 + 1] >= MO_COUT)) uetat[i] = ET.OISIF;
@@ -2265,7 +2384,7 @@
     const PAR_UNITE = [ux, uz, ucoh, ubx, ubz, ucib, ufac, utyp, ucap, uetat, uord, uphase, umode, ucharge, uminu, urech, usal, uchamp, ugen,
       uterre, uimm, ulance, uassaut, urech2];
     const GLOBAUX = [res, acc, score, pop, vivantes, elimine, lieuProp, lieuPreneur, lieuProgres, stock, actifs, casEtat, casPv,
-      sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif];
+      sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif, gN, gPres];
     let cliche = new Uint8Array(1 << 20);
     const ecrire = (vue, o) => {
       if (o + vue.length > cliche.length) { const plus = new Uint8Array(Math.max(cliche.length * 2, o + vue.length)); plus.set(cliche.subarray(0, o)); cliche = plus; }
@@ -2290,6 +2409,7 @@
       // Ce qui vole : cocktails et grenades, puis les pierres de la file, de la plus ancienne à la plus récente.
       for (let k = 0; k < nVols; k++) st.push(vIt[k], vX[k], vZ[k], vCamp[k], vSorte[k], vTireur[k]);
       for (let k = sTete; k !== sQueue; k = (k + 1) & (NPIERRES - 1)) st.push(sIt[k], sCible[k], sGen[k], sTireur[k], sCamp[k], sPres[k]);
+      st.push(IMM.n > 0 ? PDR.immeubles.empreinte(IMM) | 0 : 0);
       return ecrire(new Uint8Array(Int32Array.from(st).buffer), o);
     }
     /** L'empreinte de l'état présent, calculée d'un coup (essais, relecture). */
@@ -2356,10 +2476,10 @@
         victoire: { mode: VIC.mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
           reste: limiteTemps ? Math.max(0, (limiteTemps - it) / IT_S) : -1, plafond: plafondIt / IT_S, demo: DEMO },
         structures: null, versionStructures: versionStructures + structuresDetail,
-        cassables: null, gisements: null, voile: null, feux: null, nuages: null, minicarte: null, combats: null,
+        cassables: null, gisements: null, voile: null, feux: null, nuages: null, immeubles: null, minicarte: null, combats: null,
         evenements: ev.slice(0, nev * 6), vainqueur, raison: P.RAISONS_FIN[raison],
         mesure: { msIteration: 0, msIA: 0, msNav: mesure.msNav, vivantes: vivantes[0] + vivantes[1] + vivantes[2], champs: nav.champs.length,
-          feux: nFeux, nuages: nNuages, aTerre, gisants: nGisants },
+          feux: nFeux, nuages: nNuages, immeubles: IMM.enFeu, aTerre, gisants: nGisants },
       };
       // La liste part à chaque changement majeur (pose, fin, destruction, file, occupation), et toutes les
       // 5 itérations au plus quand seuls les pv ou l'avancement des files bougent.
@@ -2388,6 +2508,12 @@
           o += P.FEU_TAILLE;
         }
         msg.feux = a;
+      }
+      // Envoi des immeubles en feu ou modifiés
+      if (IMM.n > 0 && (versionImm !== immEnvoyes || (IMM.enFeu > 0 && it % 5 === 0))) {
+        immEnvoyes = versionImm;
+        const n = PDR.immeubles.exporter(IMM, sortieImm);
+        msg.immeubles = sortieImm.slice(0, n * P.IMMEUBLE_TAILLE);
       }
       if (versionGaz !== gazEnvoye || (nNuages > 0 && it % 5 === 0)) {
         gazEnvoye = versionGaz;
@@ -2437,7 +2563,7 @@
       get it() { return it; }, get n() { return nHaut; }, get vainqueur() { return vainqueur; },
       get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colere; },
       get delaiAlliance() { return delaiAlliance; },
-      soumettre, injecter, iterer, etat, empreinte,
+      soumettre, injecter, iterer, etat, empreinte, immeubles: IMM, allumerImmeuble,
       enregistrement: () => ({ version: P.VERSION, options: { ...opt }, commandes: journal.slice(), empreintes: empreintes.slice() }),
       bilan: () => bilan.map((b, f) => ({ ...b, infliges: Math.round(b.infliges / 1000),
         sources: Array.from(sources.subarray(f * 8, f * 8 + 8), v => Math.round(v / 1000)) })),

@@ -19,7 +19,7 @@ const exiger = createRequire(import.meta.url);
 const args = process.argv.slice(2);
 const option = (nom, defaut) => { const k = args.indexOf('--' + nom); return k >= 0 && args[k + 1] && !args[k + 1].startsWith('--') ? args[k + 1] : defaut; };
 const SRC = path.resolve(option('src', path.join(ici, '..', 'src'))), VILLE = option('ville', 'damier');
-for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(SRC, f));
+for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js']) exiger(path.join(SRC, f));
 const { regles: R, protocole: P, monde: M, ia: IA } = globalThis.PDR;
 
 const EFFECTIFS = option('effectifs', '100000,200000').split(',').map(Number);
