@@ -141,7 +141,7 @@
     COLERE_S: 45, REPLI_SEUIL: 0.25, SOUTIEN_PAR_S: 5, SOIN_RAYON: 8, FLANC: 1.5, PROTEGE: 0.5, ARC_FRONTAL_DEG: 120,
     INTERPELLER_SEUIL: 0.30, REPLI_VITESSE: 1.3,
     CHARGE_RECOLTE: 10, RECOLTEURS_MAX: 40,
-    AVANT_POSTE: Object.freeze({ moyens: 150, materiaux: 100, pv: 1500, travail: 200 }),   // travail : secondes-Équipe
+    AVANT_POSTE: Object.freeze({ moyens: 150, materiaux: 100, pv: 500, travail: 200 }),   // travail : secondes-Équipe
     BARRICADE: Object.freeze({ materiauxParMetre: 6, pvParMetre: 40, longueurMin: 4, longueurMax: 20, rendement: 0.5,
       travailParMetre: 6 }),            // secondes-unité par mètre
     LEVER_PAR_S: 8,                      // points de structure levés par seconde et par unité au facteur 1
