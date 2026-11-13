@@ -153,11 +153,12 @@
   /** Durée de vol en itérations d'un cocktail ou d'une grenade lancés à d mm (regles.dureeVol, en entiers). */
   const volIt = (p, d) => Math.round(p.vol * IT_S) + Math.trunc(d * IT_S / (p.vitesse * 1000));
 
-  // Composition de départ (après les 4 % d'Équipes), en millièmes, par camp et par type.
+  // Composition de départ (après les 4 % d'Équipes), en millièmes, par camp et par type. La Préfecture garde 2,8 % de
+  // Pompiers et 1 % de Camions : sans eux rien ne les produit (D9), et les immeubles brûlent jusqu'au bout.
   const COMPOSITION = [
     [[1, 620], [2, 290], [3, 90]],
     [[5, 520], [6, 310], [7, 170]],
-    [[9, 480], [10, 345], [11, 172], [12, 3]],
+    [[9, 462], [10, 332], [11, 165], [12, 3], [13, 28], [14, 10]],
   ];
 
   /** FNV-1a 64 bits sur des octets [debut, fin[, en quatre membres de 16 bits (h[0] le plus bas) : tout reste en
