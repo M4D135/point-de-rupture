@@ -1,5 +1,6 @@
 // Import des fonctions de feu
 import { dessinerFlammeFenetre, dessinerBraises, dessinerColonneFumee, dessinerFiletFumeeBlanche } from './feu.js';
+import { estVisible } from './brouillard.js';
 
 /**
  * Dessine les effets de feu, fumée et suie sur un immeuble.
@@ -7,8 +8,20 @@ import { dessinerFlammeFenetre, dessinerBraises, dessinerColonneFumee, dessinerF
  * @param {Object} immeuble 
  * @param {Object} cam 
  */
-export function dessinerFeuImmeuble(ctx, immeuble, cam) {
+export function dessinerFeuImmeuble(ctx, immeuble, cam, carte) {
     const etat = immeuble.etat;
+
+    // Vérification de la visibilité (brouillard de guerre)
+    // Centre de l'immeuble pour le test
+    const centreX = immeuble.x + immeuble.largeur / 2;
+    const centreY = immeuble.y + immeuble.hauteur / 2;
+    
+    if (!estVisible(centreX, centreY, cam, carte)) {
+        // Silhouette grise uniquement si invisible
+        ctx.fillStyle = 'rgba(60, 60, 60, 0.8)';
+        ctx.fillRect(immeuble.x, immeuble.y, immeuble.largeur, immeuble.hauteur);
+        return;
+    }
 
     // Gestion de l'état calciné (prioritaire sur le feu actif si éteint)
     if (etat.calcine) {
