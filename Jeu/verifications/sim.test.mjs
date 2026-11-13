@@ -435,6 +435,42 @@ verifier('alliance : un camp sans base tient tant que son allié tient la sienne
   assert.equal(m.elimine[C], 1, 'la déroute menée à son terme élimine le camp');
 });
 
+verifier('brouillard : les lieux tenus par l\'allié restent visibles, pas ceux d\'un camp isolé', () => {
+  /** Le voile autour d'un point, en mètres : le nombre de cases vues sur les 49 cases sondées. */
+  const vues = (m, x, z) => {
+    let v = null;
+    for (let k = 0; k < 8 && !v; k++) { const e = m.etat(); if (e.voile) v = e.voile; else m.iterer(); }
+    assert.ok(v, 'le voile est envoyé au joueur');
+    const g = m.carte.voile, i0 = Math.floor((x - g.x0) / g.cellule), j0 = Math.floor((z - g.z0) / g.cellule);
+    let n = 0;
+    for (let j = j0 - 3; j <= j0 + 3; j++) for (let i = i0 - 3; i <= i0 + 3; i++) {
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) continue;
+      if (v[i + j * g.nx] >= 90) n++;
+    }
+    return n;
+  };
+  const prendreLieu = (alliance) => {
+    const m = creer({ vide: true, joueur: C, alliance, brouillard: true });
+    const L = m.ville.sites.lieux[0];
+    const p = m.ville.accrocher(L.x + L.rayon / 2, L.z);
+    const b = grappe(m, B, 1, 12, p[0], p[1]);
+    const vus = courir(m, 320);
+    assert.equal(de(vus, EV.LIEU_PRIS).length, 1, 'le Bastion prend le lieu');
+    assert.equal(m.lieuProp[0], B);
+    // Le Bastion quitte le lieu : sans la règle, sa zone retombe sous le voile.
+    const q = m.ville.sites.qg[B];
+    m.soumettre(cmd(CMD.DEPLACER, B, { ids: b, x: q.sortie[0], z: q.sortie[1], mode: 0 }));
+    const loin = x => Array.from(b).every(i => Math.hypot(x.ux[i] / 1000 - L.x, x.uz[i] / 1000 - L.z) > L.rayon + 8);
+    courir(m, 1200, null, loin);
+    assert.ok(loin(m), 'le Bastion a quitté le lieu');
+    return { m, L, n: vues(m, L.x, L.z) };
+  };
+  const allie = prendreLieu([C, B]);
+  assert.ok(allie.n >= 40, 'le lieu tenu par l\'allié reste visible : ' + allie.n + ' cases vues sur 49');
+  const seul = prendreLieu(null);
+  assert.ok(seul.n <= 4, 'le même lieu, tenu par un camp qui n\'est pas notre allié, reste voilé : ' + seul.n + ' cases vues');
+});
+
 // ---- 0.3 : le feu, le gaz, les projectiles, les chutes, la fin de partie. ----
 /** Le foyer actif qui couvre l'unité i (tous les foyers sont lus, même ceux qui se chevauchent), ou -1. */
 function foyerDe(m, i) {

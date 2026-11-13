@@ -2371,6 +2371,14 @@
         const r = s.sorte === S_QG ? 4 : s.sorte === S_POSTE ? 3 : 1;
         if (vision[c] < r) vision[c] = r;
       }
+      // Les lieux tenus par un camp que l'on voit (soi-même ou son allié) restent visibles : c'est ce qui fait
+      // « l'aire de l'allié » sur la carte, et sans eux elle reste voilée dès que ses unités s'en éloignent.
+      for (let l = 0; l < NL; l++) {
+        const prop = lieuProp[l];
+        if (prop < 0 || !voit[prop]) continue;
+        const f = nav.fineDe(lieux[l].x, lieux[l].z), c = ((f % nx2) >> 2) + (((f / nx2) | 0) >> 2) * nx8;
+        if (vision[c] < 3) vision[c] = 3;
+      }
       for (let c = 0; c < N8; c++) if (voile[c] > 0) voile[c] = voile[c] > 40 ? voile[c] - 40 : 0;
       for (let c = 0; c < N8; c++) {
         const r = vision[c];
