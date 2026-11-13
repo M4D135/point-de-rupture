@@ -1011,6 +1011,15 @@
       return touche;
     }
     /** Le foyer le plus proche de (x, z) dont le bord est à moins de « portee » ; -1 s'il n'y en a pas. */
+    function arroserImmeubles(i, x, z, ax, az, la, debit) {
+      if (IMM.enFeu <= 0) return;
+      const p = T.lance[utyp[i]] ? T.lancePortee[utyp[i]] : JET_PORTEE;
+      const d = Math.min(la, p);
+      const px = x + ax * d / la;
+      const pz = z + az * d / la;
+      PDR.immeubles.arroser(IMM, px / 1000, pz / 1000, 3, debit, JET_PAS / IT_S, evIm);
+    }
+
     function feuProche(x, z, portee) {
       let meilleur = -1, md = Infinity;
       for (let q = 0; q < NFEUX; q++) {
@@ -1461,6 +1470,11 @@
     function jet(i) {
       const f = ufac[i], x = ux[i], z = uz[i], ax = usx[i] - x, az = usz[i] - z, la = Math.sqrt(ax * ax + az * az) | 0;
       if (la === 0) return;
+      if (T.lance[utyp[i]]) {
+        if (nFeux > 0) arroser(x, z, ax, az, la, f);
+        arroserImmeubles(i, x, z, ax, az, la, T.lanceDebit[utyp[i]] / 1000);
+        return;
+      }
       const c0 = uc4[i], ci = c0 % nx, cj = (c0 / nx) | 0, r2 = JET_PORTEE * JET_PORTEE;
       let n = 0;
       for (let q = 0; q < ORDRE_JET.length && n < JET_MAX; q++) {
@@ -1486,6 +1500,7 @@
         }
       }
       if (nFeux > 0) arroser(x, z, ax, az, la, f);
+      arroserImmeubles(i, x, z, ax, az, la, 2);
     }
 
     // ---- Hors jeu : l'unité reste couchée six secondes (1,5 s au-delà de 4 096 gisants, ou si « vite »), puis son
@@ -1704,6 +1719,17 @@
           if (((i + it) & 15) === 0) {
             if (T.jet[t]) {
               if (nFeux > 0 && usal[i] === 0) { const q = feuProche(x, z, JET_PORTEE - 1000); if (q >= 0) lancerJet(i, fX[q], fZ[q]); }
+              else if (IMM.enFeu > 0 && usal[i] === 0) {
+                const k = PDR.immeubles.proche(IMM, x / 1000, z / 1000, JET_PORTEE / 1000);
+                if (k >= 0) lancerJet(i, Math.round(IMM.x[k] * 1000), Math.round(IMM.z[k] * 1000));
+              }
+            } else if (T.lance[t] && usal[i] === 0) {
+              const q = nFeux > 0 ? feuProche(x, z, T.lancePortee[t]) : -1;
+              if (q >= 0) lancerJet(i, fX[q], fZ[q]);
+              else if (IMM.enFeu > 0) {
+                const k = PDR.immeubles.proche(IMM, x / 1000, z / 1000, T.lancePortee[t] / 1000 + 2);
+                if (k >= 0) lancerJet(i, Math.round(IMM.x[k] * 1000), Math.round(IMM.z[k] * 1000));
+              }
             } else if (T.molotov[t]) {
               if (urech[i] === 0 && jetons[f] >= JETON && nFeux + nVols < NFEUX_AUTO && res[f * 2 + 1] >= MO_RESERVE) {
                 const u = viserFoule(i, f, x, z, MO_MIN2, MO_MAX, 6, feuCase);
