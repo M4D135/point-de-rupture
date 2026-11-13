@@ -811,12 +811,12 @@
     }
     function detruire(s, auteur) {
       s.vivante = false;
-      // Les foyers d'une structure détruite finissent de brûler au sol, six secondes au plus.
+      // Les foyers d'une structure détruite finissent de brûler au sol, deux secondes au plus.
       if (s.feux > 0) {
         for (let q = 0; q < NFEUX; q++) {
           if (!fActif[q] || fCible[q] !== s.id || (fSorte[q] !== SF.BARRICADE && fSorte[q] !== SF.POSTE)) continue;
           fSorte[q] = SF.SOL; fCible[q] = -1;
-          if (fReste[q] > 6 * IT_S) fReste[q] = 6 * IT_S;
+          if (fReste[q] > 2 * IT_S) fReste[q] = 2 * IT_S;
         }
         s.feux = 0; s.feu = false; versionFeux++;
       }
