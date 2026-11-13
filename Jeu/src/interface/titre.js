@@ -210,7 +210,7 @@
       z.style.setProperty('--part', borne(1 - reste / ATTENTE_DEMO_MS, 0, 1).toFixed(3));
     }
     function optionsDemo() {
-      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: REG.partie.effectifs, joueur: -1, alliance: null,
+      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: Math.min(REG.partie.effectifs, C.EFFECTIFS_DEFAUT), joueur: -1, alliance: null,
         difficulte: 1, brouillard: false, coalitions: true, enregistrer: false, ville: REG.partie.ville };
     }
     function lancerDemo() {
@@ -325,7 +325,7 @@
       for (const b of doc.querySelectorAll('#prep-ville [data-ville]')) b.setAttribute('aria-pressed', String(b.dataset.ville === p.ville));
       const n = R.ilots(p.effectifs), reelle = p.ville === 'marseille';
       ecrire($('prep-effectifs-note'), (reelle ? 'Marseille, ' + (n <= 9 ? 'le Vieux-Port' : n <= 13 ? 'le centre' : 'le grand centre') : 'Ville de ' + n + ' × ' + n + ' îlots') + ' · '
-        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs <= 20000 ? 'partie courte' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : 'partie moyenne'));
+        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : p.effectifs <= 20000 ? 'partie courte' : 'partie moyenne'));
       ecrire($('prep-graine-note'), reelle ? 'Le vrai plan des rues. La graine change les départs et le hasard de la partie. Plan : © les contributeurs d’OpenStreetMap.'
         : 'Une graine, une ville : la même graine redonne les mêmes rues.');
       const g = $('prep-graine');

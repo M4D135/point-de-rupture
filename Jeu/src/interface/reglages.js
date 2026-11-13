@@ -137,7 +137,7 @@
 
   const borne = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const EFFECTIFS = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS : [20000, 50000, 100000, 150000, 200000]);
-  const EFFECTIFS_DEFAUT = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS_DEFAUT : 100000);
+  const EFFECTIFS_DEFAUT = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS_DEFAUT : 20000);
 
   function defaults(tactile = false) {
     return {
