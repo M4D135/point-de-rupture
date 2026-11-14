@@ -420,6 +420,9 @@
       // La salve annoncée ou le jet en cours (usal) survivent à un nouvel ordre : l'annonce est déjà partie.
       uord[i] = O.AUCUN; ucib[i] = -1; uphase[i] = 0; umode[i] &= ~(M_REPLI_AUTO | M_CASSABLE | M_SECONDE); ubloc[i] = 0;
       uassaut[i] = 0;
+      // Quitter un ordre sans qu'on lui donne d'état ne doit pas laisser l'unité en marche : c'est ce qui produisait
+      // les figurines « bloquées », une marche sans fin autour d'un but atteint. Sans ordre, l'unité est oisive.
+      if (uetat[i] === ET.MARCHE || uetat[i] === ET.CHARGE) uetat[i] = ET.OISIF;
     }
     function viser(i, cle) {
       if (uchamp[i] >= 0) nav.lacher(uchamp[i]);
@@ -1912,8 +1915,12 @@
           if (marche) {
             if ((sx > 40 || sx < -40 || sz > 40 || sz < -40) && uetat[i] !== ET.ATTAQUE) ucap[i] = CAP(sx, sz, ucap[i]);
             if (!bouge) { if (ubloc[i] < 255) ubloc[i]++; } else if (ubloc[i]) ubloc[i]--;
-            // Coincée depuis deux secondes près du but : elle s'arrête là.
-            if (ubloc[i] > 40 && (ord === O.ALLER || ord === O.ATTAQUE_MVT || ord === O.REGROUPER || ord === O.ATTAQUER)) arriver(i);
+            // Coincée depuis deux secondes près du but : elle s'arrête là. Y compris une unité sans ordre que son
+            // poste sépare un mur : sans cela, elle marchait sur place indéfiniment.
+            if (ubloc[i] > 40 && (ord === O.AUCUN || ord === O.ALLER || ord === O.ATTAQUE_MVT || ord === O.REGROUPER || ord === O.ATTAQUER)) arriver(i);
+            // Un récolteur bloqué en route vers son gisement n'était pas concerné par la règle : il butait dans le mur
+            // sans fin. Il cherche un autre gisement, et s'il n'y en a pas, il s'arrête là.
+            else if (ubloc[i] > 40 && ord === O.RECOLTER) { if (!changerGisement(i, ucib[i])) arriver(i); else ubloc[i] = 0; }
           }
         }
       }
@@ -1954,6 +1961,15 @@
         const etat = avancerVers(i, v);
         uetat[i] = ET.MARCHE;
         if (etat === 2) { quitterOrdre(i); uetat[i] = ET.OISIF; ubx[i] = x; ubz[i] = z; return false; }
+        if (etat === 1 && !dedans) {
+          // Arrivé à la place qu'on lui avait désignée sans être dans le gisement : la place est mauvaise (mur, cour
+          // trop étroite, trop de monde). Le code « arrivé » n'était pas traité et l'unité y restait des minutes.
+          // On lui en reprend une autre, en tournant ; s'il n'y a pas de place, elle devient oisive.
+          const pl = gs.places;
+          if (pl.length) { const fc = pl[(i + it) % pl.length]; ubx[i] = nav.fineX(fc); ubz[i] = nav.fineZ(fc); }
+          else { quitterOrdre(i); ubx[i] = x; ubz[i] = z; }
+          return false;
+        }
         return true;
       }
       if (ph === PH.RECOLTE) {
