@@ -729,13 +729,14 @@ verifier('travailleur : pret, un état par itération, tampons rendus, vitesse, 
   assert.equal(recus[0].m.type, 'pret');
   assert.deepEqual(Object.keys(recus[0].m.options).sort(), ['alliance', 'brouillard', 'coalitions', 'difficulte', 'effectifs', 'enregistrer', 'graine', 'joueur',
     'manifestants', 'victoire', 'ville']);
-  // 0.3 : une démo ne finit ni aux points ni au temps (0 : ni cible ni limite, dès « pret » comme dans l'état) ; la
-  // part des manifestants par défaut est « moyen ».
+  // Les options telles que reçues : la démo ne précise pas de mode, c'est « dernier » tel quel.
+  // L'état, lui, rend le mode EFFECTIF : une démo sans objectif courrait jusqu'au plafond sans qu'on gagne, elle joue
+  // donc l'objectif de la version — tenir des lieux — et l'annonce comme tel.
   assert.deepEqual(recus[0].m.options.victoire, { mode: 'dernier', points: 0, duree: 0 });
   assert.equal(recus[0].m.options.manifestants, 'moyen');
   assert.deepEqual(recus[0].m.carte.parts, [40, 32, 28]);
   assert.deepEqual(recus[0].m.carte.depart, [8000, 6400, 5600]);
-  assert.deepEqual(recus[1].m.victoire, { mode: 'dernier', points: 0, duree: 0, reste: -1, plafond: K.VICTOIRE.DEMO_PLAFOND_S, demo: true });
+  assert.deepEqual(recus[1].m.victoire, { mode: 'points', points: K.POINTS_VICTOIRE, duree: 0, reste: -1, plafond: K.VICTOIRE.DEMO_PLAFOND_S, demo: true });
   assert.equal(recus[0].m.options.ville, 'damier');
   assert.equal(recus[0].m.carte.ilots, 9);
   assert.equal(recus[1].m.type, 'etat');

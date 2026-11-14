@@ -354,9 +354,13 @@
         parvis: disqueCases8(mm(q.x), mm(q.z), mm(q.rayon)), coutM: 0, coutX: 0 });
     }
     // Victoire (options.victoire) : cible de points, limite de temps, limite de sécurité, en itérations ; 0 : aucune.
-    const VIC = opt.victoire;
-    const ciblePoints = !DEMO && (VIC.mode === 'points' || VIC.mode === 'mixte') ? VIC.points : 0;
-    const limiteTemps = !DEMO && (VIC.mode === 'temps' || VIC.mode === 'mixte') ? VIC.duree * 60 * IT_S : 0;
+    const VIC = opt.victoire || K.VICTOIRE.DEFAUT;
+    // La démo se regarde toute seule : sans objectif elle court jusqu'au plafond de sécurité sans que personne ne
+    // gagne, ce qui ne montre rien. Elle joue donc l'objectif de la version — tenir des lieux, à la cible de points.
+    // Une partie jouée garde le mode choisi au titre. (Le HUD cale déjà sa barre sur POINTS_VICTOIRE.)
+    const mode = DEMO ? 'points' : VIC.mode;
+    const ciblePoints = (mode === 'points' || mode === 'mixte') ? (VIC.points || K.VICTOIRE.DEFAUT.points) : 0;
+    const limiteTemps = (mode === 'temps' || mode === 'mixte') ? VIC.duree * 60 * IT_S : 0;
     const plafondIt = limiteTemps ? 0 : (DEMO ? K.VICTOIRE.DEMO_PLAFOND_S : K.VICTOIRE.PLAFOND_S) * IT_S;
     const DEROUTE_IT = K.DEROUTE_S * IT_S;
     const sansBase = new Int32Array(3);         // itérations passées sans base (0 : le camp en a une)
@@ -2559,7 +2563,7 @@
         colere: colereDuBastion() / IT_S,
         lieux: Array.from({ length: NL }, (_, l) => ({ proprietaire: lieuProp[l], progression: lieuProgres[l] / PRISE_IT,
           conteste: !!lieuConteste[l], preneur: lieuPreneur[l] })),
-        victoire: { mode: VIC.mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
+        victoire: { mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
           reste: limiteTemps ? Math.max(0, (limiteTemps - it) / IT_S) : -1, plafond: plafondIt / IT_S, demo: DEMO },
         structures: null, versionStructures: versionStructures + structuresDetail,
         cassables: null, gisements: null, voile: null, feux: null, nuages: null, immeubles: null, minicarte: null, combats: null,
