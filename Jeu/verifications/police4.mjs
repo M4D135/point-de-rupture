@@ -2,8 +2,9 @@
 // bilan[f].infliges compte tous les coups d'un camp sans dire à qui ; seules les paires prouvent que la
 // Préfecture ne frappe jamais la première. Lancer : node Jeu/verifications/police4.mjs
 import { createRequire } from 'node:module';
-const exiger = createRequire('/home/m4d135/work/pdr-reprise-20261113/Jeu/verifications/x.js');
-const src = f => '/home/m4d135/work/pdr-reprise-20261113/Jeu/src/' + f;
+import { fileURLToPath } from 'node:url';
+const exiger = createRequire(import.meta.url);
+const src = f => fileURLToPath(new URL('../src/' + f, import.meta.url));
 for (const f of ['sim/regles.js', 'sim/protocole.js', 'ville.js', 'villes/marseille.js', 'ville-reelle.js', 'sim/nav.js', 'sim/immeubles.js', 'sim/monde.js', 'sim/ia.js', 'sim/travailleur.js']) exiger(src(f));
 const { ville: V, regles: R, monde: M, ia: IA } = globalThis.PDR;
 const { CONVERGENCE: C, BASTION: B, PREFECTURE: F } = R;
