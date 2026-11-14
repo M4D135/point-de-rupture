@@ -451,10 +451,13 @@
   Pose poser(Unite u,bool cuivre){
     Pose q=Pose(0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.);
     float t=uReglages.y,ph=float(u.h&1023u)*.0061419;
-    uint e=u.etat;bool court=e==8u;bool marche=u.vitesse>.25||e==1u||court;
-    float amp=court?.95:.6*clamp(max(u.vitesse,e==1u?2.4:0.)/3.4,0.,1.);
-    float w=t*(court?2.6:1.75)*6.2831853+ph,s=sin(w);
-    if(marche){q.jg=amp*s;q.jd=-amp*s;q.bg=-amp*.8*s;q.bd=amp*.8*s;q.haut=abs(cos(w))*amp*.06;if(court)q.torse=.3;}
+    uint e=u.etat;bool court=e==8u;bool marche=u.vitesse>.25||court;
+    // La foulée suit la vitesse réelle, en cadence comme en amplitude : une figurine qui n'avance pas ne marche
+    // plus sur place, et la foule n'est plus en cadence parfaite (la fréquence varie de ±12 % selon l'empreinte).
+    float v=clamp(u.vitesse/3.4,0.,1.),amp=court?.95:.6*v,cadence=court?2.6:1.05+1.45*v;
+    cadence*=.88+.24*float(u.h&255u)/255.;
+    float w=t*cadence*6.2831853+ph,s=sin(w);
+    if(marche){q.jg=amp*s;q.jd=-amp*s;q.bg=-amp*.8*s;q.bd=amp*.8*s;q.haut=abs(cos(w))*amp*.06;q.torse=.08*amp*s;if(court)q.torse=.3;}
     else{q.torse=.025*sin(t*1.3+ph);q.bg=.05*sin(t*1.1+ph);q.bd=-q.bg;q.tete=.06*sin(t*.7+ph*1.7);}
     if(e==2u){float k=.5+.5*sin(t*7.5+ph);q.bd=1.25+.45*k;q.bg=1.05+.4*(1.-k);q.torse=.1+.18*k;if(!marche){q.jg=.3;q.jd=-.22;}}
     else if(e==3u){float k=.5+.5*sin(t*5.+ph);q.torse=.78;q.bg=.55+.5*k;q.bd=.55+.5*(1.-k);q.jg=q.jd=.15;q.haut=-.06;q.tete=-.3;}
