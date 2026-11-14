@@ -3278,11 +3278,12 @@ button.file-item:hover .icone { color: var(--alerte); }
   }
   /** Le camp a frappe-t-il le camp b ? colere : temps restant (> 0) de la colère du Bastion contre la Préfecture,
    *  allumée chaque fois que la Préfecture frappe le Bastion (CONSTANTES.COLERE_S). Relation non symétrique. */
-  function hostile(a, b, alliance, colere) {
+  function hostile(a, b, alliance, hostilite) {
     if (a === b || a > 2 || b > 2 || a < 0 || b < 0) return false;
     if (allies(a, b, alliance)) return false;
-    if (a === BASTION && b === PREFECTURE) return colere > 0;
-    return true;
+    if (hostilite === undefined || hostilite === null) return true;
+    if (typeof hostilite === 'number') return a === BASTION && b === PREFECTURE ? hostilite > 0 : true;
+    return hostilite[a * 4 + b] !== 0;
   }
   const peutCasser = f => f === CONVERGENCE;
   const peutBarricader = f => f === CONVERGENCE;
@@ -8345,14 +8346,36 @@ button.file-item:hover .icone { color: var(--alerte); }
         parvis: disqueCases8(mm(q.x), mm(q.z), mm(q.rayon)), coutM: 0, coutX: 0 });
     }
     // Victoire (options.victoire) : cible de points, limite de temps, limite de sécurité, en itérations ; 0 : aucune.
-    const VIC = opt.victoire;
-    const ciblePoints = !DEMO && (VIC.mode === 'points' || VIC.mode === 'mixte') ? VIC.points : 0;
-    const limiteTemps = !DEMO && (VIC.mode === 'temps' || VIC.mode === 'mixte') ? VIC.duree * 60 * IT_S : 0;
+    const VIC = opt.victoire || K.VICTOIRE.DEFAUT;
+    // La démo se regarde toute seule : sans objectif elle court jusqu'au plafond de sécurité sans que personne ne
+    // gagne, ce qui ne montre rien. Elle joue donc l'objectif de la version — tenir des lieux, à la cible de points.
+    // Une partie jouée garde le mode choisi au titre. (Le HUD cale déjà sa barre sur POINTS_VICTOIRE.)
+    const mode = DEMO ? 'points' : VIC.mode;
+    const ciblePoints = (mode === 'points' || mode === 'mixte') ? (VIC.points || K.VICTOIRE.DEFAUT.points) : 0;
+    const limiteTemps = (mode === 'temps' || mode === 'mixte') ? VIC.duree * 60 * IT_S : 0;
     const plafondIt = limiteTemps ? 0 : (DEMO ? K.VICTOIRE.DEMO_PLAFOND_S : K.VICTOIRE.PLAFOND_S) * IT_S;
     const DEROUTE_IT = K.DEROUTE_S * IT_S;
     const sansBase = new Int32Array(3);         // itérations passées sans base (0 : le camp en a une)
+    const maintenu = new Int32Array(3);         // 1 : sans base mais tenu en vie par un allié qui tient la sienne
     let raison = 0;                              // indice dans P.RAISONS_FIN
-    let alliance = opt.alliance, proposition = null, delaiAlliance = 0, colere = 0, derniereColere = -1000;
+    let alliance = opt.alliance, proposition = null, delaiAlliance = 0, derniereColere = -1000;
+    // R1 · la jauge d'hostilité par paire, à la place de la seule colère du Bastion. -1 : hostile d'office, le camp
+    // frappe sans avoir à être excité ; 0 : il ne frappe pas ; > 0 : excité pour autant d'itérations. La Préfecture
+    // n'a aucune hostilité de départ : elle ne frappe jamais la première (R2), elle riposte quand on la frappe.
+    const HOSTILE = -1, hostilite = new Int32Array(16), coupsParPaire = new Int32Array(16);
+    const hostileDeBase = (a, b) => (a === PREF || (a === BAST && b === PREF)) ? 0 : HOSTILE;
+    const colereDuBastion = () => Math.max(0, hostilite[BAST * 4 + PREF]);
+    // La jauge ne monte que sur une agression DÉLIBÉRÉE. Le dégât incident — éclaboussure d'un cocktail, fumée d'un
+    // incendie, pierre tombée de travers — ne l'allume pas : sinon l'exécution permissive des effets de zone
+    // autoriserait elle-même les coups qu'elle est censée laisser passer, et aucune posture passive ne tiendrait.
+    const exciter = (victime, agresseur) => {
+      if (victime < 0 || victime > 2 || agresseur < 0 || agresseur > 2 || victime === agresseur) return;
+      const k = victime * 4 + agresseur;
+      if (hostilite[k] === HOSTILE) return;                  // il frappe déjà sans qu'on ait à l'exciter
+
+      hostilite[k] = K.COLERE_S * IT_S;
+      if (victime === BAST && agresseur === PREF) colereAllumee = true;
+    };
     let vainqueur = P.VAINQUEUR.EN_COURS;
     let it = 0;
 
@@ -8367,7 +8390,15 @@ button.file-item:hover .icone { color: var(--alerte); }
     const refus = (j, raison, t) => evenement(EV.REFUS, 0, 0, j, raison, t);
 
     const majHostilite = () => {
-      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) hostile[a * 4 + b] = R.hostile(a, b, alliance, colere) ? 1 : 0;
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
+        const k = a * 4 + b;
+        if (a > 2 || b > 2) { hostile[k] = 0; continue; }
+        // Entre alliés on ne se frappe pas ; une jauge en cours n'est pas écrasée ; une jauge à zéro revient à la
+        // ligne de base du couple. L'Int32Array naît à zéro : sans cette ligne de base, personne ne se battrait.
+        if (alliance && R.allies(a, b, alliance)) hostilite[k] = 0;
+        else if (hostilite[k] === 0) hostilite[k] = hostileDeBase(a, b);
+        hostile[k] = R.hostile(a, b, alliance, hostilite) ? 1 : 0;
+      }
     };
     majHostilite();
     const adversaires = (a, b) => a !== b && a < 3 && b < 3 && !R.allies(a, b, alliance);
@@ -8410,6 +8441,9 @@ button.file-item:hover .icone { color: var(--alerte); }
       // La salve annoncée ou le jet en cours (usal) survivent à un nouvel ordre : l'annonce est déjà partie.
       uord[i] = O.AUCUN; ucib[i] = -1; uphase[i] = 0; umode[i] &= ~(M_REPLI_AUTO | M_CASSABLE | M_SECONDE); ubloc[i] = 0;
       uassaut[i] = 0;
+      // Quitter un ordre sans qu'on lui donne d'état ne doit pas laisser l'unité en marche : c'est ce qui produisait
+      // les figurines « bloquées », une marche sans fin autour d'un but atteint. Sans ordre, l'unité est oisive.
+      if (uetat[i] === ET.MARCHE || uetat[i] === ET.CHARGE) uetat[i] = ET.OISIF;
     }
     function viser(i, cle) {
       if (uchamp[i] >= 0) nav.lacher(uchamp[i]);
@@ -8543,9 +8577,13 @@ button.file-item:hover .icone { color: var(--alerte); }
         case CMD.ATTAQUER: {
           const k = filtrer(c, j), t = c.cible;
           if (!k) return;
-          if (!(t >= 0 && t < nHaut && ufac[t] !== LIBRE && uetat[t] !== ET.HORS_JEU) || !R.hostile(j, ufac[t], alliance, colere)) {
+          if (!(t >= 0 && t < nHaut && ufac[t] !== LIBRE && uetat[t] !== ET.HORS_JEU) || !adversaires(j, ufac[t])) {
             refus(j, RAISON.INTERDIT, c.t); return;
           }
+          // Un ordre joué n'est pas soumis à la jauge, mais il l'allume pour celui qui le donne : c'est ainsi que le
+          // joueur fait intervenir la Préfecture, qui part pourtant à zéro d'hostilité (R2). On n'excite PAS la
+          // victime — elle ne devient hostile qu'après avoir été réellement frappée, ce dont frapper() se charge.
+          exciter(j, ufac[t]);
           const cle = nav.cleDe(ux[t], uz[t]), ids = idsTampon.slice(0, k);
           for (let q = 0; q < k; q++) {
             const i = ids[q];
@@ -8687,9 +8725,9 @@ button.file-item:hover .icone { color: var(--alerte); }
       quitterOrdre(i);
       uord[i] = O.REPLI; uetat[i] = ET.REPLI;
       if (auto) umode[i] |= M_REPLI_AUTO;
-      const q = structures[ufac[i]];
+      const b = baseDeRepli(ufac[i]), q = structures[b];
       ubx[i] = q.sortieX; ubz[i] = q.sortieZ;
-      viser(i, cleBase(ufac[i]));
+      viser(i, cleBase(b));
     }
     function envoyerRecolter(i, g) {
       quitterOrdre(i);
@@ -9066,11 +9104,11 @@ button.file-item:hover .icone { color: var(--alerte); }
     }
     /** Le nuage hostile au camp f qui concerne un point (x, z) de case marquée k (comme feuDe), ou -1. */
     function gazDe(k, x, z, f) {
-      if (k !== PLUSIEURS) return hostile[gCamp[k - 1] * 4 + f] ? k - 1 : -1;
+      if (k !== PLUSIEURS) return gCamp[k - 1] >= 0 && adversaires(gCamp[k - 1], f) ? k - 1 : -1;
       let meilleur = -1, haut = -Infinity;
       for (let n = 0; n < nNuagesListe; n++) {
         const q = nuagesActifs[n];
-        if (!hostile[gCamp[q] * 4 + f]) continue;
+        if (gCamp[q] < 0 || !adversaires(gCamp[q], f)) continue;
         const dx = x - gX[q], dz = z - gZ[q], p = gRc[q] * gRc[q] - (dx * dx + dz * dz);
         if (p > haut) { haut = p; meilleur = q; }
       }
@@ -9094,11 +9132,16 @@ button.file-item:hover .icone { color: var(--alerte); }
 
     /** Un coup porté de loin ou par une zone : la pression p du camp f (lanceur i, ou -1) sur l'unité j. */
     function toucher(j, p, f, i, source) {
+      // Le puits de dégâts est le seul endroit où tous les coups passent, et c'est donc lui qui tient la jauge :
+      // garder (frapper) et les tirs (salve, jet) consultaient déjà la table, mais le coup porté par une zone ou une
+      // pierre frappait sans la consulter — un camp à zéro hostilité blessait donc encore son voisin.
+      if (f < 0 || !hostile[f * 4 + ufac[j]]) return;
+      coupsParPaire[f * 4 + ufac[j]] += p;
       if (udeg[j] === 0) touches[nTouches++] = j;
       udeg[j] += p;
       if (i >= 0) uagr[j] = i;
       bilan[f].infliges += p; sources[f * 8 + source] += p;
-      if (f === PREF && ufac[j] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+      
       const cb = combDeC8[uc8[j]];
       if (combats[cb] < 65535) combats[cb]++;
     }
@@ -9165,7 +9208,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < MO_MAXU; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
           if (d2 > r2) continue;
           toucher(u, T.protege[utyp[u]] ? MO_PRES >> 1 : MO_PRES, f, lanceur, 5);
@@ -9189,8 +9232,11 @@ button.file-item:hover .icone { color: var(--alerte); }
         if (sorte === 0) molotovTombe(x, z, f, tireur); else creerNuage(x, z, f);
       }
       while (sTete !== sQueue && sIt[sTete] <= it) {
-        const j = sCible[sTete], f = sCamp[sTete];
-        if (ufac[j] !== LIBRE && ugen[j] === sGen[sTete] && uetat[j] !== ET.HORS_JEU && hostile[f * 4 + ufac[j]]) {
+        const j = sCible[sTete], tireur = sTireur[sTete];
+        // Le camp est relu sur le tireur vivant : la file peut porter un camp périmé, et une hostilité mal
+        // attribuée allumerait une jauge entre des camps qui ne se sont rien fait.
+        const f = tireur >= 0 && tireur < nHaut && ufac[tireur] !== LIBRE ? ufac[tireur] : sCamp[sTete];
+        if (ufac[j] !== LIBRE && ugen[j] === sGen[sTete] && uetat[j] !== ET.HORS_JEU && adversaires(f, ufac[j])) {
           const i = sTireur[sTete];
           toucher(j, sPres[sTete], f, ufac[i] === f && uetat[i] !== ET.HORS_JEU ? i : -1, 3);
         }
@@ -9341,12 +9387,17 @@ button.file-item:hover .icone { color: var(--alerte); }
       }
       return meilleur;
     }
-    const cibleValide = (i, j) => j >= 0 && ufac[j] !== LIBRE && ugen[j] === ucibg[i] && uetat[j] !== ET.HORS_JEU && hostile[ufac[i] * 4 + ufac[j]] === 1;
+    const cibleValide = (i, j) => j >= 0 && ufac[j] !== LIBRE && ugen[j] === ucibg[i] && uetat[j] !== ET.HORS_JEU && adversaires(ufac[i], ufac[j]);
 
     // ---- Coups : pression au contact, flanc × 1,5, protégé × 0,5 de face, interpeller × 2 sous 30 %. ----
     let colereAllumee = false;
     function frapper(i, j, p, source) {
       const g = ufac[j], tj = utyp[j], f = ufac[i];
+      // Le corps à corps est le point de passage unique des coups, et il ne consultait aucune table : un camp à
+      // zéro d'hostilité frappait dès qu'un groupe lui avait désigné une cible. C'est ici que la jauge tient.
+      if (!hostile[f * 4 + g]) return;
+      coupsParPaire[f * 4 + g] += p;
+      exciter(g, f);                                          // frappé délibérément : on ripostera
       // Interpeller : pression doublée sur une unité sous 30 % de cohésion, et la matraque la jette au sol.
       if (T.interpeller[utyp[i]] && ucoh[j] * 10 < T.coh[tj] * 3) { p *= 2; if (uterre[j] === 0 && uimm[j] === 0) mettreATerre(j, CAUSE.MATRAQUE, f, false); }
       const vx = ux[i] - ux[j], vz = uz[i] - uz[j], h = ucap[j];
@@ -9357,7 +9408,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       udeg[j] += p;
       uagr[j] = i;
       bilan[f].infliges += p; sources[f * 8 + source] += p;
-      if (f === PREF && g === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+      exciter(g, f);
       const c8 = uc8[j], cb = combDeC8[c8];
       if (combats[cb] < 65535) combats[cb]++;
       const zone = g * 64 + zoneDeC8[c8];
@@ -9445,13 +9496,13 @@ button.file-item:hover .icone { color: var(--alerte); }
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < SALVE_MAX; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z;
           if (dx * dx + dz * dz > r2) continue;
           if (udeg[u] === 0) touches[nTouches++] = u;
           udeg[u] += T.protege[utyp[u]] ? SALVE_COUPS >> 1 : SALVE_COUPS;
           uagr[u] = i;
-          if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+          exciter(ufac[u], f);
           if (tombees < SALVE_A_TERRE && mettreATerre(u, CAUSE.SALVE, f, false)) tombees++;
           n++;
         }
@@ -9475,7 +9526,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < JET_MAX; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
           if (d2 > r2 || d2 === 0) continue;
           const dot = dx * ax + dz * az;
@@ -9486,7 +9537,7 @@ button.file-item:hover .icone { color: var(--alerte); }
           udeg[u] += JET_COUPS;
           uagr[u] = i; n++;
           bilan[f].infliges += JET_COUPS; sources[f * 8 + 2] += JET_COUPS;
-          if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+          exciter(ufac[u], f);
           deplacer(u, Math.trunc(dx * JET_RECUL / d), Math.trunc(dz * JET_RECUL / d));
           if (d2 <= JET_A_TERRE2) mettreATerre(u, CAUSE.JET, f, false);
         }
@@ -9557,7 +9608,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       colereAllumee = false;
       nEvATerre = 0; nEvPierres = 0;
       appliquerCommandes();
-      if (colere > 0) colere--;
+      for (let k = 0; k < 16; k++) if (hostilite[k] > 0) hostilite[k]--;
       if (delaiAlliance > 0) delaiAlliance--;
       if (proposition && --proposition.reste <= 0) proposition = null;
       majHostilite();
@@ -9621,7 +9672,7 @@ button.file-item:hover .icone { color: var(--alerte); }
           if (d2 <= r * r) {
             if (fAge[q] >= fDelai[q]) {
               const camp = fCamp[q];
-              if (camp >= 0 && hostile[camp * 4 + f]) { bilan[camp].infliges += FEU_PRES; sources[camp * 8 + 6] += FEU_PRES; }
+              if (camp >= 0 && adversaires(camp, f)) { bilan[camp].infliges += FEU_PRES; sources[camp * 8 + 6] += FEU_PRES; exciter(f, camp); }   // un nuage a un propriétaire : c'est une arme délibérée, elle met en colère
               const cb = combDeC8[uc8[i]];
               if (combats[cb] < 65535) combats[cb]++;
               if (presser(i, t, FEU_PRES, -1)) continue;
@@ -9654,7 +9705,7 @@ button.file-item:hover .icone { color: var(--alerte); }
             const camp = gCamp[q], pg = gPres[q];
             gN[q]++;
             bilan[camp].infliges += pg; sources[camp * 8 + 7] += pg;
-            if (camp === PREF && f === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+            exciter(f, camp);                                 // un nuage a un propriétaire : c'est une arme délibérée, elle met en colère
             const cb = combDeC8[uc8[i]];
             if (combats[cb] < 65535) combats[cb]++;
             if (presser(i, t, pg, camp)) continue;
@@ -9902,8 +9953,12 @@ button.file-item:hover .icone { color: var(--alerte); }
           if (marche) {
             if ((sx > 40 || sx < -40 || sz > 40 || sz < -40) && uetat[i] !== ET.ATTAQUE) ucap[i] = CAP(sx, sz, ucap[i]);
             if (!bouge) { if (ubloc[i] < 255) ubloc[i]++; } else if (ubloc[i]) ubloc[i]--;
-            // Coincée depuis deux secondes près du but : elle s'arrête là.
-            if (ubloc[i] > 40 && (ord === O.ALLER || ord === O.ATTAQUE_MVT || ord === O.REGROUPER || ord === O.ATTAQUER)) arriver(i);
+            // Coincée depuis deux secondes près du but : elle s'arrête là. Y compris une unité sans ordre que son
+            // poste sépare un mur : sans cela, elle marchait sur place indéfiniment.
+            if (ubloc[i] > 40 && (ord === O.AUCUN || ord === O.ALLER || ord === O.ATTAQUE_MVT || ord === O.REGROUPER || ord === O.ATTAQUER)) arriver(i);
+            // Un récolteur bloqué en route vers son gisement n'était pas concerné par la règle : il butait dans le mur
+            // sans fin. Il cherche un autre gisement, et s'il n'y en a pas, il s'arrête là.
+            else if (ubloc[i] > 40 && ord === O.RECOLTER) { if (!changerGisement(i, ucib[i])) arriver(i); else ubloc[i] = 0; }
           }
         }
       }
@@ -9944,6 +9999,15 @@ button.file-item:hover .icone { color: var(--alerte); }
         const etat = avancerVers(i, v);
         uetat[i] = ET.MARCHE;
         if (etat === 2) { quitterOrdre(i); uetat[i] = ET.OISIF; ubx[i] = x; ubz[i] = z; return false; }
+        if (etat === 1 && !dedans) {
+          // Arrivé à la place qu'on lui avait désignée sans être dans le gisement : la place est mauvaise (mur, cour
+          // trop étroite, trop de monde). Le code « arrivé » n'était pas traité et l'unité y restait des minutes.
+          // On lui en reprend une autre, en tournant ; s'il n'y a pas de place, elle devient oisive.
+          const pl = gs.places;
+          if (pl.length) { const fc = pl[(i + it) % pl.length]; ubx[i] = nav.fineX(fc); ubz[i] = nav.fineZ(fc); }
+          else { quitterOrdre(i); ubx[i] = x; ubz[i] = z; }
+          return false;
+        }
         return true;
       }
       if (ph === PH.RECOLTE) {
@@ -10264,6 +10328,18 @@ button.file-item:hover .icone { color: var(--alerte); }
       }
       return false;
     }
+    /** L'allié du camp f qui tient encore une base, ou -1 : sans lui, un camp sans base est éliminé. */
+    function allieQuiTient(f) {
+      if (!alliance || !alliance.includes(f)) return -1;
+      const p = alliance[0] === f ? alliance[1] : alliance[0];
+      return !elimine[p] && aUneBase(p) ? p : -1;
+    }
+    /** Le camp dont les unités de f doivent rejoindre la base : le sien s'il en tient une, sinon celui de son allié. */
+    function baseDeRepli(f) {
+      if (aUneBase(f)) return f;
+      const p = allieQuiTient(f);
+      return p >= 0 && structures[p].vivante && !structures[p].occupe ? p : f;
+    }
     /** Le camp f quitte la partie : ses unités se dispersent, ses avant-postes tombent, ses lieux redeviennent neutres. */
     function eliminer(f) {
       elimine[f] = 1; sansBase[f] = 0;
@@ -10277,22 +10353,28 @@ button.file-item:hover .icone { color: var(--alerte); }
     /**
      * Une fois par seconde : la déroute, l'élimination, puis la fin de la partie selon options.victoire (§1.7).
      * Élimination, dans tous les modes : un camp resté 30 s sans base (QG occupé, aucun avant-poste achevé et libre), ou
-     * aussitôt s'il est sans base avec moins de 2 % de ses effectifs de départ. Fin : le dernier camp (ou la dernière
+     * aussitôt s'il est sans base avec moins de 2 % de ses effectifs de départ. Un camp sans base tenu par un allié qui
+     * tient une base n'est pas éliminé : il tient tant que l'alliance tient, et ses unités se replient sur le QG de
+     * l'allié. Fin : le dernier camp (ou la dernière
      * alliance) debout ; la cible de points (« points », « mixte ») ; la limite de temps (« temps », « mixte » : le
      * meilleur score) ; sinon la limite de sécurité (« dernier », démo : le plus d'unités ; « points » : le meilleur score).
      */
-    function victoire() {
-      for (let f = 0; f < 3; f++) {
-        if (elimine[f]) continue;
-        const q = structures[f];
-        if (aUneBase(f)) {
-          if (sansBase[f] > 0) { sansBase[f] = 0; evenement(EV.BASE_REPRISE, q.x, q.z, f, 0, 0); }
-          continue;
-        }
-        if (sansBase[f] === 0) evenement(EV.DEROUTE, q.x, q.z, f, K.DEROUTE_S, 0);
-        sansBase[f] += IT_S;
-        if (sansBase[f] >= DEROUTE_IT || vivantes[f] * 100 < depart[f] * K.ELIMINATION_PART * 100) eliminer(f);
-      }
+     function victoire() {
+       for (let f = 0; f < 3; f++) {
+         if (elimine[f]) { maintenu[f] = 0; continue; }
+         const q = structures[f];
+         if (aUneBase(f)) {
+           maintenu[f] = 0;
+           if (sansBase[f] > 0) { sansBase[f] = 0; evenement(EV.BASE_REPRISE, q.x, q.z, f, 0, 0); }
+           continue;
+         }
+         // Un camp sans base reste en vie tant que son allié tient la sienne : le compte à rebours est gelé, et
+         // repart de zéro le jour où l'alliance casse ou où l'allié tombe.
+         maintenu[f] = allieQuiTient(f) >= 0 ? 1 : 0;
+         if (sansBase[f] === 0 && !maintenu[f]) evenement(EV.DEROUTE, q.x, q.z, f, K.DEROUTE_S, 0);
+         sansBase[f] = maintenu[f] ? 0 : sansBase[f] + IT_S;
+         if (!maintenu[f] && (sansBase[f] >= DEROUTE_IT || vivantes[f] * 100 < depart[f] * K.ELIMINATION_PART * 100)) eliminer(f);
+       }
       const enJeu = [0, 1, 2].filter(f => !elimine[f]);
       const cotes = [];
       for (const f of enJeu) {
@@ -10343,6 +10425,14 @@ button.file-item:hover .icone { color: var(--alerte); }
         const r = s.sorte === S_QG ? 4 : s.sorte === S_POSTE ? 3 : 1;
         if (vision[c] < r) vision[c] = r;
       }
+      // Les lieux tenus par un camp que l'on voit (soi-même ou son allié) restent visibles : c'est ce qui fait
+      // « l'aire de l'allié » sur la carte, et sans eux elle reste voilée dès que ses unités s'en éloignent.
+      for (let l = 0; l < NL; l++) {
+        const prop = lieuProp[l];
+        if (prop < 0 || !voit[prop]) continue;
+        const f = nav.fineDe(lieux[l].x, lieux[l].z), c = ((f % nx2) >> 2) + (((f / nx2) | 0) >> 2) * nx8;
+        if (vision[c] < 3) vision[c] = 3;
+      }
       for (let c = 0; c < N8; c++) if (voile[c] > 0) voile[c] = voile[c] > 40 ? voile[c] - 40 : 0;
       for (let c = 0; c < N8; c++) {
         const r = vision[c];
@@ -10384,7 +10474,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     };
     /** Recopie tout l'état dans le cliché ; rend sa longueur en octets. */
     function photographier() {
-      const entete = Int32Array.of(it, alea | 0, nHaut, nLibres, colere, delaiAlliance, alliance ? alliance[0] * 3 + alliance[1] : -1,
+      const entete = Int32Array.of(it, alea | 0, nHaut, nLibres, colereDuBastion(), delaiAlliance, alliance ? alliance[0] * 3 + alliance[1] : -1,
         proposition ? proposition.de * 3 + proposition.a : -1, proposition ? proposition.reste : 0, vainqueur, nav.version,
         raison, nGisants, nFeux, prochainFeu, nNuages, prochainNuage, nVols, (sQueue - sTete) & (NPIERRES - 1));
       let o = ecrire(new Uint8Array(entete.buffer), 0);
@@ -10429,7 +10519,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     function etat(tampon, vitesse = 1) {
       const n = nHaut;
       const f32 = new Float32Array(tampon, 0, Math.max(1, n) * 4);
-      const colereBastion = colere > 0 ? DR.COLERE : 0;
+      const colereBastion = colereDuBastion() > 0 ? DR.COLERE : 0;
       let aTerre = 0;
       for (let i = 0; i < n; i++) {
         const o = i * 4, f = ufac[i];
@@ -10457,14 +10547,15 @@ button.file-item:hover .icone { color: var(--alerte); }
             score: score[f], revenu: { moyens: Math.round(rm / 1000), materiaux: Math.round(rx / 1000) }, oisifs: oisifs[f],
             elimine: !!elimine[f], qgOccupe: q.occupe ? 1 : Math.min(1, q.occupation / (K.OCCUPATION_QG_S * IT_S)), vivantes: vivantes[f],
             depart: depart[f], force: depart[f] > 0 ? vivantes[f] / depart[f] : 0,
-            deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1 };
+            deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1,
+            maintenu: !!maintenu[f] };
         }),
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
-        colere: colere / IT_S,
+        colere: colereDuBastion() / IT_S,
         lieux: Array.from({ length: NL }, (_, l) => ({ proprietaire: lieuProp[l], progression: lieuProgres[l] / PRISE_IT,
           conteste: !!lieuConteste[l], preneur: lieuPreneur[l] })),
-        victoire: { mode: VIC.mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
+        victoire: { mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
           reste: limiteTemps ? Math.max(0, (limiteTemps - it) / IT_S) : -1, plafond: plafondIt / IT_S, demo: DEMO },
         structures: null, versionStructures: versionStructures + structuresDetail,
         cassables: null, gisements: null, voile: null, feux: null, nuages: null, immeubles: null, minicarte: null, combats: null,
@@ -10539,7 +10630,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       res, score, pop, popMax, vivantes, depart, elimine, structures, lieuProp, lieuPreneur, lieuProgres, lieuConteste, lieux,
       gis, stock, actifs, casX, casZ, casEtat, empreintes, estIA, echelle, mesure,
       // 0.3 : lecture pour l'IA et les essais. feux et nuages : tableaux par foyer ou nuage, « actif » dit lesquels servent.
-      urech, urech2, uterre, uimm, ulance, uassaut, usal, jetons, sansBase, demo: DEMO,
+      urech, urech2, uterre, uimm, ulance, uassaut, usal, jetons, sansBase, maintenu, demo: DEMO,
       feux: { max: NFEUX, actif: fActif, x: fX, z: fZ, r: fR, reste: fReste, age: fAge, sorte: fSorte, cible: fCible, camp: fCamp, id: fId },
       nuages: { max: NNUAGES, actif: gActif, x: gX, z: gZ, r: gRc, reste: gReste, camp: gCamp, id: gId },
       get nFeux() { return nFeux; }, get nNuages() { return nNuages; }, get nVols() { return nVols; }, get nGisants() { return nGisants; },
@@ -10552,7 +10643,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       /** (essais) Jette l'unité i au sol. */
       renverser: i => mettreATerre(i, CAUSE.CHARGE, -1, true),
       get it() { return it; }, get n() { return nHaut; }, get vainqueur() { return vainqueur; },
-      get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colere; },
+      get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colereDuBastion(); },
       get delaiAlliance() { return delaiAlliance; },
       soumettre, injecter, iterer, etat, empreinte, immeubles: IMM, allumerImmeuble,
       enregistrement: () => ({ version: P.VERSION, options: { ...opt }, commandes: journal.slice(), empreintes: empreintes.slice() }),
@@ -10560,7 +10651,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         sources: Array.from(sources.subarray(f * 8, f * 8 + 8), v => Math.round(v / 1000)) })),
       ajouter: (f, t, x, z) => creerUnite(f, t, mm(x), mm(z), 0),
       ressources: (f, moyens, materiaux) => { res[f * 2] = moyens * 1000; res[f * 2 + 1] = materiaux * 1000; },
-      hostileA: (a, b) => hostile[a * 4 + b] === 1,
+      hostileA: (a, b) => hostile[a * 4 + b] === 1, hostilite, coupsParPaire,
       /** (IA) Un avant-poste tiendrait-il autour de (x, z) mm ? Rend son centre [x, z] mm ou null. */
       postePossible: (x, z) => emprisePoste(x, z, null),
       popEnFile,
@@ -11933,10 +12024,13 @@ button.file-item:hover .icone { color: var(--alerte); }
   Pose poser(Unite u,bool cuivre){
     Pose q=Pose(0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.,0.);
     float t=uReglages.y,ph=float(u.h&1023u)*.0061419;
-    uint e=u.etat;bool court=e==8u;bool marche=u.vitesse>.25||e==1u||court;
-    float amp=court?.95:.6*clamp(max(u.vitesse,e==1u?2.4:0.)/3.4,0.,1.);
-    float w=t*(court?2.6:1.75)*6.2831853+ph,s=sin(w);
-    if(marche){q.jg=amp*s;q.jd=-amp*s;q.bg=-amp*.8*s;q.bd=amp*.8*s;q.haut=abs(cos(w))*amp*.06;if(court)q.torse=.3;}
+    uint e=u.etat;bool court=e==8u;bool marche=u.vitesse>.25||court;
+    // La foulée suit la vitesse réelle, en cadence comme en amplitude : une figurine qui n'avance pas ne marche
+    // plus sur place, et la foule n'est plus en cadence parfaite (la fréquence varie de ±12 % selon l'empreinte).
+    float v=clamp(u.vitesse/3.4,0.,1.),amp=court?.95:.6*v,cadence=court?2.6:1.05+1.45*v;
+    cadence*=.88+.24*float(u.h&255u)/255.;
+    float w=t*cadence*6.2831853+ph,s=sin(w);
+    if(marche){q.jg=amp*s;q.jd=-amp*s;q.bg=-amp*.8*s;q.bd=amp*.8*s;q.haut=abs(cos(w))*amp*.06;q.torse=.08*amp*s;if(court)q.torse=.3;}
     else{q.torse=.025*sin(t*1.3+ph);q.bg=.05*sin(t*1.1+ph);q.bd=-q.bg;q.tete=.06*sin(t*.7+ph*1.7);}
     if(e==2u){float k=.5+.5*sin(t*7.5+ph);q.bd=1.25+.45*k;q.bg=1.05+.4*(1.-k);q.torse=.1+.18*k;if(!marche){q.jg=.3;q.jd=-.22;}}
     else if(e==3u){float k=.5+.5*sin(t*5.+ph);q.torse=.78;q.bg=.55+.5*k;q.bd=.55+.5*(1.-k);q.jg=q.jd=.15;q.haut=-.06;q.tete=-.3;}
@@ -18415,7 +18509,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       for (const b of doc.querySelectorAll('#prep-ville [data-ville]')) b.setAttribute('aria-pressed', String(b.dataset.ville === p.ville));
       const n = R.ilots(p.effectifs), reelle = p.ville === 'marseille';
       ecrire($('prep-effectifs-note'), (reelle ? 'Marseille, ' + (n <= 9 ? 'le Vieux-Port' : n <= 13 ? 'le centre' : 'le grand centre') : 'Ville de ' + n + ' × ' + n + ' îlots') + ' · '
-        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs <= 20000 ? 'partie courte' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : 'partie moyenne'));
+        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : p.effectifs <= 20000 ? 'partie courte' : 'partie moyenne'));
       ecrire($('prep-graine-note'), reelle ? 'Le vrai plan des rues. La graine change les départs et le hasard de la partie. Plan : © les contributeurs d’OpenStreetMap.'
         : 'Une graine, une ville : la même graine redonne les mêmes rues.');
       const g = $('prep-graine');

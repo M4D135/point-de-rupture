@@ -251,11 +251,12 @@
   }
   /** Le camp a frappe-t-il le camp b ? colere : temps restant (> 0) de la colère du Bastion contre la Préfecture,
    *  allumée chaque fois que la Préfecture frappe le Bastion (CONSTANTES.COLERE_S). Relation non symétrique. */
-  function hostile(a, b, alliance, colere) {
+  function hostile(a, b, alliance, hostilite) {
     if (a === b || a > 2 || b > 2 || a < 0 || b < 0) return false;
     if (allies(a, b, alliance)) return false;
-    if (a === BASTION && b === PREFECTURE) return colere > 0;
-    return true;
+    if (hostilite === undefined || hostilite === null) return true;
+    if (typeof hostilite === 'number') return a === BASTION && b === PREFECTURE ? hostilite > 0 : true;
+    return hostilite[a * 4 + b] !== 0;
   }
   const peutCasser = f => f === CONVERGENCE;
   const peutBarricader = f => f === CONVERGENCE;

@@ -275,7 +275,7 @@ Chaque camp tenu par l'IA réfléchit une fois par seconde, à tour de rôle.
 
 ### 1.11 Démo
 
-- Une partie à trois IA, avec les effectifs choisis (100 000 par défaut), sans brouillard.
+- Une partie à trois IA, avec les effectifs choisis (20 000 par défaut, et la démo ne dépasse jamais ce format), sans brouillard.
 - Une démo longue (0.3, D4, « demo pas assez longue » ; en 0.2 elle s'arrêtait à 10 min 40 sur 3 000 points) : ni fin
   aux points ni fin au temps, le réglage de victoire est ignoré (`{ mode: 'dernier', points: 0, duree: 0 }`) ; les QG
   ne s'occupent pas, les IA ne vont jamais « achever », les revenus sont doublés : chaque camp garde sa base et ses

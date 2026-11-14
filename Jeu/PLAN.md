@@ -50,7 +50,7 @@ Prises par Claude à partir de ces demandes. David peut en changer une d'un mot 
 |---|---|---|
 | D1 | **Ton.** Le feu, les cocktails Molotov, une violence plus dure et une ambiance plus sombre sont voulus : la règle « bagarre burlesque » cède là où elle les contredit. Restent exclus : armes à feu, lames, sang, personne montrée en feu (le feu brûle le sol, les objets, les véhicules, les barricades, les bâtiments ; une unité prise dedans est blessée, fuit, tombe hors jeu), drapeaux, emblèmes, slogans, uniformes et personnalités réels, cause énoncée. Les vrais noms de lieux de Marseille restent. | tous |
 | D2 | **Victoire au choix**, avant la partie : « Jusqu'au dernier » (défaut : « un vrai warcraft starcraft »), « Au temps » (10, 15, 20, 30 ou 40 min, le meilleur score gagne), « Aux points » (1 500, 3 000 ou 5 000), « Mixte » (points, temps ou dernier debout, le premier des trois : la règle de la 0.2, 3 000 points et 40 min). Un camp sans base est éliminé dans tous les modes. | L4, L7 |
-| D3 | **Moins de manifestants par défaut** : la part de la Convergence devient un réglage, « Peu » 34 %, « Moyen » 40 % (défaut), « Beaucoup » 50 % (la 0.2). Le total reste à 100 000 unités par défaut. Si David voulait moins d'unités au total, c'est `EFFECTIFS_DEFAUT` qu'il faut baisser. | L4, L7 |
+| D3 | **Moins de manifestants par défaut** : la part de la Convergence devient un réglage, « Peu » 34 %, « Moyen » 40 % (défaut), « Beaucoup » 50 % (la 0.2). Le total est descendu à **20 000 unités par défaut** (`EFFECTIFS_DEFAUT`, décidé à la reprise du 13/11) ; les formats 50 000 à 200 000 restent au choix. La démo ne dépasse jamais le format par défaut. | L4, L7 |
 | D4 | **Démo longue.** Mesuré en ligne : la démo s'arrête à 10 min 40, quand un camp atteint 3 000 points, avec 73 % des unités déjà hors jeu. En démo : ni fin aux points ni fin au temps, une limite de sécurité à 60 minutes, des IA qui continuent de produire et d'attaquer, les nouveautés visibles dès la première minute. Quand une partie de démo finit, la suivante part aussitôt, sans retour au titre. | L4, L7 |
 | D5 | **« Full FERRO ».** Unreal est retiré du dépôt et du Mac : le jeu ne tourne que sur le moteur de David. Il n'y a plus de dépôt commun du moteur : la copie du jeu, `Jeu/src/moteur/`, est la sienne et évolue avec lui. La branche `ferro-rendu` l'a mise à jour sur le dernier état connu du moteur (FERRO 0.2 : METAL 0.8 et les ajouts de BITUME), à image égale. On garde ce travail ; on en retire ce qui le rattachait à un dépôt de référence. Le son reste le portage en français fait depuis METAL. | L1 |
 | D6 | **Marseille seule** dans la 0.3. Paris et New York attendent. | — |
@@ -823,3 +823,28 @@ réglage posé à la sonde, pas un équilibre — à reprendre au banc.
 - Paris, puis New York, sur leur vrai plan.
 - Le moteur évolue avec le jeu : pas de dépôt commun, pas de récolte. Une idée utile vue dans METAL ou BITUME se
   reprend au cas par cas, en lisant leur `PROVENANCE.md`. Le décor du jeu pourrait passer de `fx.lots` à `setLots`.
+
+## 12. La 0.4 : un vrai jeu de stratégie (décisions du 13 novembre)
+
+David veut que la partie se joue comme une partie de Warcraft 2 ou de StarCraft, avec un objectif. Cinq décisions,
+dans l'ordre où elles doivent être faites. Chacune est un lot à elle seule : elles ne sont pas faisables ensemble.
+
+- **R1 · Hostilité par paire** — remplacer la colère isolée du Bastion par une jauge d'hostilité par paire de camps
+  (`hostilite[a * 4 + b]`, en itérations, comme `colere` aujourd'hui). Elle monte quand un camp en frappe un autre,
+  redescend avec le temps, et est à zéro entre alliés. C'est le socle : sans elle, rien de ce qui suit n'est réglable.
+  Le régalage se fait à la sonde, pas au clavier.
+- **R2 · La police ne frappe pas la première** — la Préfecture a une hostilité de départ nulle contre tout le monde.
+  Elle ne tire que si on tire sur elle (riposte, portée par R1), et sinon elle **canalise** : elle pousse les cortèges
+  hors de leur route sans les frapper. Le Bastion garde le déclencheur de colère qui l'empêche de frapper la
+  Préfecture sans raison.
+- **R3 · L'objectif : tenir des lieux** — la victoire n'est plus seulement de l'usure. Un camp qui tient un nombre de
+  lieux donné pendant un temps donné l'emporte, avant la limite de temps. Un décompte visible au HUD, comme un point
+  à capturer. Les modes actuels (`dernier`, `points`, `temps`, `mixte`) restent pour la démo et les essais.
+- **R4 · Des récolteurs comme dans un RTS** — la récolte n'est plus une capacité de tout le monde : un type d'unité
+  récolteur attitré, qui fait la navette entre un point de récolte et le dépôt. Les points de récolte **s'épuisent**.
+- **R5 · Occuper pour récolter** — les points de récolte sont des bâtiments (bâtiments publics, magasins) qu'il faut
+  envahir et occuper ; tant qu'ils sont occupés, ils rapportent passivement de quoi faire des troupes. R5 remplace R4
+  côté économie une fois en place : à décider si R4 survit comme unité de navette ou disparaît.
+
+Le feu aux immeubles et l'intervention des camions de pompiers (L5, L5b en cours) restent dans leur coin : David veut
+qu'on y mette le feu plus facilement. À reprendre après R2, qui change déjà beaucoup la partie.

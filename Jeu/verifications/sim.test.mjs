@@ -412,6 +412,65 @@ verifier('élimination et victoire : QG occupés, sans avant-poste ni effectifs,
   assert.equal(m.it, it, 'la partie finie ne bouge plus');
 });
 
+verifier('alliance : un camp sans base tient tant que son allié tient la sienne', () => {
+  const m = creer({ vide: true, joueur: 0, alliance: [C, B] });
+  const qC = m.ville.sites.qg[C], qB = m.ville.sites.qg[B];
+  // Le Bastion tient sa base et la Convergence garde assez d'unités pour que seule la déroute puisse l'éliminer.
+  grappe(m, B, 1, 400, qB.sortie[0], qB.sortie[1]);
+  grappe(m, C, 1, Math.ceil(m.depart[C] * 0.3), qB.sortie[0] + 20, qB.sortie[1] + 20);
+  grappe(m, F, 1, 30, qC.sortie[0], qC.sortie[1]);
+  courir(m, 90 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.structures[C].occupe ? 1 : 0, 1, 'le QG de la Convergence est occupé par la Préfecture');
+  assert.equal(m.elimine[C], 0, 'sans base, la Convergence tient tant que le Bastion tient la sienne');
+  assert.equal(m.maintenu[C], 1);
+  assert.equal(m.maintenu[B], 0, 'le Bastion, qui a une base, n\'est pas sous protection');
+  assert.equal(m.sansBase[C], 0, 'le compte à rebours est gelé tant que l\'alliance tient');
+  // L'alliance rompue, la déroute reprend depuis le début et mène à l'élimination.
+  m.soumettre(cmd(CMD.DIPLOMATIE, C, { action: 'rompre', avec: B }));
+  courir(m, 20 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.maintenu[C], 0, 'rompre l\'alliance retire la protection');
+  assert.equal(m.sansBase[C], 20 * IT_S, 'les 30 s courent depuis la rupture, pas depuis la perte du QG');
+  assert.equal(m.elimine[C], 0, 'à vingt secondes, la Convergence tient encore');
+  courir(m, 20 * IT_S, null, x => x.elimine[C] === 1);
+  assert.equal(m.elimine[C], 1, 'la déroute menée à son terme élimine le camp');
+});
+
+verifier('brouillard : les lieux tenus par l\'allié restent visibles, pas ceux d\'un camp isolé', () => {
+  /** Le voile autour d'un point, en mètres : le nombre de cases vues sur les 49 cases sondées. */
+  const vues = (m, x, z) => {
+    let v = null;
+    for (let k = 0; k < 8 && !v; k++) { const e = m.etat(); if (e.voile) v = e.voile; else m.iterer(); }
+    assert.ok(v, 'le voile est envoyé au joueur');
+    const g = m.carte.voile, i0 = Math.floor((x - g.x0) / g.cellule), j0 = Math.floor((z - g.z0) / g.cellule);
+    let n = 0;
+    for (let j = j0 - 3; j <= j0 + 3; j++) for (let i = i0 - 3; i <= i0 + 3; i++) {
+      if (i < 0 || j < 0 || i >= g.nx || j >= g.nz) continue;
+      if (v[i + j * g.nx] >= 90) n++;
+    }
+    return n;
+  };
+  const prendreLieu = (alliance) => {
+    const m = creer({ vide: true, joueur: C, alliance, brouillard: true });
+    const L = m.ville.sites.lieux[0];
+    const p = m.ville.accrocher(L.x + L.rayon / 2, L.z);
+    const b = grappe(m, B, 1, 12, p[0], p[1]);
+    const vus = courir(m, 320);
+    assert.equal(de(vus, EV.LIEU_PRIS).length, 1, 'le Bastion prend le lieu');
+    assert.equal(m.lieuProp[0], B);
+    // Le Bastion quitte le lieu : sans la règle, sa zone retombe sous le voile.
+    const q = m.ville.sites.qg[B];
+    m.soumettre(cmd(CMD.DEPLACER, B, { ids: b, x: q.sortie[0], z: q.sortie[1], mode: 0 }));
+    const loin = x => Array.from(b).every(i => Math.hypot(x.ux[i] / 1000 - L.x, x.uz[i] / 1000 - L.z) > L.rayon + 8);
+    courir(m, 1200, null, loin);
+    assert.ok(loin(m), 'le Bastion a quitté le lieu');
+    return { m, L, n: vues(m, L.x, L.z) };
+  };
+  const allie = prendreLieu([C, B]);
+  assert.ok(allie.n >= 40, 'le lieu tenu par l\'allié reste visible : ' + allie.n + ' cases vues sur 49');
+  const seul = prendreLieu(null);
+  assert.ok(seul.n <= 4, 'le même lieu, tenu par un camp qui n\'est pas notre allié, reste voilé : ' + seul.n + ' cases vues');
+});
+
 // ---- 0.3 : le feu, le gaz, les projectiles, les chutes, la fin de partie. ----
 /** Le foyer actif qui couvre l'unité i (tous les foyers sont lus, même ceux qui se chevauchent), ou -1. */
 function foyerDe(m, i) {
@@ -670,13 +729,14 @@ verifier('travailleur : pret, un état par itération, tampons rendus, vitesse, 
   assert.equal(recus[0].m.type, 'pret');
   assert.deepEqual(Object.keys(recus[0].m.options).sort(), ['alliance', 'brouillard', 'coalitions', 'difficulte', 'effectifs', 'enregistrer', 'graine', 'joueur',
     'manifestants', 'victoire', 'ville']);
-  // 0.3 : une démo ne finit ni aux points ni au temps (0 : ni cible ni limite, dès « pret » comme dans l'état) ; la
-  // part des manifestants par défaut est « moyen ».
+  // Les options telles que reçues : la démo ne précise pas de mode, c'est « dernier » tel quel.
+  // L'état, lui, rend le mode EFFECTIF : une démo sans objectif courrait jusqu'au plafond sans qu'on gagne, elle joue
+  // donc l'objectif de la version — tenir des lieux — et l'annonce comme tel.
   assert.deepEqual(recus[0].m.options.victoire, { mode: 'dernier', points: 0, duree: 0 });
   assert.equal(recus[0].m.options.manifestants, 'moyen');
   assert.deepEqual(recus[0].m.carte.parts, [40, 32, 28]);
   assert.deepEqual(recus[0].m.carte.depart, [8000, 6400, 5600]);
-  assert.deepEqual(recus[1].m.victoire, { mode: 'dernier', points: 0, duree: 0, reste: -1, plafond: K.VICTOIRE.DEMO_PLAFOND_S, demo: true });
+  assert.deepEqual(recus[1].m.victoire, { mode: 'points', points: K.POINTS_VICTOIRE, duree: 0, reste: -1, plafond: K.VICTOIRE.DEMO_PLAFOND_S, demo: true });
   assert.equal(recus[0].m.options.ville, 'damier');
   assert.equal(recus[0].m.carte.ilots, 9);
   assert.equal(recus[1].m.type, 'etat');

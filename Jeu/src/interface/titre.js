@@ -325,7 +325,7 @@
       for (const b of doc.querySelectorAll('#prep-ville [data-ville]')) b.setAttribute('aria-pressed', String(b.dataset.ville === p.ville));
       const n = R.ilots(p.effectifs), reelle = p.ville === 'marseille';
       ecrire($('prep-effectifs-note'), (reelle ? 'Marseille, ' + (n <= 9 ? 'le Vieux-Port' : n <= 13 ? 'le centre' : 'le grand centre') : 'Ville de ' + n + ' × ' + n + ' îlots') + ' · '
-        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs <= 20000 ? 'partie courte' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : 'partie moyenne'));
+        + (p.effectifs >= 150000 ? 'machine solide conseillée' : p.effectifs === C.EFFECTIFS_DEFAUT ? 'le format prévu' : p.effectifs <= 20000 ? 'partie courte' : 'partie moyenne'));
       ecrire($('prep-graine-note'), reelle ? 'Le vrai plan des rues. La graine change les départs et le hasard de la partie. Plan : © les contributeurs d’OpenStreetMap.'
         : 'Une graine, une ville : la même graine redonne les mêmes rues.');
       const g = $('prep-graine');
