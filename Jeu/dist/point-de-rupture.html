@@ -3180,7 +3180,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     // pendant DEROUTE_S est éliminé.
     OCCUPATION_POSTE_S: 30, REPRISE_POSTE_S: 10, DEROUTE_S: 30,
     PLAFOND: 1.25, PART_OUVRIERS: 0.04, FILE_MAX: 5,
-    EFFECTIFS: Object.freeze([20000, 50000, 100000, 150000, 200000]), EFFECTIFS_DEFAUT: 100000,
+    EFFECTIFS: Object.freeze([20000, 50000, 100000, 150000, 200000]), EFFECTIFS_DEFAUT: 20000,
     ALLIANCE_DELAI_S: 60, COALITION_SEUIL: 0.45,
     RESSOURCES_DEPART: Object.freeze([{ moyens: 400, materiaux: 150 }, { moyens: 400, materiaux: 100 }, { moyens: 600, materiaux: 100 }]),
     // ---- Version 0.3. ----
@@ -17648,7 +17648,7 @@ button.file-item:hover .icone { color: var(--alerte); }
 
   const borne = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const EFFECTIFS = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS : [20000, 50000, 100000, 150000, 200000]);
-  const EFFECTIFS_DEFAUT = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS_DEFAUT : 100000);
+  const EFFECTIFS_DEFAUT = () => (PDR.regles ? PDR.regles.CONSTANTES.EFFECTIFS_DEFAUT : 20000);
 
   function defaults(tactile = false) {
     return {
@@ -18300,7 +18300,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       z.style.setProperty('--part', borne(1 - reste / ATTENTE_DEMO_MS, 0, 1).toFixed(3));
     }
     function optionsDemo() {
-      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: REG.partie.effectifs, joueur: -1, alliance: null,
+      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: Math.min(REG.partie.effectifs, C.EFFECTIFS_DEFAUT), joueur: -1, alliance: null,
         difficulte: 1, brouillard: false, coalitions: true, enregistrer: false, ville: REG.partie.ville };
     }
     function lancerDemo() {

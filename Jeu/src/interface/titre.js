@@ -210,7 +210,7 @@
       z.style.setProperty('--part', borne(1 - reste / ATTENTE_DEMO_MS, 0, 1).toFixed(3));
     }
     function optionsDemo() {
-      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: REG.partie.effectifs, joueur: -1, alliance: null,
+      return { graine: 1 + Math.floor(Math.random() * 999999), effectifs: Math.min(REG.partie.effectifs, C.EFFECTIFS_DEFAUT), joueur: -1, alliance: null,
         difficulte: 1, brouillard: false, coalitions: true, enregistrer: false, ville: REG.partie.ville };
     }
     function lancerDemo() {

@@ -153,7 +153,7 @@
     // pendant DEROUTE_S est éliminé.
     OCCUPATION_POSTE_S: 30, REPRISE_POSTE_S: 10, DEROUTE_S: 30,
     PLAFOND: 1.25, PART_OUVRIERS: 0.04, FILE_MAX: 5,
-    EFFECTIFS: Object.freeze([20000, 50000, 100000, 150000, 200000]), EFFECTIFS_DEFAUT: 100000,
+    EFFECTIFS: Object.freeze([20000, 50000, 100000, 150000, 200000]), EFFECTIFS_DEFAUT: 20000,
     ALLIANCE_DELAI_S: 60, COALITION_SEUIL: 0.45,
     RESSOURCES_DEPART: Object.freeze([{ moyens: 400, materiaux: 150 }, { moyens: 400, materiaux: 100 }, { moyens: 600, materiaux: 100 }]),
     // ---- Version 0.3. ----
