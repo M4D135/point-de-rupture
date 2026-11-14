@@ -362,7 +362,24 @@
     const sansBase = new Int32Array(3);         // itérations passées sans base (0 : le camp en a une)
     const maintenu = new Int32Array(3);         // 1 : sans base mais tenu en vie par un allié qui tient la sienne
     let raison = 0;                              // indice dans P.RAISONS_FIN
-    let alliance = opt.alliance, proposition = null, delaiAlliance = 0, colere = 0, derniereColere = -1000;
+    let alliance = opt.alliance, proposition = null, delaiAlliance = 0, derniereColere = -1000;
+    // R1 · la jauge d'hostilité par paire, à la place de la seule colère du Bastion. -1 : hostile d'office, le camp
+    // frappe sans avoir à être excité ; 0 : il ne frappe pas ; > 0 : excité pour autant d'itérations. La Préfecture
+    // n'a aucune hostilité de départ : elle ne frappe jamais la première (R2), elle riposte quand on la frappe.
+    const HOSTILE = -1, hostilite = new Int32Array(16), coupsParPaire = new Int32Array(16);
+    const hostileDeBase = (a, b) => (a === PREF || (a === BAST && b === PREF)) ? 0 : HOSTILE;
+    const colereDuBastion = () => Math.max(0, hostilite[BAST * 4 + PREF]);
+    // La jauge ne monte que sur une agression DÉLIBÉRÉE. Le dégât incident — éclaboussure d'un cocktail, fumée d'un
+    // incendie, pierre tombée de travers — ne l'allume pas : sinon l'exécution permissive des effets de zone
+    // autoriserait elle-même les coups qu'elle est censée laisser passer, et aucune posture passive ne tiendrait.
+    const exciter = (victime, agresseur) => {
+      if (victime < 0 || victime > 2 || agresseur < 0 || agresseur > 2 || victime === agresseur) return;
+      const k = victime * 4 + agresseur;
+      if (hostilite[k] === HOSTILE) return;                  // il frappe déjà sans qu'on ait à l'exciter
+
+      hostilite[k] = K.COLERE_S * IT_S;
+      if (victime === BAST && agresseur === PREF) colereAllumee = true;
+    };
     let vainqueur = P.VAINQUEUR.EN_COURS;
     let it = 0;
 
@@ -377,7 +394,15 @@
     const refus = (j, raison, t) => evenement(EV.REFUS, 0, 0, j, raison, t);
 
     const majHostilite = () => {
-      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) hostile[a * 4 + b] = R.hostile(a, b, alliance, colere) ? 1 : 0;
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
+        const k = a * 4 + b;
+        if (a > 2 || b > 2) { hostile[k] = 0; continue; }
+        // Entre alliés on ne se frappe pas ; une jauge en cours n'est pas écrasée ; une jauge à zéro revient à la
+        // ligne de base du couple. L'Int32Array naît à zéro : sans cette ligne de base, personne ne se battrait.
+        if (alliance && R.allies(a, b, alliance)) hostilite[k] = 0;
+        else if (hostilite[k] === 0) hostilite[k] = hostileDeBase(a, b);
+        hostile[k] = R.hostile(a, b, alliance, hostilite) ? 1 : 0;
+      }
     };
     majHostilite();
     const adversaires = (a, b) => a !== b && a < 3 && b < 3 && !R.allies(a, b, alliance);
@@ -556,9 +581,13 @@
         case CMD.ATTAQUER: {
           const k = filtrer(c, j), t = c.cible;
           if (!k) return;
-          if (!(t >= 0 && t < nHaut && ufac[t] !== LIBRE && uetat[t] !== ET.HORS_JEU) || !R.hostile(j, ufac[t], alliance, colere)) {
+          if (!(t >= 0 && t < nHaut && ufac[t] !== LIBRE && uetat[t] !== ET.HORS_JEU) || !adversaires(j, ufac[t])) {
             refus(j, RAISON.INTERDIT, c.t); return;
           }
+          // Un ordre joué n'est pas soumis à la jauge, mais il l'allume pour celui qui le donne : c'est ainsi que le
+          // joueur fait intervenir la Préfecture, qui part pourtant à zéro d'hostilité (R2). On n'excite PAS la
+          // victime — elle ne devient hostile qu'après avoir été réellement frappée, ce dont frapper() se charge.
+          exciter(j, ufac[t]);
           const cle = nav.cleDe(ux[t], uz[t]), ids = idsTampon.slice(0, k);
           for (let q = 0; q < k; q++) {
             const i = ids[q];
@@ -1079,11 +1108,11 @@
     }
     /** Le nuage hostile au camp f qui concerne un point (x, z) de case marquée k (comme feuDe), ou -1. */
     function gazDe(k, x, z, f) {
-      if (k !== PLUSIEURS) return hostile[gCamp[k - 1] * 4 + f] ? k - 1 : -1;
+      if (k !== PLUSIEURS) return gCamp[k - 1] >= 0 && adversaires(gCamp[k - 1], f) ? k - 1 : -1;
       let meilleur = -1, haut = -Infinity;
       for (let n = 0; n < nNuagesListe; n++) {
         const q = nuagesActifs[n];
-        if (!hostile[gCamp[q] * 4 + f]) continue;
+        if (gCamp[q] < 0 || !adversaires(gCamp[q], f)) continue;
         const dx = x - gX[q], dz = z - gZ[q], p = gRc[q] * gRc[q] - (dx * dx + dz * dz);
         if (p > haut) { haut = p; meilleur = q; }
       }
@@ -1107,11 +1136,16 @@
 
     /** Un coup porté de loin ou par une zone : la pression p du camp f (lanceur i, ou -1) sur l'unité j. */
     function toucher(j, p, f, i, source) {
+      // Le puits de dégâts est le seul endroit où tous les coups passent, et c'est donc lui qui tient la jauge :
+      // garder (frapper) et les tirs (salve, jet) consultaient déjà la table, mais le coup porté par une zone ou une
+      // pierre frappait sans la consulter — un camp à zéro hostilité blessait donc encore son voisin.
+      if (f < 0 || !hostile[f * 4 + ufac[j]]) return;
+      coupsParPaire[f * 4 + ufac[j]] += p;
       if (udeg[j] === 0) touches[nTouches++] = j;
       udeg[j] += p;
       if (i >= 0) uagr[j] = i;
       bilan[f].infliges += p; sources[f * 8 + source] += p;
-      if (f === PREF && ufac[j] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+      
       const cb = combDeC8[uc8[j]];
       if (combats[cb] < 65535) combats[cb]++;
     }
@@ -1178,7 +1212,7 @@
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < MO_MAXU; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
           if (d2 > r2) continue;
           toucher(u, T.protege[utyp[u]] ? MO_PRES >> 1 : MO_PRES, f, lanceur, 5);
@@ -1202,8 +1236,11 @@
         if (sorte === 0) molotovTombe(x, z, f, tireur); else creerNuage(x, z, f);
       }
       while (sTete !== sQueue && sIt[sTete] <= it) {
-        const j = sCible[sTete], f = sCamp[sTete];
-        if (ufac[j] !== LIBRE && ugen[j] === sGen[sTete] && uetat[j] !== ET.HORS_JEU && hostile[f * 4 + ufac[j]]) {
+        const j = sCible[sTete], tireur = sTireur[sTete];
+        // Le camp est relu sur le tireur vivant : la file peut porter un camp périmé, et une hostilité mal
+        // attribuée allumerait une jauge entre des camps qui ne se sont rien fait.
+        const f = tireur >= 0 && tireur < nHaut && ufac[tireur] !== LIBRE ? ufac[tireur] : sCamp[sTete];
+        if (ufac[j] !== LIBRE && ugen[j] === sGen[sTete] && uetat[j] !== ET.HORS_JEU && adversaires(f, ufac[j])) {
           const i = sTireur[sTete];
           toucher(j, sPres[sTete], f, ufac[i] === f && uetat[i] !== ET.HORS_JEU ? i : -1, 3);
         }
@@ -1354,12 +1391,17 @@
       }
       return meilleur;
     }
-    const cibleValide = (i, j) => j >= 0 && ufac[j] !== LIBRE && ugen[j] === ucibg[i] && uetat[j] !== ET.HORS_JEU && hostile[ufac[i] * 4 + ufac[j]] === 1;
+    const cibleValide = (i, j) => j >= 0 && ufac[j] !== LIBRE && ugen[j] === ucibg[i] && uetat[j] !== ET.HORS_JEU && adversaires(ufac[i], ufac[j]);
 
     // ---- Coups : pression au contact, flanc × 1,5, protégé × 0,5 de face, interpeller × 2 sous 30 %. ----
     let colereAllumee = false;
     function frapper(i, j, p, source) {
       const g = ufac[j], tj = utyp[j], f = ufac[i];
+      // Le corps à corps est le point de passage unique des coups, et il ne consultait aucune table : un camp à
+      // zéro d'hostilité frappait dès qu'un groupe lui avait désigné une cible. C'est ici que la jauge tient.
+      if (!hostile[f * 4 + g]) return;
+      coupsParPaire[f * 4 + g] += p;
+      exciter(g, f);                                          // frappé délibérément : on ripostera
       // Interpeller : pression doublée sur une unité sous 30 % de cohésion, et la matraque la jette au sol.
       if (T.interpeller[utyp[i]] && ucoh[j] * 10 < T.coh[tj] * 3) { p *= 2; if (uterre[j] === 0 && uimm[j] === 0) mettreATerre(j, CAUSE.MATRAQUE, f, false); }
       const vx = ux[i] - ux[j], vz = uz[i] - uz[j], h = ucap[j];
@@ -1370,7 +1412,7 @@
       udeg[j] += p;
       uagr[j] = i;
       bilan[f].infliges += p; sources[f * 8 + source] += p;
-      if (f === PREF && g === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+      exciter(g, f);
       const c8 = uc8[j], cb = combDeC8[c8];
       if (combats[cb] < 65535) combats[cb]++;
       const zone = g * 64 + zoneDeC8[c8];
@@ -1458,13 +1500,13 @@
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < SALVE_MAX; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z;
           if (dx * dx + dz * dz > r2) continue;
           if (udeg[u] === 0) touches[nTouches++] = u;
           udeg[u] += T.protege[utyp[u]] ? SALVE_COUPS >> 1 : SALVE_COUPS;
           uagr[u] = i;
-          if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+          exciter(ufac[u], f);
           if (tombees < SALVE_A_TERRE && mettreATerre(u, CAUSE.SALVE, f, false)) tombees++;
           n++;
         }
@@ -1488,7 +1530,7 @@
         const cc = ii + j * nx;
         for (let p = debutCase[cc], fin = debutCase[cc + 1]; p < fin && n < JET_MAX; p++) {
           const u = tri[p];
-          if (!hostile[f * 4 + ufac[u]] || uetat[u] === ET.HORS_JEU) continue;
+          if (!adversaires(f, ufac[u]) || uetat[u] === ET.HORS_JEU) continue;
           const dx = ux[u] - x, dz = uz[u] - z, d2 = dx * dx + dz * dz;
           if (d2 > r2 || d2 === 0) continue;
           const dot = dx * ax + dz * az;
@@ -1499,7 +1541,7 @@
           udeg[u] += JET_COUPS;
           uagr[u] = i; n++;
           bilan[f].infliges += JET_COUPS; sources[f * 8 + 2] += JET_COUPS;
-          if (f === PREF && ufac[u] === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+          exciter(ufac[u], f);
           deplacer(u, Math.trunc(dx * JET_RECUL / d), Math.trunc(dz * JET_RECUL / d));
           if (d2 <= JET_A_TERRE2) mettreATerre(u, CAUSE.JET, f, false);
         }
@@ -1570,7 +1612,7 @@
       colereAllumee = false;
       nEvATerre = 0; nEvPierres = 0;
       appliquerCommandes();
-      if (colere > 0) colere--;
+      for (let k = 0; k < 16; k++) if (hostilite[k] > 0) hostilite[k]--;
       if (delaiAlliance > 0) delaiAlliance--;
       if (proposition && --proposition.reste <= 0) proposition = null;
       majHostilite();
@@ -1634,7 +1676,7 @@
           if (d2 <= r * r) {
             if (fAge[q] >= fDelai[q]) {
               const camp = fCamp[q];
-              if (camp >= 0 && hostile[camp * 4 + f]) { bilan[camp].infliges += FEU_PRES; sources[camp * 8 + 6] += FEU_PRES; }
+              if (camp >= 0 && adversaires(camp, f)) { bilan[camp].infliges += FEU_PRES; sources[camp * 8 + 6] += FEU_PRES; exciter(f, camp); }   // un nuage a un propriétaire : c'est une arme délibérée, elle met en colère
               const cb = combDeC8[uc8[i]];
               if (combats[cb] < 65535) combats[cb]++;
               if (presser(i, t, FEU_PRES, -1)) continue;
@@ -1667,7 +1709,7 @@
             const camp = gCamp[q], pg = gPres[q];
             gN[q]++;
             bilan[camp].infliges += pg; sources[camp * 8 + 7] += pg;
-            if (camp === PREF && f === BAST) { colere = K.COLERE_S * IT_S; colereAllumee = true; }
+            exciter(f, camp);                                 // un nuage a un propriétaire : c'est une arme délibérée, elle met en colère
             const cb = combDeC8[uc8[i]];
             if (combats[cb] < 65535) combats[cb]++;
             if (presser(i, t, pg, camp)) continue;
@@ -2436,7 +2478,7 @@
     };
     /** Recopie tout l'état dans le cliché ; rend sa longueur en octets. */
     function photographier() {
-      const entete = Int32Array.of(it, alea | 0, nHaut, nLibres, colere, delaiAlliance, alliance ? alliance[0] * 3 + alliance[1] : -1,
+      const entete = Int32Array.of(it, alea | 0, nHaut, nLibres, colereDuBastion(), delaiAlliance, alliance ? alliance[0] * 3 + alliance[1] : -1,
         proposition ? proposition.de * 3 + proposition.a : -1, proposition ? proposition.reste : 0, vainqueur, nav.version,
         raison, nGisants, nFeux, prochainFeu, nNuages, prochainNuage, nVols, (sQueue - sTete) & (NPIERRES - 1));
       let o = ecrire(new Uint8Array(entete.buffer), 0);
@@ -2481,7 +2523,7 @@
     function etat(tampon, vitesse = 1) {
       const n = nHaut;
       const f32 = new Float32Array(tampon, 0, Math.max(1, n) * 4);
-      const colereBastion = colere > 0 ? DR.COLERE : 0;
+      const colereBastion = colereDuBastion() > 0 ? DR.COLERE : 0;
       let aTerre = 0;
       for (let i = 0; i < n; i++) {
         const o = i * 4, f = ufac[i];
@@ -2514,7 +2556,7 @@
         }),
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
-        colere: colere / IT_S,
+        colere: colereDuBastion() / IT_S,
         lieux: Array.from({ length: NL }, (_, l) => ({ proprietaire: lieuProp[l], progression: lieuProgres[l] / PRISE_IT,
           conteste: !!lieuConteste[l], preneur: lieuPreneur[l] })),
         victoire: { mode: VIC.mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
@@ -2605,7 +2647,7 @@
       /** (essais) Jette l'unité i au sol. */
       renverser: i => mettreATerre(i, CAUSE.CHARGE, -1, true),
       get it() { return it; }, get n() { return nHaut; }, get vainqueur() { return vainqueur; },
-      get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colere; },
+      get alliance() { return alliance; }, get proposition() { return proposition; }, get colere() { return colereDuBastion(); },
       get delaiAlliance() { return delaiAlliance; },
       soumettre, injecter, iterer, etat, empreinte, immeubles: IMM, allumerImmeuble,
       enregistrement: () => ({ version: P.VERSION, options: { ...opt }, commandes: journal.slice(), empreintes: empreintes.slice() }),
@@ -2613,7 +2655,7 @@
         sources: Array.from(sources.subarray(f * 8, f * 8 + 8), v => Math.round(v / 1000)) })),
       ajouter: (f, t, x, z) => creerUnite(f, t, mm(x), mm(z), 0),
       ressources: (f, moyens, materiaux) => { res[f * 2] = moyens * 1000; res[f * 2 + 1] = materiaux * 1000; },
-      hostileA: (a, b) => hostile[a * 4 + b] === 1,
+      hostileA: (a, b) => hostile[a * 4 + b] === 1, hostilite, coupsParPaire,
       /** (IA) Un avant-poste tiendrait-il autour de (x, z) mm ? Rend son centre [x, z] mm ou null. */
       postePossible: (x, z) => emprisePoste(x, z, null),
       popEnFile,
