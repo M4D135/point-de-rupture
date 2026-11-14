@@ -823,3 +823,28 @@ réglage posé à la sonde, pas un équilibre — à reprendre au banc.
 - Paris, puis New York, sur leur vrai plan.
 - Le moteur évolue avec le jeu : pas de dépôt commun, pas de récolte. Une idée utile vue dans METAL ou BITUME se
   reprend au cas par cas, en lisant leur `PROVENANCE.md`. Le décor du jeu pourrait passer de `fx.lots` à `setLots`.
+
+## 12. La 0.4 : un vrai jeu de stratégie (décisions du 13 novembre)
+
+David veut que la partie se joue comme une partie de Warcraft 2 ou de StarCraft, avec un objectif. Cinq décisions,
+dans l'ordre où elles doivent être faites. Chacune est un lot à elle seule : elles ne sont pas faisables ensemble.
+
+- **R1 · Hostilité par paire** — remplacer la colère isolée du Bastion par une jauge d'hostilité par paire de camps
+  (`hostilite[a * 4 + b]`, en itérations, comme `colere` aujourd'hui). Elle monte quand un camp en frappe un autre,
+  redescend avec le temps, et est à zéro entre alliés. C'est le socle : sans elle, rien de ce qui suit n'est réglable.
+  Le régalage se fait à la sonde, pas au clavier.
+- **R2 · La police ne frappe pas la première** — la Préfecture a une hostilité de départ nulle contre tout le monde.
+  Elle ne tire que si on tire sur elle (riposte, portée par R1), et sinon elle **canalise** : elle pousse les cortèges
+  hors de leur route sans les frapper. Le Bastion garde le déclencheur de colère qui l'empêche de frapper la
+  Préfecture sans raison.
+- **R3 · L'objectif : tenir des lieux** — la victoire n'est plus seulement de l'usure. Un camp qui tient un nombre de
+  lieux donné pendant un temps donné l'emporte, avant la limite de temps. Un décompte visible au HUD, comme un point
+  à capturer. Les modes actuels (`dernier`, `points`, `temps`, `mixte`) restent pour la démo et les essais.
+- **R4 · Des récolteurs comme dans un RTS** — la récolte n'est plus une capacité de tout le monde : un type d'unité
+  récolteur attitré, qui fait la navette entre un point de récolte et le dépôt. Les points de récolte **s'épuisent**.
+- **R5 · Occuper pour récolter** — les points de récolte sont des bâtiments (bâtiments publics, magasins) qu'il faut
+  envahir et occuper ; tant qu'ils sont occupés, ils rapportent passivement de quoi faire des troupes. R5 remplace R4
+  côté économie une fois en place : à décider si R4 survit comme unité de navette ou disparaît.
+
+Le feu aux immeubles et l'intervention des camions de pompiers (L5, L5b en cours) restent dans leur coin : David veut
+qu'on y mette le feu plus facilement. À reprendre après R2, qui change déjà beaucoup la partie.
