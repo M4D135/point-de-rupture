@@ -2,11 +2,13 @@
 // après une chauffe, moyenne et 95e centile, avec les trois IA et sans IA (foule au repos).
 //   node Jeu/verifications/banc-sim.mjs [--effectifs 100000,200000] [--essais 3] [--chauffe 1200] [--mesure 200]
 //                                       [--graine 1] [--detail] [--ville damier|marseille] [--src chemin/vers/Jeu/src]
+//                                       [--validation-repetee]
 // --ville : le damier de la graine (par défaut) ou le plan réel de Marseille ; --src : les sources à charger (par
 // défaut celles du dépôt), pour comparer deux versions dans les mêmes conditions, l'une après l'autre.
 // La simulation est déterministe : chaque essai refait exactement le même travail (même graine, mêmes ordres d'IA ;
 // l'empreinte finale le prouve). La machine pouvant être chargée, le banc garde l'essai de plus faible moyenne et
 // donne aussi la moyenne médiane des essais. Critère (CONCEPTION.md §4) : 25 ms au plus en moyenne à 100 000.
+// --validation-repetee exige ce critère pour CHAQUE essai, avec et sans IA ; à utiliser avant intégration.
 // Les scripts sont chargés dans le contexte principal de Node (un contexte vm.createContext ralentit chaque accès
 // global de 2 à 6 fois et fausserait la mesure).
 import { createRequire } from 'node:module';
@@ -25,6 +27,7 @@ const { regles: R, protocole: P, monde: M, ia: IA } = globalThis.PDR;
 const EFFECTIFS = option('effectifs', '100000,200000').split(',').map(Number);
 const ESSAIS = Number(option('essais', 3)), CHAUFFE = Number(option('chauffe', 1200)), MESURE = Number(option('mesure', 200));
 const GRAINE = Number(option('graine', 1)), DETAIL = args.includes('--detail');
+const VALIDATION_REPETEE = args.includes('--validation-repetee');
 const OBJECTIF_MS = 25;
 
 const statistiques = valeurs => {
@@ -89,15 +92,18 @@ for (const E of EFFECTIFS) {
     console.log(`  vivantes ${meilleur.vivantes.join(' / ')}, champs en cache ${meilleur.champs}, empreinte ${meilleur.empreinte}`);
     if (meilleur.fenetres) console.log(`  pas moyen par fenêtre de 200 : ${meilleur.fenetres.map(v => v.toFixed(1)).join(' ')}`);
     console.log('');
+    const retenu = VALIDATION_REPETEE ? tries[tries.length - 1] : meilleur;
     bilan.push({ effectifs: E, ia: avecIA, moyenne: +meilleur.total.moyenne.toFixed(3), p95: +meilleur.total.p95.toFixed(3),
-      pas: +meilleur.sim.moyenne.toFixed(3), msIA: +meilleur.ia.moyenne.toFixed(3), etat: +meilleur.etat.moyenne.toFixed(3) });
-    if (E === 100000 && meilleur.total.moyenne > OBJECTIF_MS) echec = true;
+      pas: +meilleur.sim.moyenne.toFixed(3), msIA: +meilleur.ia.moyenne.toFixed(3), etat: +meilleur.etat.moyenne.toFixed(3),
+      essais: essais.map(e => e.total.moyenne), mediane: median.total.moyenne,
+      validationRepetee: VALIDATION_REPETEE, moyenneValidation: retenu.total.moyenne });
+    if (E === 100000 && retenu.total.moyenne > OBJECTIF_MS) echec = true;
   }
 }
 const cent = bilan.filter(b => b.effectifs === 100000);
 if (cent.length) {
-  const pire = Math.max(...cent.map(b => b.moyenne));
-  console.log(`objectif : ${OBJECTIF_MS} ms au plus en moyenne à 100 000 unités : ${pire <= OBJECTIF_MS ? 'tenu' : 'MANQUÉ'} (${pire.toFixed(2)} ms, pire des cas)`);
+  const pire = Math.max(...cent.map(b => b.moyenneValidation));
+  console.log(`objectif : ${OBJECTIF_MS} ms au plus en moyenne à 100 000 unités : ${pire <= OBJECTIF_MS ? 'tenu' : 'MANQUÉ'} (${pire.toFixed(2)} ms, ${VALIDATION_REPETEE ? 'tous les essais' : 'meilleur essai de chaque cas'})`);
 }
 console.log(`charge à la fin : ${os.loadavg().map(v => v.toFixed(1)).join(' / ')}`);
 console.log('JSON ' + JSON.stringify(bilan));
