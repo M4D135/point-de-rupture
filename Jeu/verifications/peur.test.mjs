@@ -152,6 +152,11 @@ verifier('export : moyenne et seuil, hors-jeu/libres/véhicules exclus, format i
   assert.equal(e.eco[F].peur, .5); assert.equal(e.eco[F].effrayes, 1);
   assert.equal(e.eco[C].peur, 0); assert.equal(e.eco[C].effrayes, 0);
   assert.equal(DR.PEUR, 32); assert.equal(P.VERSION, 2);
+  assert.deepEqual(e.hostilite, m.hostilite, 'matrice réelle destinée à l’ATH');
+  assert.notEqual(e.hostilite, m.hostilite, 'copie indépendante, y compris sur le fil principal');
+  m.hostilite[F * 4 + C] = 900;
+  assert.equal(e.hostilite[F * 4 + C], 0, 'un état reçu ne change pas rétroactivement');
+  assert.equal(etatDe(m).hostilite[F * 4 + C], 900, 'le nouvel état transmet la riposte');
   assert.ok((f32[ids[0] * 4 + 3] >>> 16) & DR.PEUR);
   for (const i of [ids[1], ids[2], ids[3], veh]) assert.equal((f32[i * 4 + 3] >>> 16) & DR.PEUR, 0);
 });

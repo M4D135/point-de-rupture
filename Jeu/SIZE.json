@@ -1,18 +1,18 @@
 {
   "version": "essai-0.3e",
-  "raw": 1562840,
-  "gzip": 531842,
-  "sha256": "be885bb48b42ea728febed1b21f617ca12350c6a72cbba975b1aa8671f7845f9",
+  "raw": 1566324,
+  "gzip": 532792,
+  "sha256": "f0d18b4e021b30acfeee5c755d66c7e0a0cfd057e0692952c4b0ccf20bf2a757",
   "sources": {
     "moteur/renderer.js": 138579,
     "sim/regles.js": 25098,
-    "sim/protocole.js": 22767,
+    "sim/protocole.js": 22980,
     "ville.js": 58411,
     "villes/marseille.js": 245035,
     "ville-reelle.js": 141247,
     "sim/nav.js": 18480,
     "sim/immeubles.js": 19494,
-    "sim/monde.js": 162765,
+    "sim/monde.js": 162803,
     "sim/ia.js": 40239,
     "sim/travailleur.js": 9269,
     "foule.js": 56602,
@@ -23,12 +23,12 @@
     "son.js": 31178,
     "interface/reglages.js": 32543,
     "interface/titre.js": 42789,
-    "interface/hud.js": 42677,
+    "interface/hud.js": 44199,
     "interface/minicarte.js": 18699,
     "interface/commandes.js": 57088,
     "hote.js": 6138,
     "jeu.js": 14895,
-    "index.html": 24076,
-    "style.css": 58010
+    "index.html": 24673,
+    "style.css": 59124
   }
 }

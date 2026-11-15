@@ -293,7 +293,8 @@ select option { background: var(--ardoise-2); color: var(--texte); }
 #hud { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
 #hud > * { pointer-events: auto; }
 .barre {
-  position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 16px; height: 54px; padding: 0 12px;
+  position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: 54px auto; align-items: center; column-gap: 16px; padding: 0 12px;
   padding-top: env(safe-area-inset-top); box-sizing: content-box;
   background: linear-gradient(180deg, rgba(10, 13, 17, .94), rgba(10, 13, 17, .8)); border-bottom: 1px solid var(--trait);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -346,17 +347,24 @@ select option { background: var(--ardoise-2); color: var(--texte); }
 .ips small { color: var(--texte-3); font-size: 10px; }
 
 .moral { position: absolute; left: 50%; top: calc(var(--bas-barre, 54px) + 10px); transform: translateX(-50%); width: max-content; max-width: calc(100% - 16px); display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.colere, .proposition {
+.proposition {
   display: flex; align-items: center; gap: 12px;
   border-radius: 3px; background: var(--voile); box-shadow: var(--ombre); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.colere { width: max-content; max-width: calc(100% - 16px); padding: 7px 12px; border: 1px solid rgba(237, 163, 38, .45); color: var(--c1); font: 700 11px/1 var(--corps); letter-spacing: .14em; text-transform: uppercase; }
-.colere i { width: 90px; height: 3px; background: rgba(237, 163, 38, .18); }
-.colere b { display: block; height: 100%; background: var(--c1); transform-origin: 0 50%; }
-.colere strong { font-size: 13px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
-.peur { color: #c8b6f5; border-color: rgba(174, 143, 231, .45); }
-.peur i { background: rgba(174, 143, 231, .18); }
-.peur b { background: #c8b6f5; }
+.tensions {
+  grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;
+  margin: 0 -12px; padding: 7px max(12px, calc((100vw - 780px) / 2)) 8px;
+  border-top: 1px solid var(--trait); background: rgba(22, 28, 36, .65);
+}
+.jauge { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 12px; color: var(--jauge); }
+.jauge > span { font: 700 12px/1 var(--titre); letter-spacing: .08em; text-transform: uppercase; }
+.jauge small { margin-left: 8px; color: var(--texte-2); font: 500 10px/1 var(--corps); letter-spacing: 0; text-transform: none; }
+.jauge strong { font-size: 14px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.jauge i { grid-column: 1 / -1; height: 3px; background: color-mix(in srgb, var(--jauge) 16%, transparent); }
+.jauge b { display: block; height: 100%; background: var(--jauge); transform: scaleX(0); transform-origin: 0 50%; }
+.peur { --jauge: #c8b6f5; }
+.colere { --jauge: var(--c1); }
+.hostilite { --jauge: var(--alerte); }
 .proposition { padding: 10px 12px 10px 14px; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); }
 .proposition-texte { display: flex; align-items: center; gap: 10px; }
 .proposition-texte .motif { width: 18px; height: 18px; }
@@ -496,7 +504,8 @@ button.file-item:hover .icone { color: var(--alerte); }
 #jeu[data-ecran="demo"] .barre-camp, #jeu[data-ecran="demo"] .ressources, #jeu[data-ecran="demo"] #bouton-oisifs,
 #jeu[data-ecran="demo"] #bouton-diplomatie, #jeu[data-ecran="demo"] #bouton-pause, #jeu[data-ecran="demo"] .selection,
 #jeu[data-ecran="demo"] .commandes, #jeu[data-ecran="demo"] .alertes, #jeu[data-ecran="demo"] .proposition,
-#jeu[data-ecran="demo"] .diplomatie, #jeu[data-ecran="demo"] .infobulle, #jeu[data-ecran="demo"] .message, #jeu[data-ecran="demo"] .colere { display: none !important; }
+#jeu[data-ecran="demo"] .diplomatie, #jeu[data-ecran="demo"] .infobulle, #jeu[data-ecran="demo"] .message, #jeu[data-ecran="demo"] .tensions { display: none !important; }
+#jeu[data-ecran="demo"] .barre { display: flex; }
 #jeu[data-ecran="demo"] .scores { margin-left: auto; }
 #jeu[data-ecran="demo"] #ips { display: inline-grid !important; }
 #jeu[data-ecran="demo"] .console { grid-template-columns: 208px; }
@@ -590,7 +599,7 @@ button.file-item:hover .icone { color: var(--alerte); }
 
 /* ---- Écrans plus petits ---- */
 @media (max-width: 1180px) {
-  .barre { gap: 10px; }
+  .barre { column-gap: 10px; }
   .res { padding: 0 6px; }
   .res small { display: none; }
   .score { padding: 0 8px 3px; gap: 5px; }
@@ -598,6 +607,8 @@ button.file-item:hover .icone { color: var(--alerte); }
   .prep-options { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (max-width: 960px) {
+  #barre-nom { display: none; }
+  .barre-camp { padding: 0 9px; gap: 0; }
   .score-nom { display: none; }
   .ips { min-width: 0; }
   .console { grid-template-columns: 176px minmax(0, 1fr) auto; }
@@ -608,13 +619,14 @@ button.file-item:hover .icone { color: var(--alerte); }
   .camp-carte { min-height: 0; }
   .camp-carte .camp-regles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
-@media (max-width: 760px) {
-  /* Bandeau sur deux rangs ; console : minicarte et commandes en bas, sélection au-dessus. */
+@media (max-width: 860px) {
+  /* Bandeau sur trois rangs, dont les jauges, avant que les ressources et les scores se chevauchent. */
   .barre {
-    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "camp res horloge pause" "scores scores oisifs diplo";
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-rows: auto auto auto;
+    grid-template-areas: "camp res horloge pause" "scores scores oisifs diplo" "tensions tensions tensions tensions";
     height: auto; padding: 6px 8px; padding-top: calc(6px + env(safe-area-inset-top)); gap: 6px;
   }
-  #jeu[data-ecran="demo"] .barre { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "scores horloge pause"; }
+  #jeu[data-ecran="demo"] .barre { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto; grid-template-areas: "scores horloge pause"; }
   #jeu[data-ecran="demo"] .scores { margin: 0; }
   .barre-droite { display: contents; }
   .barre-camp { grid-area: camp; height: 32px; padding: 0 8px 0 7px; }
@@ -632,6 +644,14 @@ button.file-item:hover .icone { color: var(--alerte); }
   .bouton-barre, .ips { height: 32px; }
   .bouton-barre.pause, #bouton-diplomatie { width: 32px; justify-content: center; padding: 0; }
   .ips { display: none; }
+  .tensions { grid-area: tensions; margin: 0 -8px -6px; padding: 7px 8px 8px; gap: 14px; }
+  .jauge { gap: 5px 6px; }
+  .jauge > span { font-size: 12px; }
+  .jauge small { display: block; margin: 4px 0 0; font-size: 9px; }
+  .jauge strong { font-size: 13px; }
+}
+@media (max-width: 760px) {
+  /* Minicarte et commandes en bas, sélection au-dessus. */
   .moral { top: calc(var(--bas-barre, 84px) + 8px); }
   .proposition { max-width: 100%; flex-wrap: wrap; justify-content: center; }
   .diplomatie { top: calc(var(--bas-barre, 84px) + 8px); left: 8px; right: 8px; width: auto; }
@@ -870,10 +890,19 @@ button.file-item:hover .icone { color: var(--alerte); }
         <span id="ips" class="ips" title="Images par seconde">– <small>i/s</small></span>
         <button id="bouton-pause" type="button" class="bouton-barre pause" aria-label="Pause et réglages (P)"><i class="icone-pause" aria-hidden="true"></i></button>
       </div>
+      <div class="tensions" role="group" aria-label="Peur, colère et hostilité">
+        <div id="peur" class="jauge peur" role="meter" aria-label="Peur de votre camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span>Peur<small>Votre camp</small></span><strong>0 %</strong><i aria-hidden="true"><b></b></i>
+        </div>
+        <div id="colere" class="jauge colere" role="meter" aria-label="Colère du Bastion" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0">
+          <span>Colère<small>Bastion</small></span><strong>0 s</strong><i aria-hidden="true"><b></b></i>
+        </div>
+        <div id="hostilite" class="jauge hostilite" role="meter" aria-label="Camps hostiles envers vous" aria-valuemin="0" aria-valuemax="2" aria-valuenow="0">
+          <span>Hostilité<small>Envers vous</small></span><strong>–</strong><i aria-hidden="true"><b></b></i>
+        </div>
+      </div>
     </header>
     <div class="moral">
-      <div id="peur" class="colere peur" role="meter" aria-label="Peur du camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Peur du camp</span><i><b></b></i><strong>0 %</strong></div>
-      <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
       <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
         <div class="proposition-texte"></div>
         <span class="proposition-reste">60 s</span>
@@ -3398,6 +3427,8 @@ button.file-item:hover .icone { color: var(--alerte); }
               depart (effectifs de départ), force (vivantes / depart : ce qui reste du camp, peut dépasser 1),
               deroute (-1 : le camp a une base ; sinon secondes avant son élimination, voir VICTOIRE) } × 3 ],
      alliance: [a, b] ou null, proposition: { de, a, reste (s) } ou null, colere (s restantes, Bastion contre Préfecture),
+     hostilite: Int32Array(16),  par paire [agresseur * 4 + cible] : -1 hostile d'office, 0 calme,
+                                >0 itérations de riposte restantes ; champ additif, absent = inconnu dans l'ATH,
      lieux: [ { proprietaire (-1 : neutre), progression (0..1), conteste (booléen), preneur (camp qui prend, -1 : aucun) } ],
      victoire: { mode, points (cible ; 0 : pas de cible), duree (minutes ; 0 : pas de limite de temps),
                  reste (s avant la limite de temps ; -1 : pas de limite), plafond (s de partie : la limite de
@@ -10707,6 +10738,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
         colere: colereDuBastion() / IT_S,
+        hostilite: hostilite.slice(),
         lieux: Array.from({ length: NL }, (_, l) => ({ proprietaire: lieuProp[l], progression: lieuProgres[l] / PRISE_IT,
           conteste: !!lieuConteste[l], preneur: lieuPreneur[l] })),
         victoire: { mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,
@@ -19190,6 +19222,14 @@ button.file-item:hover .icone { color: var(--alerte); }
   };
   const ICONE_ROLE = { ouvrier: 'ouvrier', ligne: 'ligne', choc: 'choc', soutien: 'soutien', protege: 'protege', outil: 'outil', rapide: 'rapide', vehicule: 'vehicule' };
 
+  /** Camps encore en jeu qui peuvent frapper le joueur, selon la matrice reçue de la simulation.
+   *  La colère seule ne décrit pas les ripostes de la Préfecture ; un ancien état reste explicitement inconnu. */
+  function campsHostiles(joueur, e) {
+    if (!e.hostilite || e.hostilite.length < 16) return null;
+    return [0, 1, 2].filter(f => f !== joueur && !(e.eco && e.eco[f] && e.eco[f].elimine) &&
+      PDR.regles.hostile(f, joueur, e.alliance, e.hostilite));
+  }
+
   // ---------------------------------------------------------------------------------------------------------------
 
   function creerHud(o) {
@@ -19202,10 +19242,11 @@ button.file-item:hover .icone { color: var(--alerte); }
       moyens: $('moyens'), moyensRythme: $('moyens-rythme'), materiaux: $('materiaux'), materiauxRythme: $('materiaux-rythme'),
       pop: $('pop'), popMax: $('pop-max'), resPop: $('res-pop'), scores: $('scores'), horloge: $('horloge'), vitesse: $('vitesse'),
       ips: $('ips'), pause: $('bouton-pause'), diploBouton: $('bouton-diplomatie'), diplo: $('diplomatie'), proposition: $('proposition'),
-      colere: $('colere'), peur: $('peur'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
+      colere: $('colere'), peur: $('peur'), hostilite: $('hostilite'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
       grille: $('commandes-grille'), carte: $('commandes'), infobulle: $('infobulle'),
     };
     const ecrit = new WeakMap();
+    const jauges = new WeakMap();
     const texte = (e, v) => { if (e && ecrit.get(e) !== v) { ecrit.set(e, v); e.textContent = typo(v); } };
     const poser = (e, s) => { if (e) e.innerHTML = typo(s); };
     const REGL = () => PDR.interface.reglages;
@@ -19250,6 +19291,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       if (el.diploBouton) el.diploBouton.setAttribute('aria-expanded', 'false');
       if (el.selection) el.selection.innerHTML = '';
       if (el.grille) el.grille.innerHTML = '';
+      majTensions({ eco: [], alliance });
     }
 
     const rythme = v => (v >= 0 ? '+' : '−') + formatNombre(Math.abs(v)) + '/min';
@@ -19280,18 +19322,37 @@ button.file-item:hover .icone { color: var(--alerte); }
       colere = e.colere || 0;
       if (e.evenements && e.evenements.length) lireEvenements(e.evenements);
       if (e.structures) { sortes.clear(); for (const s of e.structures) sortes.set(s.id, s.sorte); }
-      if (el.peur) {
-        const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
-        const pct = Math.round(p * 100);
-        el.peur.hidden = demo;
-        el.peur.querySelector('i b').style.transform = 'scaleX(' + p.toFixed(3) + ')';
-        texte(el.peur.querySelector('strong'), pct + ' %');
-        el.peur.setAttribute('aria-valuenow', String(pct));
-        el.peur.title = typo('Peur moyenne des unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
-          ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
-      }
+      majTensions(e);
       majDiplomatie();
       majFile();
+    }
+    function jauge(element, valeur, maximum, libelle, description) {
+      if (!element) return;
+      const sig = [valeur, maximum, libelle, description].join('|');
+      if (jauges.get(element) === sig) return;
+      jauges.set(element, sig);
+      texte(element.querySelector('strong'), libelle);
+      element.querySelector('i b').style.transform = 'scaleX(' + (valeur === null ? 0 : valeur / maximum).toFixed(3) + ')';
+      element.setAttribute('aria-valuemax', String(maximum));
+      if (valeur === null) element.removeAttribute('aria-valuenow');
+      else element.setAttribute('aria-valuenow', String(valeur));
+      element.setAttribute('aria-valuetext', typo(libelle + ' — ' + description));
+      element.title = typo(description);
+    }
+    function majTensions(e) {
+      const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
+      const pct = Math.round(p * 1000) / 10;
+      jauge(el.peur, pct, 100, String(pct).replace('.', ',') + ' %',
+        'Peur moyenne de vos unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
+        ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
+      const secondes = Math.max(0, Math.min(C.COLERE_S, Math.ceil(colere)));
+      jauge(el.colere, secondes, C.COLERE_S, secondes + ' s',
+        'Colère du Bastion envers la Préfecture : durée de riposte restante, renouvelée quand elle le frappe.');
+      const hostiles = campsHostiles(joueur, e);
+      jauge(el.hostilite, hostiles === null ? null : hostiles.length, 2, hostiles === null ? '–' : hostiles.length + ' / 2',
+        hostiles === null ? 'Hostilité non reçue.' : hostiles.length ?
+          'Camps hostiles envers vous : ' + hostiles.map(f => F[f].nom).join(', ') + '. Alliés et camps éliminés exclus.' :
+          'Aucun camp hostile envers vous. Alliés et camps éliminés exclus.');
     }
     function majScores(e) {
       const allie = alliance ? alliance : null;
@@ -19316,14 +19377,6 @@ button.file-item:hover .icone { color: var(--alerte); }
       const sig = JSON.stringify([alliance, proposition && [proposition.de, proposition.a, Math.ceil(proposition.reste)], reste, Math.ceil(colere)]);
       if (sig === signatureDiplo) return;
       signatureDiplo = sig;
-      // Colère du Bastion : visible de tous, elle change qui frappe qui.
-      if (el.colere) {
-        el.colere.hidden = !(colere > 0);
-        if (colere > 0) {
-          texte(el.colere.querySelector('strong'), Math.ceil(colere) + ' s');
-          el.colere.querySelector('i b').style.transform = 'scaleX(' + Math.min(1, colere / C.COLERE_S).toFixed(3) + ')';
-        }
-      }
       // Proposition reçue.
       if (el.proposition) {
         const recue = proposition && proposition.a === joueur;
@@ -19720,7 +19773,7 @@ button.file-item:hover .icone { color: var(--alerte); }
   }
 
   I.creerHud = creerHud;
-  I.outils = Object.freeze({ formatNombre, formatHorloge, motifSVG, icone, echapper, typo, typographier, ICONES, MOTIFS, COURTS, AIDES, ICONE_ROLE });
+  I.outils = Object.freeze({ formatNombre, formatHorloge, motifSVG, icone, echapper, typo, typographier, campsHostiles, ICONES, MOTIFS, COURTS, AIDES, ICONE_ROLE });
 })(globalThis.PDR = globalThis.PDR || {});
 </script>
 <script>

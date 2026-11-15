@@ -7,9 +7,16 @@ classique, full procedural rts ».
 
 En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus bas).
 
-## Peur — état local du 15 novembre 2026
+## Peur et ATH — 15 novembre 2026
 
-La jauge **Peur du camp** donne la moyenne des unités vivantes à pied. Les coups, le feu et le gaz subis font monter
+L'ATH regroupe trois jauges permanentes dans le bandeau, sur ordinateur et petit écran : **Peur** (moyenne de vos
+unités vivantes à pied), **Colère** (secondes de riposte du Bastion contre la Préfecture) et **Hostilité** (0 à 2 camps
+hostiles envers vous, selon la matrice réelle de la simulation, hors alliés et camps éliminés). La colère reste
+visible à zéro ; les infobulles précisent le sens des jauges et nomment les camps hostiles. L'hostilité n'est pas un
+pourcentage de peur ou de colère. Le champ additif `etat.hostilite` transmet les 16 valeurs par paire ; un ancien
+état sans ce champ affiche une valeur inconnue, sans inventer la posture de la Préfecture.
+
+Les coups, le feu et le gaz subis font monter
 leur peur ; à 65 %, elles prennent le chemin de repli existant. **Tenir** empêche ce repli automatique ; les véhicules
 ne prennent pas peur. Les sorties immédiates du feu et du gaz restent prioritaires. Après trois secondes sans
 pression, la peur baisse de 6 points par seconde, ou de 18 près d'une base ou d'une Fanfare. La sélection indique

@@ -2694,6 +2694,7 @@
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
         colere: colereDuBastion() / IT_S,
+        hostilite: hostilite.slice(),
         lieux: Array.from({ length: NL }, (_, l) => ({ proprietaire: lieuProp[l], progression: lieuProgres[l] / PRISE_IT,
           conteste: !!lieuConteste[l], preneur: lieuPreneur[l] })),
         victoire: { mode, points: ciblePoints, duree: limiteTemps ? VIC.duree : 0,

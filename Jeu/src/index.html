@@ -144,10 +144,19 @@
         <span id="ips" class="ips" title="Images par seconde">– <small>i/s</small></span>
         <button id="bouton-pause" type="button" class="bouton-barre pause" aria-label="Pause et réglages (P)"><i class="icone-pause" aria-hidden="true"></i></button>
       </div>
+      <div class="tensions" role="group" aria-label="Peur, colère et hostilité">
+        <div id="peur" class="jauge peur" role="meter" aria-label="Peur de votre camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span>Peur<small>Votre camp</small></span><strong>0 %</strong><i aria-hidden="true"><b></b></i>
+        </div>
+        <div id="colere" class="jauge colere" role="meter" aria-label="Colère du Bastion" aria-valuemin="0" aria-valuemax="45" aria-valuenow="0">
+          <span>Colère<small>Bastion</small></span><strong>0 s</strong><i aria-hidden="true"><b></b></i>
+        </div>
+        <div id="hostilite" class="jauge hostilite" role="meter" aria-label="Camps hostiles envers vous" aria-valuemin="0" aria-valuemax="2" aria-valuenow="0">
+          <span>Hostilité<small>Envers vous</small></span><strong>–</strong><i aria-hidden="true"><b></b></i>
+        </div>
+      </div>
     </header>
     <div class="moral">
-      <div id="peur" class="colere peur" role="meter" aria-label="Peur du camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Peur du camp</span><i><b></b></i><strong>0 %</strong></div>
-      <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
       <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
         <div class="proposition-texte"></div>
         <span class="proposition-reste">60 s</span>

@@ -106,6 +106,14 @@
   };
   const ICONE_ROLE = { ouvrier: 'ouvrier', ligne: 'ligne', choc: 'choc', soutien: 'soutien', protege: 'protege', outil: 'outil', rapide: 'rapide', vehicule: 'vehicule' };
 
+  /** Camps encore en jeu qui peuvent frapper le joueur, selon la matrice reçue de la simulation.
+   *  La colère seule ne décrit pas les ripostes de la Préfecture ; un ancien état reste explicitement inconnu. */
+  function campsHostiles(joueur, e) {
+    if (!e.hostilite || e.hostilite.length < 16) return null;
+    return [0, 1, 2].filter(f => f !== joueur && !(e.eco && e.eco[f] && e.eco[f].elimine) &&
+      PDR.regles.hostile(f, joueur, e.alliance, e.hostilite));
+  }
+
   // ---------------------------------------------------------------------------------------------------------------
 
   function creerHud(o) {
@@ -118,10 +126,11 @@
       moyens: $('moyens'), moyensRythme: $('moyens-rythme'), materiaux: $('materiaux'), materiauxRythme: $('materiaux-rythme'),
       pop: $('pop'), popMax: $('pop-max'), resPop: $('res-pop'), scores: $('scores'), horloge: $('horloge'), vitesse: $('vitesse'),
       ips: $('ips'), pause: $('bouton-pause'), diploBouton: $('bouton-diplomatie'), diplo: $('diplomatie'), proposition: $('proposition'),
-      colere: $('colere'), peur: $('peur'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
+      colere: $('colere'), peur: $('peur'), hostilite: $('hostilite'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
       grille: $('commandes-grille'), carte: $('commandes'), infobulle: $('infobulle'),
     };
     const ecrit = new WeakMap();
+    const jauges = new WeakMap();
     const texte = (e, v) => { if (e && ecrit.get(e) !== v) { ecrit.set(e, v); e.textContent = typo(v); } };
     const poser = (e, s) => { if (e) e.innerHTML = typo(s); };
     const REGL = () => PDR.interface.reglages;
@@ -166,6 +175,7 @@
       if (el.diploBouton) el.diploBouton.setAttribute('aria-expanded', 'false');
       if (el.selection) el.selection.innerHTML = '';
       if (el.grille) el.grille.innerHTML = '';
+      majTensions({ eco: [], alliance });
     }
 
     const rythme = v => (v >= 0 ? '+' : '−') + formatNombre(Math.abs(v)) + '/min';
@@ -196,18 +206,37 @@
       colere = e.colere || 0;
       if (e.evenements && e.evenements.length) lireEvenements(e.evenements);
       if (e.structures) { sortes.clear(); for (const s of e.structures) sortes.set(s.id, s.sorte); }
-      if (el.peur) {
-        const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
-        const pct = Math.round(p * 100);
-        el.peur.hidden = demo;
-        el.peur.querySelector('i b').style.transform = 'scaleX(' + p.toFixed(3) + ')';
-        texte(el.peur.querySelector('strong'), pct + ' %');
-        el.peur.setAttribute('aria-valuenow', String(pct));
-        el.peur.title = typo('Peur moyenne des unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
-          ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
-      }
+      majTensions(e);
       majDiplomatie();
       majFile();
+    }
+    function jauge(element, valeur, maximum, libelle, description) {
+      if (!element) return;
+      const sig = [valeur, maximum, libelle, description].join('|');
+      if (jauges.get(element) === sig) return;
+      jauges.set(element, sig);
+      texte(element.querySelector('strong'), libelle);
+      element.querySelector('i b').style.transform = 'scaleX(' + (valeur === null ? 0 : valeur / maximum).toFixed(3) + ')';
+      element.setAttribute('aria-valuemax', String(maximum));
+      if (valeur === null) element.removeAttribute('aria-valuenow');
+      else element.setAttribute('aria-valuenow', String(valeur));
+      element.setAttribute('aria-valuetext', typo(libelle + ' — ' + description));
+      element.title = typo(description);
+    }
+    function majTensions(e) {
+      const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
+      const pct = Math.round(p * 1000) / 10;
+      jauge(el.peur, pct, 100, String(pct).replace('.', ',') + ' %',
+        'Peur moyenne de vos unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
+        ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
+      const secondes = Math.max(0, Math.min(C.COLERE_S, Math.ceil(colere)));
+      jauge(el.colere, secondes, C.COLERE_S, secondes + ' s',
+        'Colère du Bastion envers la Préfecture : durée de riposte restante, renouvelée quand elle le frappe.');
+      const hostiles = campsHostiles(joueur, e);
+      jauge(el.hostilite, hostiles === null ? null : hostiles.length, 2, hostiles === null ? '–' : hostiles.length + ' / 2',
+        hostiles === null ? 'Hostilité non reçue.' : hostiles.length ?
+          'Camps hostiles envers vous : ' + hostiles.map(f => F[f].nom).join(', ') + '. Alliés et camps éliminés exclus.' :
+          'Aucun camp hostile envers vous. Alliés et camps éliminés exclus.');
     }
     function majScores(e) {
       const allie = alliance ? alliance : null;
@@ -232,14 +261,6 @@
       const sig = JSON.stringify([alliance, proposition && [proposition.de, proposition.a, Math.ceil(proposition.reste)], reste, Math.ceil(colere)]);
       if (sig === signatureDiplo) return;
       signatureDiplo = sig;
-      // Colère du Bastion : visible de tous, elle change qui frappe qui.
-      if (el.colere) {
-        el.colere.hidden = !(colere > 0);
-        if (colere > 0) {
-          texte(el.colere.querySelector('strong'), Math.ceil(colere) + ' s');
-          el.colere.querySelector('i b').style.transform = 'scaleX(' + Math.min(1, colere / C.COLERE_S).toFixed(3) + ')';
-        }
-      }
       // Proposition reçue.
       if (el.proposition) {
         const recue = proposition && proposition.a === joueur;
@@ -636,5 +657,5 @@
   }
 
   I.creerHud = creerHud;
-  I.outils = Object.freeze({ formatNombre, formatHorloge, motifSVG, icone, echapper, typo, typographier, ICONES, MOTIFS, COURTS, AIDES, ICONE_ROLE });
+  I.outils = Object.freeze({ formatNombre, formatHorloge, motifSVG, icone, echapper, typo, typographier, campsHostiles, ICONES, MOTIFS, COURTS, AIDES, ICONE_ROLE });
 })(globalThis.PDR = globalThis.PDR || {});

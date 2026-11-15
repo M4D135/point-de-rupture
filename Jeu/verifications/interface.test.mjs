@@ -623,4 +623,23 @@ verifier('sélection : compte la peur forte, puis oublie le drapeau absent et le
   assert.equal(c.resume.n, 1); assert.equal(c.resume.effrayes, 0);
 });
 
+verifier('ATH : hostilité entrante réelle, riposte, alliance, élimination et ancien état', () => {
+  const hostilite = new Int32Array(16), eco = [{}, {}, {}];
+  const e = { hostilite, eco, alliance: null, colere: 0 };
+  // La Préfecture est initialement passive, même si la Convergence lui est hostile.
+  hostilite[0 * 4 + 2] = -1;
+  hostilite[1 * 4 + 0] = -1;
+  assert.deepEqual(I.outils.campsHostiles(0, e), [1]);
+  assert.deepEqual(I.outils.campsHostiles(2, e), [0]);
+  hostilite[2 * 4 + 0] = 900;
+  assert.deepEqual(I.outils.campsHostiles(0, e), [1, 2], 'riposte de la Préfecture, sans colère du Bastion');
+  e.alliance = [0, 2];
+  assert.deepEqual(I.outils.campsHostiles(0, e), [1]);
+  eco[1].elimine = true;
+  assert.deepEqual(I.outils.campsHostiles(0, e), []);
+  e.alliance = null; hostilite[2 * 4 + 0] = 0;
+  assert.deepEqual(I.outils.campsHostiles(0, e), [], 'fin de la riposte');
+  assert.equal(I.outils.campsHostiles(0, { eco, colere: 45 }), null, 'ne pas déduire une matrice de la seule colère');
+});
+
 console.log(ok + ' vérifications passées');

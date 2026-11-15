@@ -52,6 +52,8 @@
               depart (effectifs de départ), force (vivantes / depart : ce qui reste du camp, peut dépasser 1),
               deroute (-1 : le camp a une base ; sinon secondes avant son élimination, voir VICTOIRE) } × 3 ],
      alliance: [a, b] ou null, proposition: { de, a, reste (s) } ou null, colere (s restantes, Bastion contre Préfecture),
+     hostilite: Int32Array(16),  par paire [agresseur * 4 + cible] : -1 hostile d'office, 0 calme,
+                                >0 itérations de riposte restantes ; champ additif, absent = inconnu dans l'ATH,
      lieux: [ { proprietaire (-1 : neutre), progression (0..1), conteste (booléen), preneur (camp qui prend, -1 : aucun) } ],
      victoire: { mode, points (cible ; 0 : pas de cible), duree (minutes ; 0 : pas de limite de temps),
                  reste (s avant la limite de temps ; -1 : pas de limite), plafond (s de partie : la limite de
