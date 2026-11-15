@@ -1,8 +1,8 @@
 {
   "version": "essai-0.3e",
-  "raw": 1553264,
-  "gzip": 528600,
-  "sha256": "3000386d976d8665cbcd5bc89261d6742c9743cd524507ca5ce751f6d1306fdd",
+  "raw": 1559327,
+  "gzip": 530630,
+  "sha256": "3f610674ed0774a69993e735f97c6b14dcffee8a7e78b1bab4ff0a4d80402152",
   "sources": {
     "moteur/renderer.js": 138579,
     "sim/regles.js": 24723,
@@ -12,7 +12,7 @@
     "ville-reelle.js": 141247,
     "sim/nav.js": 18480,
     "sim/immeubles.js": 19494,
-    "sim/monde.js": 155033,
+    "sim/monde.js": 161096,
     "sim/ia.js": 40239,
     "sim/travailleur.js": 9269,
     "foule.js": 56602,

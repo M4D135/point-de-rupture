@@ -9424,6 +9424,108 @@ button.file-item:hover .icone { color: var(--alerte); }
     }
 
     // ---- Déplacement d'un pas, avec glissement le long des murs et mise à jour des grilles. ----
+    // Deux figurines ne sont pas au même point : sans rien pour les écarter, elles se superposent et glissent l'une
+    // sur l'autre sans avancer. On les pousse hors du corps de leurs voisines, à partir des cases déjà triées.
+    // Les véhicules n'entrent pas dans la bousculade et ne la subissent pas : ils ont leur propre gabarit.
+    const SEP_DISTANCE = 340, SEP_PAS = 130, SEP_VOISINS = 12;
+    // Index temporaire de côté 2 × SEP_DISTANCE, dérivé après le déplacement normal. Les listes
+    // gardent le rang du tri4 du début du pas : même ordre de voisins et même
+    // plafond de douze que la recherche de référence sur les cases de 4 m.
+    const sepCell = 2 * SEP_DISTANCE, sepNX = Math.ceil(nx * 4000 / sepCell), sepNZ = Math.ceil(nz * 4000 / sepCell);
+    const sepHead = new Int32Array(sepNX * sepNZ), sepNext = new Int32Array(ux.length);
+    const sepPrev = new Int32Array(ux.length), sepFine = new Int32Array(ux.length);
+    const sepRank = new Int32Array(ux.length), sepOldX = new Int32Array(ux.length), sepOldZ = new Int32Array(ux.length), sepCursor = new Int32Array(4);
+    const sepInside = new Uint8Array(ux.length);
+    // Une cellule n'est lue que si le bit de présence correspondant est allumé : le tableau sepHead, grand et
+    // froid, n'est plus effacé ni parcouru quand la foule est clairsemée. Le bit reste allumé si la liste se vide
+    // en cours de pas (la tête vaut alors -1, donc la lecture rend -1 comme avant).
+    const sepOcc = new Int32Array((sepNX * sepNZ + 31) >>> 5);
+    const sepX = x => { const a = ((x - X0) / sepCell) | 0; return a < 0 ? 0 : a >= sepNX ? sepNX - 1 : a; };
+    const sepZ = z => { const a = ((z - Z0) / sepCell) | 0; return a < 0 ? 0 : a >= sepNZ ? sepNZ - 1 : a; };
+    // Si j reste à moins de 4000-R du bord de sa case ancienne, tout i à
+    // distance <R de j voit cette case dans ses neuf voisines. Sinon le contrôle
+    // explicite reste nécessaire (téléportation ou poussée inhabituelle).
+    function marquerSep(i) {
+      const x0 = X0 + sepOldX[i] * 4000, z0 = Z0 + sepOldZ[i] * 4000, marge = 4000 - SEP_DISTANCE;
+      sepInside[i] = ux[i] >= x0 - marge && ux[i] < x0 + 4000 + marge && uz[i] >= z0 - marge && uz[i] < z0 + 4000 + marge ? 1 : 0;
+    }
+    function voisinSep(j, x, z, ci, cj, self) {
+      for (; j >= 0; j = sepNext[j]) {
+        if (j === self) continue;
+        if (!sepInside[j]) {
+          const a = sepOldX[j], b = sepOldZ[j];
+          if (a < ci - 1 || a > ci + 1 || b < cj - 1 || b > cj + 1) continue;
+        }
+        const dx = x - ux[j], dz = z - uz[j];
+        if (dx * dx + dz * dz < SEP_DISTANCE * SEP_DISTANCE) return j;
+      }
+      return -1;
+    }
+    function separer() {
+      sepOcc.fill(0); sepRank.fill(-1);
+      for (let c = 0; c + 1 < debutCase.length; c++) {
+        const a = c % nx, b = (c / nx) | 0;
+        for (let q = debutCase[c], fin = debutCase[c + 1]; q < fin; q++) { const i = tri[q]; sepOldX[i] = a; sepOldZ[i] = b; }
+      }
+      for (let q = debutCase[debutCase.length - 1] - 1; q >= 0; q--) {
+        const i = tri[q], c = sepX(ux[i]) + sepZ(uz[i]) * sepNX, w = c >>> 5, m = 1 << (c & 31);
+        let h;
+        if (sepOcc[w] & m) h = sepHead[c];
+        else { sepOcc[w] |= m; sepHead[c] = -1; h = -1; }
+        marquerSep(i); sepRank[i] = q; sepFine[i] = c; sepPrev[i] = -1; sepNext[i] = h;
+        if (h >= 0) sepPrev[h] = i;
+        sepHead[c] = i;
+      }
+      for (let i = 0; i < nHaut; i++) {
+        const f = ufac[i];
+        if (f < 0 || f > 2 || uetat[i] === ET.HORS_JEU) continue;
+        const tt = utyp[i];
+        if (tt >= 0 && tt < R.TYPES.length && R.TYPES[tt].vehicule) continue;
+        const c4 = uc4[i], ci = c4 % nx, cj = (c4 / nx) | 0, x = ux[i], z = uz[i];
+        const x0 = sepX(x - SEP_DISTANCE), x1 = sepX(x + SEP_DISTANCE);
+        const z0 = sepZ(z - SEP_DISTANCE), z1 = sepZ(z + SEP_DISTANCE);
+        let nc = 0, ax = 0, az = 0, n = 0;
+        for (let b = z0; b <= z1; b++) for (let a = x0; a <= x1; a++) {
+          const cc = a + b * sepNX;
+          sepCursor[nc++] = (sepOcc[cc >>> 5] & (1 << (cc & 31))) ? voisinSep(sepHead[cc], x, z, ci, cj, i) : -1;
+        }
+        while (n < SEP_VOISINS) {
+          let best = -1, rank = 2147483647;
+          for (let k = 0; k < nc; k++) {
+            const j = sepCursor[k];
+            if (j >= 0 && sepRank[j] < rank) { best = k; rank = sepRank[j]; }
+          }
+          if (best < 0) break;
+          const j = sepCursor[best];
+          sepCursor[best] = voisinSep(sepNext[j], x, z, ci, cj, i);
+          if (j === i) continue;
+          const dx = x - ux[j], dz = z - uz[j], d2 = dx * dx + dz * dz;
+          if (d2 < 1) { ax += ((i * 2654435761 + j * 40503) & 3) - 1.5; az += ((i * 2246822519 + j * 668265263) & 3) - 1.5; n++; continue; }
+          const d = Math.sqrt(d2); ax += dx / d; az += dz / d; n++;
+        }
+        if (n > 0) {
+          const k = n > 3 ? 3 : n; deplacer(i, Math.round(ax * SEP_PAS / k), Math.round(az * SEP_PAS / k));
+          // Replacer immédiatement l'unité mobile dans l'index fin. Un soldat
+          // réveillé pendant boucle() qui n'était pas dans tri4 reste absent de
+          // la recherche des autres, comme dans la référence, jusqu'au pas suivant.
+          if (sepRank[i] < 0) continue;
+          marquerSep(i);
+          const c = sepX(ux[i]) + sepZ(uz[i]) * sepNX, old = sepFine[i];
+          if (c === old) continue;
+          const prev = sepPrev[i], next = sepNext[i];
+          if (prev < 0) sepHead[old] = next; else sepNext[prev] = next;
+          if (next >= 0) sepPrev[next] = prev;
+          const w = c >>> 5, m = 1 << (c & 31);
+          let a = -1, b;
+          if (sepOcc[w] & m) b = sepHead[c];
+          else { sepOcc[w] |= m; sepHead[c] = -1; b = -1; }
+          while (b >= 0 && sepRank[b] < sepRank[i]) { a = b; b = sepNext[b]; }
+          sepFine[i] = c; sepPrev[i] = a; sepNext[i] = b;
+          if (a < 0) sepHead[c] = i; else sepNext[a] = i;
+          if (b >= 0) sepPrev[b] = i;
+        }
+      }
+    }
     function deplacer(i, sx, sz) {
       if (sx === 0 && sz === 0) return false;
       const x = ux[i], z = uz[i], c4 = uc4[i];
@@ -9634,6 +9736,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       if (marquerSoins) soin.fill(0);
       oisifs.fill(0);
       boucle(marquerSoins, soigner);
+      separer();
       if (soigner) {
         for (let q = 0; q < nSoins; q++) {
           const c8 = soins[q] >> 2, f = soins[q] & 3;
