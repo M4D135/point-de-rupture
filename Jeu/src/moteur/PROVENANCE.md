@@ -150,3 +150,19 @@ Une ligne par changement du moteur, de la plus ancienne à la plus récente.
 |---|---|---|---|
 | 12/11/2026 | Le renderer passe à FERRO 0.2 (commit `248043a`) : fusion à trois, réglages de création, six ajouts du jeu conservés. | Prendre le dernier état du moteur commun avant sa suppression, sans changer l'image. | 14 blocs, 212 lignes ajoutées, 2 lignes remplacées ; sur seize vues, 0,5 à 3,3 % des pixels diffèrent de la copie d'avant, moins de 0,01 % de plus de 24 sur 255, écart moyen sous 0,2 sur 255 ; deux rendus de la même copie sont identiques. |
 | 12/11/2026 | Ajouts « grain » et « lampes » (lot L5, le feu à l'écran). | Fumées et flammes sans moiré ; les foyers éclairent façades et foule. | 2 lignes. Banc `BANC=cout`, 128 foyers et 64 nuages, 100 000 unités, deux passages par réglage (charge 7 à 9) : à 600 m, 60,1 à 60,2 images/s avec 8 ou 3 lampes ; à 160 m, 60,1 avec 8 et 60,1 / 51,8 avec 3 : l'écart suit la charge de la machine, pas le nombre de lampes. |
+| 15/11/2026 | Ajout « empaquetage » : les 16 valeurs de `pack` et `packEffects` sont écrites directement dans leur `Float32Array`, suivant METAL `7f1d5589`. | Éviter le tableau JavaScript temporaire de 16 valeurs créé pour chaque instance ; conserver le regroupement et le tri transparent du jeu. | Un tableau temporaire en moins par instance empaquetée ; aucun changement de résolution, qualité, passes ou simulation. Contrôle des octets et groupes avant/après sur les valeurs par défaut, les listes vides et 513 objets variés, puis suite `rendu.test.mjs`. Aucun gain d'images/s revendiqué. |
+
+### Adaptation du 15 novembre 2026 : empaquetage
+
+Source relue : METAL, commit `7f1d5589b7f5863e09369b0f55a21d4fe4334280`,
+`src/renderer.js` dans la voie `render` du chantier Spark
+(`/home/m4d135/metal-chantier/voies/render`). SHA-256 du fichier à ce commit :
+`6e986ce829135db97fb380b10075d06e240260796a8b80c5465ec13525baf132`.
+
+Les deux blocs « PDR (empaquetage) » adaptent uniquement les écritures directes des
+16 valeurs dans le tampon typé. Les valeurs de repli, les drapeaux de surface,
+l'ordre des formes et le tri des effets restent ceux de Point de rupture. Les
+pools, le tri par comptage, le raster extérieur et les changements de stratégie
+d'envoi GPU du même commit METAL ne sont pas repris. Les passes de la foule, du
+voile, des lots et du MSAA restent intactes. Les comptes de blocs et de lignes
+plus haut décrivent le passage historique à FERRO 0.2.

@@ -1,10 +1,10 @@
 {
   "version": "essai-0.3e",
-  "raw": 1552484,
-  "gzip": 528395,
-  "sha256": "37bf1888bf42854320394434e0b580c1cdc53d1b7618a650d52e045d87d42d03",
+  "raw": 1553264,
+  "gzip": 528600,
+  "sha256": "3000386d976d8665cbcd5bc89261d6742c9743cd524507ca5ce751f6d1306fdd",
   "sources": {
-    "moteur/renderer.js": 137799,
+    "moteur/renderer.js": 138579,
     "sim/regles.js": 24723,
     "sim/protocole.js": 22547,
     "ville.js": 58411,
