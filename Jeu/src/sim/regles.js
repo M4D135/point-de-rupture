@@ -39,8 +39,8 @@
   const ETATS = { OISIF: 0, MARCHE: 1, ATTAQUE: 2, RECOLTE: 3, CHARGE: 4, CONSTRUIT: 5, LEVE: 6, CASSE: 7, REPLI: 8, TIENT: 9,
     HORS_JEU: 10, CAPACITE: 11, A_TERRE: 12, LANCE: 13, SUFFOQUE: 14, ASSAUT: 15 };
   // Drapeaux codés sur 8 bits : porte une charge, touchée depuis moins d'une demi-seconde, colère du Bastion,
-  // bouclier levé (protégée de face), véhicule. Les bits 32, 64 et 128 sont libres.
-  const DRAPEAUX = { PORTE: 1, TOUCHE: 2, COLERE: 4, BOUCLIER: 8, VEHICULE: 16 };
+  // bouclier levé (protégée de face), véhicule, peur au seuil de repli. Les bits 64 et 128 sont libres.
+  const DRAPEAUX = { PORTE: 1, TOUCHE: 2, COLERE: 4, BOUCLIER: 8, VEHICULE: 16, PEUR: 32 };
 
   // Capacités d'un type. Depuis la 0.3 :
   //   pierres { portee, porteeMin (m), pression (points par jet), recharge (s) } : jet de pierres et de bouteilles
@@ -138,6 +138,10 @@
     TICK_MS: 50, IT_PAR_S: 20,
     CAPACITE: 262144,                     // emplacements d'unités
     CELLULE_NAV: 4, CELLULE_DENSITE: 2, CELLULE_VOILE: 8, MINICARTE: 128, GRILLE_COMBATS: 64,   // m, m, m, cases, cases
+    // Peur en millièmes : 65 % déclenche le repli, hors Tenir et véhicules. Les coups sont rapportés à la
+    // cohésion maximale ; après 3 s sans pression, calme et soutien apaisent dans la boucle existante.
+    PEUR_MAX: 1000, PEUR_SEUIL: 650, PEUR_PRESSION: 2000, PEUR_CALME_S: 3,
+    PEUR_BAISSE_PAR_S: 60, PEUR_SOUTIEN_PAR_S: 120,
     COLERE_S: 45, REPLI_SEUIL: 0.25, SOUTIEN_PAR_S: 5, SOIN_RAYON: 8, FLANC: 1.5, PROTEGE: 0.5, ARC_FRONTAL_DEG: 120,
     INTERPELLER_SEUIL: 0.30, REPLI_VITESSE: 1.3,
     CHARGE_RECOLTE: 10, RECOLTEURS_MAX: 40,

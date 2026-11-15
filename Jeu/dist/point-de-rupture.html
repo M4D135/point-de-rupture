@@ -345,15 +345,19 @@ select option { background: var(--ardoise-2); color: var(--texte); }
 .ips { display: inline-grid; place-items: center; min-width: 58px; height: 36px; padding: 0 8px; border: 1px solid var(--trait); border-radius: 3px; color: var(--texte-2); font: 600 12px/1 var(--corps); white-space: nowrap; }
 .ips small { color: var(--texte-3); font-size: 10px; }
 
+.moral { position: absolute; left: 50%; top: calc(var(--bas-barre, 54px) + 10px); transform: translateX(-50%); width: max-content; max-width: calc(100% - 16px); display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .colere, .proposition {
-  position: absolute; left: 50%; top: calc(var(--bas-barre, 54px) + 10px); transform: translateX(-50%); display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px;
   border-radius: 3px; background: var(--voile); box-shadow: var(--ombre); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
 .colere { width: max-content; max-width: calc(100% - 16px); padding: 7px 12px; border: 1px solid rgba(237, 163, 38, .45); color: var(--c1); font: 700 11px/1 var(--corps); letter-spacing: .14em; text-transform: uppercase; }
 .colere i { width: 90px; height: 3px; background: rgba(237, 163, 38, .18); }
 .colere b { display: block; height: 100%; background: var(--c1); transform-origin: 0 50%; }
 .colere strong { font-size: 13px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
-.proposition { top: calc(var(--bas-barre, 54px) + 48px); padding: 10px 12px 10px 14px; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); }
+.peur { color: #c8b6f5; border-color: rgba(174, 143, 231, .45); }
+.peur i { background: rgba(174, 143, 231, .18); }
+.peur b { background: #c8b6f5; }
+.proposition { padding: 10px 12px 10px 14px; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); }
 .proposition-texte { display: flex; align-items: center; gap: 10px; }
 .proposition-texte .motif { width: 18px; height: 18px; }
 .proposition-texte span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
@@ -628,8 +632,8 @@ button.file-item:hover .icone { color: var(--alerte); }
   .bouton-barre, .ips { height: 32px; }
   .bouton-barre.pause, #bouton-diplomatie { width: 32px; justify-content: center; padding: 0; }
   .ips { display: none; }
-  .colere { top: calc(var(--bas-barre, 84px) + 50px); }
-  .proposition { top: auto; bottom: calc(var(--haut-console, 300px) + 8px); left: 8px; right: 8px; transform: none; flex-wrap: wrap; justify-content: center; }
+  .moral { top: calc(var(--bas-barre, 84px) + 8px); }
+  .proposition { max-width: 100%; flex-wrap: wrap; justify-content: center; }
   .diplomatie { top: calc(var(--bas-barre, 84px) + 8px); left: 8px; right: 8px; width: auto; }
   .console { left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); grid-template-columns: 132px minmax(0, 1fr); grid-template-rows: auto auto; gap: 8px; }
   .minicarte-cadre { grid-row: 2; width: 132px; height: 132px; padding: 4px; }
@@ -867,12 +871,15 @@ button.file-item:hover .icone { color: var(--alerte); }
         <button id="bouton-pause" type="button" class="bouton-barre pause" aria-label="Pause et réglages (P)"><i class="icone-pause" aria-hidden="true"></i></button>
       </div>
     </header>
-    <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
-    <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
-      <div class="proposition-texte"></div>
-      <span class="proposition-reste">60 s</span>
-      <span class="proposition-boutons"><button type="button" class="primaire petit" data-reponse="accepter">Accepter</button><button type="button" class="secondaire petit" data-reponse="refuser">Refuser</button></span>
-    </section>
+    <div class="moral">
+      <div id="peur" class="colere peur" role="meter" aria-label="Peur du camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Peur du camp</span><i><b></b></i><strong>0 %</strong></div>
+      <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
+      <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
+        <div class="proposition-texte"></div>
+        <span class="proposition-reste">60 s</span>
+        <span class="proposition-boutons"><button type="button" class="primaire petit" data-reponse="accepter">Accepter</button><button type="button" class="secondaire petit" data-reponse="refuser">Refuser</button></span>
+      </section>
+    </div>
     <section id="diplomatie" class="diplomatie" hidden aria-label="Diplomatie">
       <p class="surtitre">DIPLOMATIE</p>
       <div class="diplo-corps"></div>
@@ -3074,8 +3081,8 @@ button.file-item:hover .icone { color: var(--alerte); }
   const ETATS = { OISIF: 0, MARCHE: 1, ATTAQUE: 2, RECOLTE: 3, CHARGE: 4, CONSTRUIT: 5, LEVE: 6, CASSE: 7, REPLI: 8, TIENT: 9,
     HORS_JEU: 10, CAPACITE: 11, A_TERRE: 12, LANCE: 13, SUFFOQUE: 14, ASSAUT: 15 };
   // Drapeaux codés sur 8 bits : porte une charge, touchée depuis moins d'une demi-seconde, colère du Bastion,
-  // bouclier levé (protégée de face), véhicule. Les bits 32, 64 et 128 sont libres.
-  const DRAPEAUX = { PORTE: 1, TOUCHE: 2, COLERE: 4, BOUCLIER: 8, VEHICULE: 16 };
+  // bouclier levé (protégée de face), véhicule, peur au seuil de repli. Les bits 64 et 128 sont libres.
+  const DRAPEAUX = { PORTE: 1, TOUCHE: 2, COLERE: 4, BOUCLIER: 8, VEHICULE: 16, PEUR: 32 };
 
   // Capacités d'un type. Depuis la 0.3 :
   //   pierres { portee, porteeMin (m), pression (points par jet), recharge (s) } : jet de pierres et de bouteilles
@@ -3173,6 +3180,10 @@ button.file-item:hover .icone { color: var(--alerte); }
     TICK_MS: 50, IT_PAR_S: 20,
     CAPACITE: 262144,                     // emplacements d'unités
     CELLULE_NAV: 4, CELLULE_DENSITE: 2, CELLULE_VOILE: 8, MINICARTE: 128, GRILLE_COMBATS: 64,   // m, m, m, cases, cases
+    // Peur en millièmes : 65 % déclenche le repli, hors Tenir et véhicules. Les coups sont rapportés à la
+    // cohésion maximale ; après 3 s sans pression, calme et soutien apaisent dans la boucle existante.
+    PEUR_MAX: 1000, PEUR_SEUIL: 650, PEUR_PRESSION: 2000, PEUR_CALME_S: 3,
+    PEUR_BAISSE_PAR_S: 60, PEUR_SOUTIEN_PAR_S: 120,
     COLERE_S: 45, REPLI_SEUIL: 0.25, SOUTIEN_PAR_S: 5, SOIN_RAYON: 8, FLANC: 1.5, PROTEGE: 0.5, ARC_FRONTAL_DEG: 120,
     INTERPELLER_SEUIL: 0.30, REPLI_VITESSE: 1.3,
     CHARGE_RECOLTE: 10, RECOLTEURS_MAX: 40,
@@ -3382,6 +3393,8 @@ button.file-item:hover .icone { color: var(--alerte); }
                            feu : personne n'est montré en feu), puis son emplacement se libère.
      eco: [ { moyens, materiaux, pop, popMax, score, revenu: { moyens, materiaux } (par minute), oisifs,
               elimine, qgOccupe (0..1 : part de l'occupation), vivantes,
+              peur (0..1 : moyenne des unités vivantes à pied), effrayes (nombre au seuil de repli),
+                champs additifs : considérer 0 s'ils sont absents ; DRAPEAUX.PEUR (32) signale le seuil par unité,
               depart (effectifs de départ), force (vivantes / depart : ce qui reste du camp, peut dépasser 1),
               deroute (-1 : le camp a une base ; sinon secondes avant son élimination, voir VICTOIRE) } × 3 ],
      alliance: [a, b] ou null, proposition: { de, a, reste (s) } ou null, colere (s restantes, Bastion contre Préfecture),
@@ -8079,6 +8092,8 @@ button.file-item:hover .icone { color: var(--alerte); }
   // RYTHME ; le feu et le gaz, qui chassent plus qu'ils ne blessent, gardent leurs chiffres.
   const RYTHME = K.RYTHME, REPLI_PCT = Math.round(K.REPLI_SEUIL * 100);
   /** Tables entières par type d'unité, tirées de regles.TYPES. */
+  const PEUR_CALME_IT = K.PEUR_CALME_S * IT_S;
+  const PEUR_BAISSE = Math.round(K.PEUR_BAISSE_PAR_S / IT_S), PEUR_SOUTIEN = Math.round(K.PEUR_SOUTIEN_PAR_S / IT_S);
   const NT = R.TYPES.length;
   const T = {
     fac: new Uint8Array(NT), coh: new Int32Array(NT), pres: new Int32Array(NT), rayon: new Int32Array(NT), portee: new Int32Array(NT),
@@ -8224,6 +8239,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     const ucharge = new Uint8Array(CAPACITE), urech = new Uint16Array(CAPACITE), usal = new Uint8Array(CAPACITE);
     const usx = new Int32Array(CAPACITE), usz = new Int32Array(CAPACITE), utouche = new Uint8Array(CAPACITE);
     const uagr = new Int32Array(CAPACITE).fill(-1), udeg = new Int32Array(CAPACITE), ubloc = new Uint8Array(CAPACITE);
+    const upeur = new Uint16Array(CAPACITE), ucalme = new Uint8Array(CAPACITE);
     const uc2 = new Int32Array(CAPACITE), uc4 = new Int32Array(CAPACITE), uc8 = new Int32Array(CAPACITE);
     // 0.3 : à terre (itérations restantes), immunité après s'être relevée, geste du lancer, élan d'une charge,
     // recharge de la capacité seconde (la grenade de la Compagnie).
@@ -8432,6 +8448,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       ucib[i] = -1; ugen[i] = (ugen[i] + 1) & 0xFFFF; uminu[i] = 0; ucharge[i] = 0; urech[i] = 0; usal[i] = 0;
       utouche[i] = 0; uagr[i] = -1; udeg[i] = 0; ubloc[i] = 0;
       uterre[i] = 0; uimm[i] = 0; ulance[i] = 0; uassaut[i] = 0; urech2[i] = 0;
+      upeur[i] = 0; ucalme[i] = 0;
       placerCases(i);
       pop[f] += T.pop[t]; vivantes[f]++;
       return i;
@@ -9155,9 +9172,18 @@ button.file-item:hover .icone { color: var(--alerte); }
     }
     /** La pression d'une zone (feu, gaz) sur l'unité i, de type t : appliquée tout de suite, sans l'éclair « touchée »
      *  des coups. Rend vrai si l'unité est hors jeu (par : le camp à qui cela revient, -1 pour personne). */
+    // La pression réellement reçue fait peur. Le cumul des coups est traité une seule fois dans degats(),
+    // afin que leur découpage ne multiplie pas les arrondis. Aucun changement d'hostilité ici.
+    function effrayer(i, t, p) {
+      if (p <= 0 || T.vehicule[t]) return;
+      upeur[i] = Math.min(K.PEUR_MAX, upeur[i] + Math.ceil(p * K.PEUR_PRESSION / T.coh[t]));
+      ucalme[i] = PEUR_CALME_IT;
+      if (upeur[i] >= K.PEUR_SEUIL && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
+    }
     function presser(i, t, p, par) {
       ucoh[i] -= p;
       if (ucoh[i] <= 0) { horsJeu(i, false, par); return true; }
+      effrayer(i, t, p);
       if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
       return false;
     }
@@ -9766,6 +9792,15 @@ button.file-item:hover .icone { color: var(--alerte); }
           continue;
         }
         const t = utyp[i];
+        // Au calme, y compris à cohésion pleine et à terre. Le soutien lit les mêmes cases que les soins.
+        if (upeur[i] > 0) {
+          if (ucalme[i] > 0) ucalme[i]--;
+          else {
+            const c = uc4[i], bit = 1 << f;
+            const soutien = ((soin[c] | zoneBase[c]) & bit) ? PEUR_SOUTIEN : 0;
+            upeur[i] = Math.max(0, upeur[i] - PEUR_BAISSE - soutien);
+          }
+        }
         if (utouche[i] > 0) utouche[i]--;
         if (urech[i] > 0) urech[i]--;
         if (urech2[i] > 0) urech2[i]--;
@@ -10284,14 +10319,16 @@ button.file-item:hover .icone { color: var(--alerte); }
       return true;
     }
 
-    /** Applique les coups de l'itération : cohésion, hors jeu, repli automatique sous 25 %. */
+    /** Applique les coups : cohésion, hors jeu, peur et repli automatique. */
     function degats() {
       for (let q = 0; q < nTouches; q++) {
         const i = touches[q];
         if (ufac[i] === LIBRE || uetat[i] === ET.HORS_JEU) { udeg[i] = 0; continue; }
-        ucoh[i] -= udeg[i]; udeg[i] = 0; utouche[i] = TOUCHE_IT;
+        const p = udeg[i];
+        ucoh[i] -= p; udeg[i] = 0; utouche[i] = TOUCHE_IT;
         const t = utyp[i];
         if (ucoh[i] <= 0) { horsJeu(i); continue; }
+        effrayer(i, t, p);
         if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
       }
       nTouches = 0;
@@ -10574,7 +10611,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     // itérations suivantes : pas de pic. L'empreinte de l'itération k × 100 entre dans m.empreintes 50 itérations
     // plus tard ; elle vaut exactement m.empreinte() appelée à l'itération k × 100.
     const PAR_UNITE = [ux, uz, ucoh, ubx, ubz, ucib, ufac, utyp, ucap, uetat, uord, uphase, umode, ucharge, uminu, urech, usal, uchamp, ugen,
-      uterre, uimm, ulance, uassaut, urech2];
+      uterre, uimm, ulance, uassaut, urech2, upeur, ucalme];
     const GLOBAUX = [res, acc, score, pop, vivantes, elimine, lieuProp, lieuPreneur, lieuProgres, stock, actifs, casEtat, casPv,
       sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif, gN, gPres];
     let cliche = new Uint8Array(1 << 20);
@@ -10632,6 +10669,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       const f32 = new Float32Array(tampon, 0, Math.max(1, n) * 4);
       const colereBastion = colereDuBastion() > 0 ? DR.COLERE : 0;
       let aTerre = 0;
+      const peurSomme = [0, 0, 0], peurN = [0, 0, 0], effrayes = [0, 0, 0];
       for (let i = 0; i < n; i++) {
         const o = i * 4, f = ufac[i];
         if (f === LIBRE) { f32[o] = 0; f32[o + 1] = 0; f32[o + 2] = 0; f32[o + 3] = LIBRE; continue; }
@@ -10645,6 +10683,10 @@ button.file-item:hover .icone { color: var(--alerte); }
         if (f === BAST) d |= colereBastion;
         if (T.protege[t]) d |= DR.BOUCLIER;
         if (T.vehicule[t]) d |= DR.VEHICULE;
+        if (uetat[i] !== ET.HORS_JEU && !T.vehicule[t]) {
+          peurSomme[f] += upeur[i]; peurN[f]++;
+          if (upeur[i] >= K.PEUR_SEUIL) { d |= DR.PEUR; effrayes[f]++; }
+        }
         f32[o] = ux[i] / 1000; f32[o + 1] = uz[i] / 1000; f32[o + 2] = RADIANS[ucap[i]];
         f32[o + 3] = f | (t << 2) | (uetat[i] << 6) | (niveau << 10) | (d << 16);
       }
@@ -10659,7 +10701,8 @@ button.file-item:hover .icone { color: var(--alerte); }
             elimine: !!elimine[f], qgOccupe: q.occupe ? 1 : Math.min(1, q.occupation / (K.OCCUPATION_QG_S * IT_S)), vivantes: vivantes[f],
             depart: depart[f], force: depart[f] > 0 ? vivantes[f] / depart[f] : 0,
             deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1,
-            maintenu: !!maintenu[f] };
+            maintenu: !!maintenu[f], peur: peurN[f] ? peurSomme[f] / (peurN[f] * K.PEUR_MAX) : 0,
+            effrayes: effrayes[f] };
         }),
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
@@ -10738,6 +10781,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     const monde = {
       carte, options: opt, ville, nav, O, PH, T, S: { QG: S_QG, POSTE: S_POSTE, BARRICADE: S_BARRICADE },
       ux, uz, ufac, utyp, ucoh, ucap, uetat, uord, uphase, umode, ucib, ubx, ubz, ucharge, uc4, uc8, pres, N8, nx8, nz8,
+      upeur, ucalme,
       res, score, pop, popMax, vivantes, depart, elimine, structures, lieuProp, lieuPreneur, lieuProgres, lieuConteste, lieux,
       gis, stock, actifs, casX, casZ, casEtat, empreintes, estIA, echelle, mesure,
       // 0.3 : lecture pour l'IA et les essais. feux et nuages : tableaux par foyer ou nuage, « actif » dit lesquels servent.
@@ -19158,7 +19202,7 @@ button.file-item:hover .icone { color: var(--alerte); }
       moyens: $('moyens'), moyensRythme: $('moyens-rythme'), materiaux: $('materiaux'), materiauxRythme: $('materiaux-rythme'),
       pop: $('pop'), popMax: $('pop-max'), resPop: $('res-pop'), scores: $('scores'), horloge: $('horloge'), vitesse: $('vitesse'),
       ips: $('ips'), pause: $('bouton-pause'), diploBouton: $('bouton-diplomatie'), diplo: $('diplomatie'), proposition: $('proposition'),
-      colere: $('colere'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
+      colere: $('colere'), peur: $('peur'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
       grille: $('commandes-grille'), carte: $('commandes'), infobulle: $('infobulle'),
     };
     const ecrit = new WeakMap();
@@ -19236,6 +19280,16 @@ button.file-item:hover .icone { color: var(--alerte); }
       colere = e.colere || 0;
       if (e.evenements && e.evenements.length) lireEvenements(e.evenements);
       if (e.structures) { sortes.clear(); for (const s of e.structures) sortes.set(s.id, s.sorte); }
+      if (el.peur) {
+        const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
+        const pct = Math.round(p * 100);
+        el.peur.hidden = demo;
+        el.peur.querySelector('i b').style.transform = 'scaleX(' + p.toFixed(3) + ')';
+        texte(el.peur.querySelector('strong'), pct + ' %');
+        el.peur.setAttribute('aria-valuenow', String(pct));
+        el.peur.title = typo('Peur moyenne des unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
+          ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
+      }
       majDiplomatie();
       majFile();
     }
@@ -19398,6 +19452,7 @@ button.file-item:hover .icone { color: var(--alerte); }
         }
         const etats = [];
         if (resume.repli) etats.push(formatNombre(resume.repli) + ' en repli');
+        if (resume.effrayes) etats.push(formatNombre(resume.effrayes) + ' effrayées');
         if (resume.tient) etats.push(formatNombre(resume.tient) + ' tiennent');
         if (resume.oisifs) etats.push(formatNombre(resume.oisifs) + ' Équipes oisives');
         texte(z.querySelector('.selection-etat'), etats.join(' · '));
@@ -20064,7 +20119,7 @@ button.file-item:hover .icone { color: var(--alerte); }
    commandes.versionContexte          change quand la carte de commandes doit être redessinée
    commandes.annulerVisee() → vrai si une visée était en cours
    commandes.contexte()               { version, sorte: 'vide' | 'unites' | 'structure', mode, structure, actions[12] }
-   commandes.resume                   { n, parType, cohesion (0..1), repli, tient, ouvriers, oisifs } (mis à jour par état)
+   commandes.resume                   { n, parType, cohesion (0..1), repli, effrayes, tient, ouvriers, oisifs } (mis à jour par état)
    commandes.selection                { masque: Uint8Array(CAPACITE) (1 : choisie, pour la texture de sélection du rendu),
                                         liste, n, version, structure (id ou -1) }
    commandes.apercu                   null ou { sorte: 'barricade' | 'point' | 'avant-poste' | 'zone' | 'cone', x, z, x2, z2,
@@ -20348,7 +20403,7 @@ button.file-item:hover .icone { color: var(--alerte); }
     const masque = new Uint8Array(CAP), liste = new Int32Array(CAP), typeDe = new Uint8Array(CAP);
     const selection = { masque, liste, n: 0, version: 0, structure: -1 };
     const parType = new Uint32Array(16);
-    const resume = { n: 0, parType, cohesion: 0, repli: 0, tient: 0, ouvriers: 0, oisifs: 0 };
+    const resume = { n: 0, parType, cohesion: 0, repli: 0, effrayes: 0, tient: 0, ouvriers: 0, oisifs: 0 };
 
     // ---- Ce que dit le dernier état. ----
     let f32 = null, n = 0, joueur = 0, alliance = null, colere = 0, temps = 0, eco = null;
@@ -20415,17 +20470,18 @@ button.file-item:hover .icone { color: var(--alerte); }
     }
     function resumer() {
       parType.fill(0);
-      let somme = 0, repli = 0, tient = 0, ouvriers = 0, oisifs = 0;
+      let somme = 0, repli = 0, effrayes = 0, tient = 0, ouvriers = 0, oisifs = 0;
       for (let k = 0; k < selection.n; k++) {
         const i = liste[k], c = f32 ? f32[i * 4 + 3] | 0 : 0, t = typeDe[i], e = (c >>> 6) & 15;
         parType[t]++;
         somme += (c >>> 10) & 63;
+        if ((c >>> 16) & R.DRAPEAUX.PEUR) effrayes++;
         if (e === E.REPLI) repli++; else if (e === E.TIENT) tient++;
         if (estOuvrier[t]) { ouvriers++; if (e === E.OISIF) oisifs++; }
       }
       resume.n = selection.n;
       resume.cohesion = selection.n ? somme / (selection.n * 63) : 0;
-      resume.repli = repli; resume.tient = tient; resume.ouvriers = ouvriers; resume.oisifs = oisifs;
+      resume.repli = repli; resume.effrayes = effrayes; resume.tient = tient; resume.ouvriers = ouvriers; resume.oisifs = oisifs;
       // Les boutons de la carte dépendent des capacités présentes : on la redessine quand elles changent.
       let sig = selection.structure + ':';
       for (let t = 0; t < 13; t++) sig += parType[t] ? '1' : '0';

@@ -118,7 +118,7 @@
       moyens: $('moyens'), moyensRythme: $('moyens-rythme'), materiaux: $('materiaux'), materiauxRythme: $('materiaux-rythme'),
       pop: $('pop'), popMax: $('pop-max'), resPop: $('res-pop'), scores: $('scores'), horloge: $('horloge'), vitesse: $('vitesse'),
       ips: $('ips'), pause: $('bouton-pause'), diploBouton: $('bouton-diplomatie'), diplo: $('diplomatie'), proposition: $('proposition'),
-      colere: $('colere'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
+      colere: $('colere'), peur: $('peur'), alertes: $('alertes'), message: $('message'), oisifs: $('bouton-oisifs'), selection: $('selection'),
       grille: $('commandes-grille'), carte: $('commandes'), infobulle: $('infobulle'),
     };
     const ecrit = new WeakMap();
@@ -196,6 +196,16 @@
       colere = e.colere || 0;
       if (e.evenements && e.evenements.length) lireEvenements(e.evenements);
       if (e.structures) { sortes.clear(); for (const s of e.structures) sortes.set(s.id, s.sorte); }
+      if (el.peur) {
+        const p = eco && Number.isFinite(eco.peur) ? Math.max(0, Math.min(1, eco.peur)) : 0;
+        const pct = Math.round(p * 100);
+        el.peur.hidden = demo;
+        el.peur.querySelector('i b').style.transform = 'scaleX(' + p.toFixed(3) + ')';
+        texte(el.peur.querySelector('strong'), pct + ' %');
+        el.peur.setAttribute('aria-valuenow', String(pct));
+        el.peur.title = typo('Peur moyenne des unités à pied. À ' + Math.round(C.PEUR_SEUIL / C.PEUR_MAX * 100) +
+          ' %, une unité se replie, sauf ordre Tenir. Le calme, les Fanfares et les bases apaisent.');
+      }
       majDiplomatie();
       majFile();
     }
@@ -358,6 +368,7 @@
         }
         const etats = [];
         if (resume.repli) etats.push(formatNombre(resume.repli) + ' en repli');
+        if (resume.effrayes) etats.push(formatNombre(resume.effrayes) + ' effrayées');
         if (resume.tient) etats.push(formatNombre(resume.tient) + ' tiennent');
         if (resume.oisifs) etats.push(formatNombre(resume.oisifs) + ' Équipes oisives');
         texte(z.querySelector('.selection-etat'), etats.join(' · '));

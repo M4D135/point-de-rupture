@@ -380,7 +380,7 @@ verifier('lieu : pris en 15 s sans ennemi, gelé par un ennemi, puis repris par 
   assert.ok(m.score[B] > avant, 'le lieu tenu rapporte 1 point par seconde');
 });
 
-verifier('repli automatique sous 25 % de cohésion, sauf en posture Tenir', () => {
+verifier('repli automatique par cohésion ou peur, sauf en posture Tenir', () => {
   const m = creer({ vide: true, joueur: 0 });
   const r = rueEntreMurs(m.ville);
   const fuyard = m.ajouter(C, 1, r.x, r.z), tenace = m.ajouter(C, 1, r.x, r.z + 30);
@@ -390,8 +390,8 @@ verifier('repli automatique sous 25 % de cohésion, sauf en posture Tenir', () =
   for (let k = 0; k < 600; k++) {
     m.iterer();
     if (m.uord[fuyard] === m.O.REPLI && m.uetat[fuyard] !== R.ETATS.HORS_JEU) {
+      if (!repli) assert.ok(m.ucoh[fuyard] > 0 && (m.ucoh[fuyard] * 4 < R.TYPES[1].coh * 1000 || m.upeur[fuyard] >= K.PEUR_SEUIL));
       repli = true;
-      assert.ok(m.ucoh[fuyard] * 4 < R.TYPES[1].coh * 1000 && m.ucoh[fuyard] > 0);
     }
     if (m.uord[tenace] === m.O.REPLI) repliTenace = true;
   }

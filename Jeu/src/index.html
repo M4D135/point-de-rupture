@@ -145,12 +145,15 @@
         <button id="bouton-pause" type="button" class="bouton-barre pause" aria-label="Pause et réglages (P)"><i class="icone-pause" aria-hidden="true"></i></button>
       </div>
     </header>
-    <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
-    <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
-      <div class="proposition-texte"></div>
-      <span class="proposition-reste">60 s</span>
-      <span class="proposition-boutons"><button type="button" class="primaire petit" data-reponse="accepter">Accepter</button><button type="button" class="secondaire petit" data-reponse="refuser">Refuser</button></span>
-    </section>
+    <div class="moral">
+      <div id="peur" class="colere peur" role="meter" aria-label="Peur du camp" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span>Peur du camp</span><i><b></b></i><strong>0 %</strong></div>
+      <div id="colere" class="colere" hidden><span>Colère du Bastion</span><i><b></b></i><strong>45 s</strong></div>
+      <section id="proposition" class="proposition" hidden aria-live="polite" aria-label="Proposition d’alliance">
+        <div class="proposition-texte"></div>
+        <span class="proposition-reste">60 s</span>
+        <span class="proposition-boutons"><button type="button" class="primaire petit" data-reponse="accepter">Accepter</button><button type="button" class="secondaire petit" data-reponse="refuser">Refuser</button></span>
+      </section>
+    </div>
     <section id="diplomatie" class="diplomatie" hidden aria-label="Diplomatie">
       <p class="surtitre">DIPLOMATIE</p>
       <div class="diplo-corps"></div>

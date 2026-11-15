@@ -29,7 +29,7 @@
    commandes.versionContexte          change quand la carte de commandes doit être redessinée
    commandes.annulerVisee() → vrai si une visée était en cours
    commandes.contexte()               { version, sorte: 'vide' | 'unites' | 'structure', mode, structure, actions[12] }
-   commandes.resume                   { n, parType, cohesion (0..1), repli, tient, ouvriers, oisifs } (mis à jour par état)
+   commandes.resume                   { n, parType, cohesion (0..1), repli, effrayes, tient, ouvriers, oisifs } (mis à jour par état)
    commandes.selection                { masque: Uint8Array(CAPACITE) (1 : choisie, pour la texture de sélection du rendu),
                                         liste, n, version, structure (id ou -1) }
    commandes.apercu                   null ou { sorte: 'barricade' | 'point' | 'avant-poste' | 'zone' | 'cone', x, z, x2, z2,
@@ -313,7 +313,7 @@
     const masque = new Uint8Array(CAP), liste = new Int32Array(CAP), typeDe = new Uint8Array(CAP);
     const selection = { masque, liste, n: 0, version: 0, structure: -1 };
     const parType = new Uint32Array(16);
-    const resume = { n: 0, parType, cohesion: 0, repli: 0, tient: 0, ouvriers: 0, oisifs: 0 };
+    const resume = { n: 0, parType, cohesion: 0, repli: 0, effrayes: 0, tient: 0, ouvriers: 0, oisifs: 0 };
 
     // ---- Ce que dit le dernier état. ----
     let f32 = null, n = 0, joueur = 0, alliance = null, colere = 0, temps = 0, eco = null;
@@ -380,17 +380,18 @@
     }
     function resumer() {
       parType.fill(0);
-      let somme = 0, repli = 0, tient = 0, ouvriers = 0, oisifs = 0;
+      let somme = 0, repli = 0, effrayes = 0, tient = 0, ouvriers = 0, oisifs = 0;
       for (let k = 0; k < selection.n; k++) {
         const i = liste[k], c = f32 ? f32[i * 4 + 3] | 0 : 0, t = typeDe[i], e = (c >>> 6) & 15;
         parType[t]++;
         somme += (c >>> 10) & 63;
+        if ((c >>> 16) & R.DRAPEAUX.PEUR) effrayes++;
         if (e === E.REPLI) repli++; else if (e === E.TIENT) tient++;
         if (estOuvrier[t]) { ouvriers++; if (e === E.OISIF) oisifs++; }
       }
       resume.n = selection.n;
       resume.cohesion = selection.n ? somme / (selection.n * 63) : 0;
-      resume.repli = repli; resume.tient = tient; resume.ouvriers = ouvriers; resume.oisifs = oisifs;
+      resume.repli = repli; resume.effrayes = effrayes; resume.tient = tient; resume.ouvriers = ouvriers; resume.oisifs = oisifs;
       // Les boutons de la carte dépendent des capacités présentes : on la redessine quand elles changent.
       let sig = selection.structure + ':';
       for (let t = 0; t < 13; t++) sig += parType[t] ? '1' : '0';

@@ -47,6 +47,8 @@
                            feu : personne n'est montré en feu), puis son emplacement se libère.
      eco: [ { moyens, materiaux, pop, popMax, score, revenu: { moyens, materiaux } (par minute), oisifs,
               elimine, qgOccupe (0..1 : part de l'occupation), vivantes,
+              peur (0..1 : moyenne des unités vivantes à pied), effrayes (nombre au seuil de repli),
+                champs additifs : considérer 0 s'ils sont absents ; DRAPEAUX.PEUR (32) signale le seuil par unité,
               depart (effectifs de départ), force (vivantes / depart : ce qui reste du camp, peut dépasser 1),
               deroute (-1 : le camp a une base ; sinon secondes avant son élimination, voir VICTOIRE) } × 3 ],
      alliance: [a, b] ou null, proposition: { de, a, reste (s) } ou null, colere (s restantes, Bastion contre Préfecture),

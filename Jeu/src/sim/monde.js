@@ -79,6 +79,8 @@
   // RYTHME ; le feu et le gaz, qui chassent plus qu'ils ne blessent, gardent leurs chiffres.
   const RYTHME = K.RYTHME, REPLI_PCT = Math.round(K.REPLI_SEUIL * 100);
   /** Tables entières par type d'unité, tirées de regles.TYPES. */
+  const PEUR_CALME_IT = K.PEUR_CALME_S * IT_S;
+  const PEUR_BAISSE = Math.round(K.PEUR_BAISSE_PAR_S / IT_S), PEUR_SOUTIEN = Math.round(K.PEUR_SOUTIEN_PAR_S / IT_S);
   const NT = R.TYPES.length;
   const T = {
     fac: new Uint8Array(NT), coh: new Int32Array(NT), pres: new Int32Array(NT), rayon: new Int32Array(NT), portee: new Int32Array(NT),
@@ -224,6 +226,7 @@
     const ucharge = new Uint8Array(CAPACITE), urech = new Uint16Array(CAPACITE), usal = new Uint8Array(CAPACITE);
     const usx = new Int32Array(CAPACITE), usz = new Int32Array(CAPACITE), utouche = new Uint8Array(CAPACITE);
     const uagr = new Int32Array(CAPACITE).fill(-1), udeg = new Int32Array(CAPACITE), ubloc = new Uint8Array(CAPACITE);
+    const upeur = new Uint16Array(CAPACITE), ucalme = new Uint8Array(CAPACITE);
     const uc2 = new Int32Array(CAPACITE), uc4 = new Int32Array(CAPACITE), uc8 = new Int32Array(CAPACITE);
     // 0.3 : à terre (itérations restantes), immunité après s'être relevée, geste du lancer, élan d'une charge,
     // recharge de la capacité seconde (la grenade de la Compagnie).
@@ -432,6 +435,7 @@
       ucib[i] = -1; ugen[i] = (ugen[i] + 1) & 0xFFFF; uminu[i] = 0; ucharge[i] = 0; urech[i] = 0; usal[i] = 0;
       utouche[i] = 0; uagr[i] = -1; udeg[i] = 0; ubloc[i] = 0;
       uterre[i] = 0; uimm[i] = 0; ulance[i] = 0; uassaut[i] = 0; urech2[i] = 0;
+      upeur[i] = 0; ucalme[i] = 0;
       placerCases(i);
       pop[f] += T.pop[t]; vivantes[f]++;
       return i;
@@ -1155,9 +1159,18 @@
     }
     /** La pression d'une zone (feu, gaz) sur l'unité i, de type t : appliquée tout de suite, sans l'éclair « touchée »
      *  des coups. Rend vrai si l'unité est hors jeu (par : le camp à qui cela revient, -1 pour personne). */
+    // La pression réellement reçue fait peur. Le cumul des coups est traité une seule fois dans degats(),
+    // afin que leur découpage ne multiplie pas les arrondis. Aucun changement d'hostilité ici.
+    function effrayer(i, t, p) {
+      if (p <= 0 || T.vehicule[t]) return;
+      upeur[i] = Math.min(K.PEUR_MAX, upeur[i] + Math.ceil(p * K.PEUR_PRESSION / T.coh[t]));
+      ucalme[i] = PEUR_CALME_IT;
+      if (upeur[i] >= K.PEUR_SEUIL && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
+    }
     function presser(i, t, p, par) {
       ucoh[i] -= p;
       if (ucoh[i] <= 0) { horsJeu(i, false, par); return true; }
+      effrayer(i, t, p);
       if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
       return false;
     }
@@ -1766,6 +1779,15 @@
           continue;
         }
         const t = utyp[i];
+        // Au calme, y compris à cohésion pleine et à terre. Le soutien lit les mêmes cases que les soins.
+        if (upeur[i] > 0) {
+          if (ucalme[i] > 0) ucalme[i]--;
+          else {
+            const c = uc4[i], bit = 1 << f;
+            const soutien = ((soin[c] | zoneBase[c]) & bit) ? PEUR_SOUTIEN : 0;
+            upeur[i] = Math.max(0, upeur[i] - PEUR_BAISSE - soutien);
+          }
+        }
         if (utouche[i] > 0) utouche[i]--;
         if (urech[i] > 0) urech[i]--;
         if (urech2[i] > 0) urech2[i]--;
@@ -2284,14 +2306,16 @@
       return true;
     }
 
-    /** Applique les coups de l'itération : cohésion, hors jeu, repli automatique sous 25 %. */
+    /** Applique les coups : cohésion, hors jeu, peur et repli automatique. */
     function degats() {
       for (let q = 0; q < nTouches; q++) {
         const i = touches[q];
         if (ufac[i] === LIBRE || uetat[i] === ET.HORS_JEU) { udeg[i] = 0; continue; }
-        ucoh[i] -= udeg[i]; udeg[i] = 0; utouche[i] = TOUCHE_IT;
+        const p = udeg[i];
+        ucoh[i] -= p; udeg[i] = 0; utouche[i] = TOUCHE_IT;
         const t = utyp[i];
         if (ucoh[i] <= 0) { horsJeu(i); continue; }
+        effrayer(i, t, p);
         if (ucoh[i] * 100 < T.coh[t] * REPLI_PCT && uord[i] !== O.TENIR && uord[i] !== O.REPLI) commencerRepli(i, true);
       }
       nTouches = 0;
@@ -2574,7 +2598,7 @@
     // itérations suivantes : pas de pic. L'empreinte de l'itération k × 100 entre dans m.empreintes 50 itérations
     // plus tard ; elle vaut exactement m.empreinte() appelée à l'itération k × 100.
     const PAR_UNITE = [ux, uz, ucoh, ubx, ubz, ucib, ufac, utyp, ucap, uetat, uord, uphase, umode, ucharge, uminu, urech, usal, uchamp, ugen,
-      uterre, uimm, ulance, uassaut, urech2];
+      uterre, uimm, ulance, uassaut, urech2, upeur, ucalme];
     const GLOBAUX = [res, acc, score, pop, vivantes, elimine, lieuProp, lieuPreneur, lieuProgres, stock, actifs, casEtat, casPv,
       sansBase, jetons, fX, fZ, fR, fReste, fAge, fDelai, fSorte, fCible, fCamp, fId, fGen, fActif, gX, gZ, gRc, gReste, gAge, gCamp, gId, gActif, gN, gPres];
     let cliche = new Uint8Array(1 << 20);
@@ -2632,6 +2656,7 @@
       const f32 = new Float32Array(tampon, 0, Math.max(1, n) * 4);
       const colereBastion = colereDuBastion() > 0 ? DR.COLERE : 0;
       let aTerre = 0;
+      const peurSomme = [0, 0, 0], peurN = [0, 0, 0], effrayes = [0, 0, 0];
       for (let i = 0; i < n; i++) {
         const o = i * 4, f = ufac[i];
         if (f === LIBRE) { f32[o] = 0; f32[o + 1] = 0; f32[o + 2] = 0; f32[o + 3] = LIBRE; continue; }
@@ -2645,6 +2670,10 @@
         if (f === BAST) d |= colereBastion;
         if (T.protege[t]) d |= DR.BOUCLIER;
         if (T.vehicule[t]) d |= DR.VEHICULE;
+        if (uetat[i] !== ET.HORS_JEU && !T.vehicule[t]) {
+          peurSomme[f] += upeur[i]; peurN[f]++;
+          if (upeur[i] >= K.PEUR_SEUIL) { d |= DR.PEUR; effrayes[f]++; }
+        }
         f32[o] = ux[i] / 1000; f32[o + 1] = uz[i] / 1000; f32[o + 2] = RADIANS[ucap[i]];
         f32[o + 3] = f | (t << 2) | (uetat[i] << 6) | (niveau << 10) | (d << 16);
       }
@@ -2659,7 +2688,8 @@
             elimine: !!elimine[f], qgOccupe: q.occupe ? 1 : Math.min(1, q.occupation / (K.OCCUPATION_QG_S * IT_S)), vivantes: vivantes[f],
             depart: depart[f], force: depart[f] > 0 ? vivantes[f] / depart[f] : 0,
             deroute: sansBase[f] > 0 ? Math.max(0, (DEROUTE_IT - sansBase[f]) / IT_S) : -1,
-            maintenu: !!maintenu[f] };
+            maintenu: !!maintenu[f], peur: peurN[f] ? peurSomme[f] / (peurN[f] * K.PEUR_MAX) : 0,
+            effrayes: effrayes[f] };
         }),
         alliance: alliance ? alliance.slice() : null,
         proposition: proposition ? { de: proposition.de, a: proposition.a, reste: proposition.reste / IT_S } : null,
@@ -2738,6 +2768,7 @@
     const monde = {
       carte, options: opt, ville, nav, O, PH, T, S: { QG: S_QG, POSTE: S_POSTE, BARRICADE: S_BARRICADE },
       ux, uz, ufac, utyp, ucoh, ucap, uetat, uord, uphase, umode, ucib, ubx, ubz, ucharge, uc4, uc8, pres, N8, nx8, nz8,
+      upeur, ucalme,
       res, score, pop, popMax, vivantes, depart, elimine, structures, lieuProp, lieuPreneur, lieuProgres, lieuConteste, lieux,
       gis, stock, actifs, casX, casZ, casEtat, empreintes, estIA, echelle, mesure,
       // 0.3 : lecture pour l'IA et les essais. feux et nuages : tableaux par foyer ou nuage, « actif » dit lesquels servent.

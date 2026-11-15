@@ -608,4 +608,19 @@ verifier('minicarte : densité par camp (teinte dominante, contact, opacité log
   console.log('    densité 128 × 128 : ' + ((performance.now() - t0) / 50).toFixed(3) + ' ms par remplissage (moyenne de 50)');
 });
 
+verifier('sélection : compte la peur forte, puis oublie le drapeau absent et les hors-jeu', () => {
+  const c = I.creerCommandes({ regles: R, protocole: P, reglages: REGL.defaults() });
+  c.partie({ options: { joueur: 0, brouillard: false } }); c.activer(true);
+  const f32 = new Float32Array(12);
+  f32[3] = R.coder(0, 1, R.ETATS.REPLI, 40, R.DRAPEAUX.PEUR);
+  f32[7] = R.coder(0, 1, R.ETATS.TIENT, 63, 0);
+  f32[11] = R.coder(1, 5, R.ETATS.REPLI, 40, R.DRAPEAUX.PEUR);
+  c.etat({ n: 3, unites: f32 }); c.general('armee');
+  assert.equal(c.resume.n, 2); assert.equal(c.resume.effrayes, 1); assert.equal(c.resume.repli, 1);
+  f32[3] = R.coder(0, 1, R.ETATS.REPLI, 40, 0); c.etat({ n: 3, unites: f32 });
+  assert.equal(c.resume.effrayes, 0, 'ancien tampon sans bit PEUR');
+  f32[3] = R.coder(0, 1, R.ETATS.HORS_JEU, 0, R.DRAPEAUX.PEUR); c.etat({ n: 3, unites: f32 });
+  assert.equal(c.resume.n, 1); assert.equal(c.resume.effrayes, 0);
+});
+
 console.log(ok + ' vérifications passées');

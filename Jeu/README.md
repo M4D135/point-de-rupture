@@ -7,6 +7,21 @@ classique, full procedural rts ».
 
 En ligne : https://pdr.estrasse.fr (page déposée par `deposer.sh`, voir plus bas).
 
+## Peur — état local du 15 novembre 2026
+
+La jauge **Peur du camp** donne la moyenne des unités vivantes à pied. Les coups, le feu et le gaz subis font monter
+leur peur ; à 65 %, elles prennent le chemin de repli existant. **Tenir** empêche ce repli automatique ; les véhicules
+ne prennent pas peur. Les sorties immédiates du feu et du gaz restent prioritaires. Après trois secondes sans
+pression, la peur baisse de 6 points par seconde, ou de 18 près d'une base ou d'une Fanfare. La sélection indique
+combien d'unités ont une peur forte. Les choix d'hostilité restent ceux de la simulation précédente.
+
+Le réglage par défaut reste **20 000 unités** ; un choix enregistré à 100 000 est conservé. Le protocole reçoit seulement
+des champs additifs (`eco.peur`, `eco.effrayes`, drapeau 32) ; un champ absent vaut zéro dans l'interface. La peur et
+son délai entrent dans les empreintes. Les enregistrements de commandes se relisent avec les règles courantes :
+leurs anciennes empreintes ne promettent pas une trajectoire identique entre deux versions de règles. Il n'existe
+pas de nouveau format de sauvegarde de partie. Les goldens historiques de séparation sont conservés ; le test compare
+désormais l'index optimisé à la recherche exhaustive historique, tous deux avec les mêmes règles courantes.
+
 ## Essai 0.3 (en cours)
 
 Étape « essai-0.3e » (13 novembre 2026) : la simulation 0.3 est entière dans `main`. Les immeubles prennent feu — une
