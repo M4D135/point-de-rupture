@@ -1,0 +1,38 @@
+ok  maillages : un par type et par niveau de détail, rangés bout à bout, indices et sommets valides
+ok  maillages : faces tournées vers le dehors, aucun triangle dégénéré
+    triangles (détail/simple) par type : 388/168 348/120 296/120 352/192 356/144 336/156 368/144 356/144 288/144 276/132 336/156 364/240 452/224
+ok  silhouettes : chaque type a ses pièces, le niveau simple est plus léger, l’anneau de sélection est partout
+ok  liste des proches : devant la caméra, assez grandes, ni libres ni cachées par le brouillard, rangées par seau
+ok  plafond : les plus grandes tailles projetées sont gardées, et pas une de plus que le plafond
+ok  tampons réutilisés : même résultat, mêmes tableaux d’une liste à l’autre
+ok  codes d’unité : decoder relit regles.coder, après le passage en Float32
+ok  sur un contexte simulé : lignes servies seulement, points en un seul appel, figurines par seau, recréation
+8 vérifications de la foule réussies
+✔ verifications/foule.test.mjs (88.732041ms)
+ok  moteur : retouches marquées « PDR (nom) », bibliothèque d’éclairage et points d’accroche exposés, réglages du jeu
+ok  retouches du jeu : foule appelée dans chaque passe, état GL rétabli, lots envoyés selon leur version, voile posé puis retiré
+ok  retouche du jeu : fx.msaa === false dessine sans anticrénelage, sans recréer une seule cible
+ok  migration FERRO : géométrie et réglages conservés dans les scènes historiques du jeu
+    pièces au plus : avant-poste 0 32, avant-poste 1 142, avant-poste 2 55, barricade 130
+ok  décor : structures de chaque sorte, à chaque étape, au format de pack du moteur
+ok  décor : chaque cassable de la ville, intact et cassé, au format de pack ; tas, lieux et QG aussi
+    instances des lots : cassables 7971, tas 949, structures 77, structures hors alliance 54, marques 568, traces 5
+ok  décor : états reçus, lots versionnés, brouillard, effets de chaque évènement, valeurs finies
+    cassables de Marseille (9 îlots) : 1488 ; instances par état : 6700, 15462, 15462, 15462
+ok  décor, feu : les sortes de Marseille (deux-roues, conteneur, terrasse, kiosque) dans leurs quatre états, au format de pack
+    image la plus chargée : 166 particules, 7 lampes
+ok  décor, feu : foyers de chaque sorte, colonnes, nuages, vols, souffle, vapeur, traces, lampes, brouillard
+    plans : ville, combat, combat, combat, combat, ville, combat, combat, ville, combat ; plus grand pas de caméra 9.09 m par image
+ok  réalisateur : ville entière d’abord, puis le point le plus vivant, plans de 8 à 12 s, sans saut
+    sans la ville : 6 visées sur 400 mettent l’œil dans un immeuble ; avec : aucune (recul au plus 28.9 m ; plus grand pas en glissant 2.02 m)
+ok  caméra : au plus près, l’œil reste au-dessus des toits (la visée, elle, ne bouge pas)
+11 vérifications du rendu réussies
+✔ verifications/rendu.test.mjs (637.886ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 642.998875

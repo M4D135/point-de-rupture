@@ -2234,8 +2234,12 @@
     function drawChunks(accept,shadow=false){let objects=0,count=0;for(const c of chunks.values())if(accept(c)){renderBatch(c.batch,c.buffer,false,shadow);objects+=c.entries.length;count++;}if(shadow){stats.shadowChunks=count;stats.shadowStatic=objects;}else{stats.visibleChunks=count;stats.staticVisible=objects;stats.staticCulled=world.length-objects;}return count;}
     function setWorld(meshes,points,atmosphere,setOptions) {
       const partition=partitionState=partitionWorld(meshes);environment=environmentInfo(atmosphere);world=partition.world;worldIndex=spatialIndex(world,environment,undefined,setOptions);backgroundIndex=spatialIndex(partition.background,environment,undefined,setOptions);lights=points||[];worldBatch=pack([]);shadowLight=null;actorLightPlan=null;stats.staticTotal=world.length+backgroundIndex.entries.length;stats.biome=environment?environment.biome:null;
-      worldRevision=0;stats.worldRevision=0;indexRevision++;viewCache=torchCache=sunCache=null;for(const c of chunks.values())gl.deleteBuffer(c.buffer);chunks.clear();
+      worldRevision=0;stats.worldRevision=0;indexRevision++;viewCache=torchCache=sunCache=null;for(const c of chunks.values())gl.deleteBuffer(c.buffer);chunks.clear();chunkState.index=null;chunkState.epoch=0;
       lampCasters=[];for(const cache of staticCaches){cache.entries=[];cache.batch=pack([]);}
+      // A scene can be detached during loading without another draw. Release
+      // last-frame mesh references while retaining compiled GPU resources.
+      ordinary.length=overlay.length=particles.length=overlayParticles.length=0;packFx([],null,[0,0,0]);
+      pdrLots.length=0;for(const slot of pdrSlots)if(slot){slot.lot=null;slot.version=NaN;}probeBatch=null;probeKey='';
       governor.reset();autoScale=1;
       if(stats.contextLost||disposed) return;
       gl.bindBuffer(gl.ARRAY_BUFFER,worldBuffer);gl.bufferData(gl.ARRAY_BUFFER,worldBatch.values,gl.STATIC_DRAW);

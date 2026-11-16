@@ -12,7 +12,7 @@
     {
       "id": "render",
       "path": "src/moteur/renderer.js",
-      "sha256": "ed310b7bf4265f9609a0657dfa54db6b5f1d57dedfd2357778c02f8c9d642af5"
+      "sha256": "19c1e7011d9a87e88ffff7be5f4665d16ab7f33846f2a92a56baa7af6a864f29"
     },
     {
       "id": "webgpu-shaders",
@@ -22,7 +22,7 @@
     {
       "id": "webgpu",
       "path": "src/ferro/webgpu-renderer.js",
-      "sha256": "50e916bd9f6362e5c94b6203b5c55df266bac98217ebb5c768ab9d219116c0bd"
+      "sha256": "5416639acac871ef042f953e13e199a98ed07f441023c4bcf7d71d5de2522529"
     },
     {
       "id": "backends",
