@@ -737,6 +737,6 @@ button.file-item:hover .icone { color: var(--alerte); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
-/* m4d135 : signature de l'écran titre */
-.m4d-signature{display:inline-flex;align-items:center;gap:.5em;text-transform:none;opacity:.75;transition:opacity .2s}.m4d-signature:hover,.m4d-signature:focus-visible{opacity:1}.m4d-signature svg{width:1.3em;height:1.3em;margin:-.15em 0;flex:none}
-.titre-bas .m4d-signature{margin-top:8px;margin-right:16px;float:right}
+
+
+
