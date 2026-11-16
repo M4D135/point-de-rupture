@@ -1,8 +1,8 @@
 {
   "version": "essai-0.3e",
-  "raw": 13753117,
-  "gzip": 3274187,
-  "sha256": "f5dc86c6c97cd996184d1ad268ab929c5d3ceae4eb774fd6558e9e4cfac8a77d",
+  "raw": 13754019,
+  "gzip": 3274526,
+  "sha256": "febdbcd8cb9277008d069b9fd8cbd32e019b4ece8fd59cad685e4ca7f43f5750",
   "sources": {
     "moteur/renderer.js": 209041,
     "sim/regles.js": 25098,
@@ -33,7 +33,7 @@
     "interface/commandes.js": 57088,
     "hote.js": 6138,
     "jeu.js": 15233,
-    "index.html": 24218,
-    "style.css": 59124
+    "index.html": 24756,
+    "style.css": 59488
   }
 }
