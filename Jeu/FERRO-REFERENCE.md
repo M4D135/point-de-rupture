@@ -1,4 +1,4 @@
-# FERRO — référence commune 0.3.1
+# FERRO — référence commune 0.3.2
 
 Décision de David du 16 novembre 2026 : entièrement procédural, aucun plafond de taille du code ni du build. Moteur prioritaire, atelier secondaire.
 

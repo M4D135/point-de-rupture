@@ -1,6 +1,6 @@
 {
   "format": "ferro-lock",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "reference": "M4D135/FERRO:src/ferro",
   "game": "point-de-rupture",
   "modules": [
@@ -12,7 +12,7 @@
     {
       "id": "render",
       "path": "src/moteur/renderer.js",
-      "sha256": "19c1e7011d9a87e88ffff7be5f4665d16ab7f33846f2a92a56baa7af6a864f29"
+      "sha256": "074ad6d98542c7f1fff95625d0d49a748ba65f6f89cdae35ab694708bf157748"
     },
     {
       "id": "webgpu-shaders",
@@ -162,7 +162,7 @@
     {
       "id": "host",
       "path": "src/ferro/engine.js",
-      "sha256": "2c84ba77346f86e2d1d80ce609b583331de1666449ad67076300afba7c0de2ad"
+      "sha256": "60cd8cafa388da240aa37ee438888fe1886074801bf16596f3a434f31d59c5d0"
     }
   ]
 }

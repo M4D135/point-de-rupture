@@ -786,13 +786,10 @@ button.file-item:hover .icone { color: var(--alerte); }
       <span class="titre-edition"><span class="edition-nom">03 / MARSEILLE</span><b class="version-jeu" aria-label="Version 0.3e">V0.3e</b></span>
     </header>
     <div class="titre-corps">
-      <p class="surtitre">UNE VILLE. TROIS CAMPS. TOUT TIENT À UN FIL.</p>
       <h1 id="titre-jeu" class="titre-jeu" aria-label="Point de rupture">
         <span class="titre-l1" aria-hidden="true">POINT DE</span>
         <span class="titre-l2" aria-hidden="true"><span class="rupture-haut">RUPTURE</span><span class="rupture-bas">RUPTURE</span></span>
       </h1>
-      <p class="accroche">Cent mille, une ville, et personne ne recule.</p>
-      <p class="titre-texte">La Convergence tient la rue, le Bastion tient ses lignes, la Préfecture veut l’ordre partout. Une bousculade géante où l’on ne blesse personne : qui plie sort du jeu.</p>
       <div class="titre-actions">
         <button id="titre-jouer" type="button" class="primaire"><span>Nouvelle partie</span><i class="fleche" aria-hidden="true"></i></button>
         <button id="titre-reglages" type="button" class="secondaire">Réglages<span>Image, audio, commandes</span></button>
@@ -802,9 +799,9 @@ button.file-item:hover .icone { color: var(--alerte); }
     </div>
     <footer class="titre-bas">
       <ul class="titre-camps" aria-label="Les trois camps">
-        <li style="--c:#e6452f"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/></svg><strong>La Convergence</strong><span>Le nombre et la rue.</span></li>
-        <li style="--c:#eda326"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.1" y="2.1" width="11.8" height="11.8" rx="1"/></svg><strong>Le Bastion</strong><span>Tenir et nettoyer.</span></li>
-        <li style="--c:#4d86f0"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg><strong>La Préfecture</strong><span>L’ordre, partout.</span></li>
+        <li style="--c:#e6452f"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"/></svg><strong>La Convergence</strong></li>
+        <li style="--c:#eda326"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.1" y="2.1" width="11.8" height="11.8" rx="1"/></svg><strong>Le Bastion</strong></li>
+        <li style="--c:#4d86f0"><svg class="motif" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.4 13 8 2.4 14.6 13h-3.4L8 7.9 4.8 13z"/></svg><strong>La Préfecture</strong></li>
       </ul>
       <div id="titre-attente" class="attente" hidden><span id="titre-attente-texte">Démo dans 5 s</span><i><b></b></i></div>
     </footer>
@@ -2100,13 +2097,18 @@ button.file-item:hover .icone { color: var(--alerte); }
     if(!Array.isArray(value))return [];
     const valid=[];
     for(const source of value.slice(0,16)){
-      if(!source||!Array.isArray(source.p)||source.p.length!==3||!source.p.every(Number.isFinite)||!Number.isFinite(source.power)||source.power<=0||!Number.isFinite(source.range)||source.range<=0)continue;
+      if(!source||!Array.isArray(source.p)||source.p.length!==3||!source.p.every(Number.isFinite)||!Number.isFinite(source.power)||source.power<0||!Number.isFinite(source.range)||source.range<=0)continue;
+      // A flashing emitter may reserve its rank using a nominal peak power.
+      // Its actual emitted power still reaches the shader unchanged (including
+      // zero), so a beacon cannot switch unrelated steady lamps on and off.
+      const selectionPower=Number.isFinite(source.selectionPower)&&source.selectionPower>0?Math.min(64,source.selectionPower):0;
+      if(source.power===0&&!selectionPower)continue;
       const range=Math.min(48,source.range),power=Math.min(64,source.power),p=source.p;
       const distance=(p[0]-eye[0])**2+(p[1]-eye[1])**2+(p[2]-eye[2])**2;
       if(distance>(180+range)**2)continue;
       const color=Array.isArray(source.color)&&source.color.length===3?source.color.map(v=>Number.isFinite(v)?Math.max(0,Math.min(3,v)):0):[1,.42,.09];
       if(!color.some(v=>v>0))continue;
-      valid.push({p,color,power,range,dir:source.dir,cone:source.cone,score:power/(1+distance*.1)});
+      valid.push({p,color,power,range,dir:source.dir,cone:source.cone,score:Math.max(power,selectionPower)/(1+distance*.1)});
     }
     return valid.sort((a,b)=>b.score-a.score).slice(0,limit);
   }
@@ -12459,7 +12461,7 @@ globalThis.FNavigation=globalThis.PDR.nav;
 (function(G){'use strict';
  const names={passages:'FPassages',tacticalNetwork:'FBrain',loop:'FLoop',scheduler:'FSchedule',jobs:'FJobs',demo:'FDemo',surface:'FSurface',gpuProfile:'FGPUProfile',skies:'FSky',reflections:'FSceneReflections',render:'FRender',backends:'FRenderBackends',physics:'FPhysics',physicsGeometry:'FPhysicsGeometry',geometry:'FGeometry',vehicleDynamics:'FVehicleDynamics',navigation:'FNavigation',crowd:'FCrowd',crowdWebGPU:'FCrowdWebGPU',materials:'FMaterials',destruction:'FDestruction',input:'FInput',audio:'FAudio',motion:'FMotion',effects:'FEffects',recipes:'FRecipes',math:'FMath',music:'FMusic',musicTransitions:'FImuse'};
  function requireModule(name){const module=G[names[name]];if(!module)throw new Error('FERRO : module '+name+' non chargé.');return module;}
- const api={version:'0.3.1',apiVersion:1,
+ const api={version:'0.3.2',apiVersion:1,
   capabilities(){return Object.fromEntries(Object.entries(names).map(([name,key])=>[name,!!G[key]]));},
   require:requireModule,
   async createRenderer(canvas,options={}){const materials=options.materials||requireModule('materials').create();if(!materials.layers.length)await materials.load();return requireModule('backends').create(canvas,{...options,materials});},

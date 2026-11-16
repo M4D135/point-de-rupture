@@ -1,10 +1,10 @@
 {
   "version": "essai-0.3e",
-  "raw": 1676455,
-  "gzip": 565329,
-  "sha256": "a3183dd76b7288ed206f208478f0c2670fc2a426e25a99867fc654c03b9768a2",
+  "raw": 1676440,
+  "gzip": 565301,
+  "sha256": "bc789bad456aac49233ddf45ebf5e8d1efcc2540ef5ceb037defc9ed7dfd87a9",
   "sources": {
-    "moteur/renderer.js": 208601,
+    "moteur/renderer.js": 209041,
     "sim/regles.js": 25098,
     "sim/protocole.js": 22980,
     "ville.js": 58411,
@@ -31,7 +31,7 @@
     "interface/commandes.js": 57088,
     "hote.js": 6138,
     "jeu.js": 14925,
-    "index.html": 24673,
+    "index.html": 24218,
     "style.css": 59124
   }
 }
