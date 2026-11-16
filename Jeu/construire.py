@@ -16,6 +16,8 @@ import pathlib
 import re
 
 ICI = pathlib.Path(__file__).resolve().parent
+import subprocess,sys
+subprocess.run([sys.executable,str(ICI/'tools/check-ferro-lock.py'),str(ICI)],check=True)
 SRC = ICI / 'src'
 DIST = ICI / 'dist'
 # Chaque script a un rôle :
@@ -36,6 +38,9 @@ MODULES = [
     ('sim/monde.js', 'simulation'),
     ('sim/ia.js', 'simulation'),
     ('sim/travailleur.js', 'simulation'),
+    ('ferro/engine.js', 'page'),
+    ('crowd-style.js', 'page'),
+    ('ferro/crowd.js', 'page'),
     ('foule.js', 'page'),
     ('decor.js', 'page'),
     ('camera.js', 'page'),
@@ -57,7 +62,6 @@ OUVERTURE = {
 }
 VERSION = 'essai-0.3e'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3e »)
 EDITION = '03 / MARSEILLE'    # le nom de l'étape, à gauche de la version sur l'écran titre
-BUDGET = 3_000_000     # octets : la page reste bien sous la limite des artefacts (16 Mo)
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
 POLICES = re.compile(r'^<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">\n', re.M)
 ICONE = ('<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'%3E'
@@ -90,8 +94,6 @@ def main():
             '</head>\n<body>\n' + autonome + '</body>\n</html>\n')
 
     octets = page.encode('utf-8')
-    if len(octets) > BUDGET:
-        raise SystemExit(f'page de {len(octets)} octets, au-delà du budget de {BUDGET}')
     DIST.mkdir(exist_ok=True)
     (DIST / 'point-de-rupture.html').write_bytes(octets)
     (DIST / 'artefact.html').write_text(fragment, encoding='utf-8')

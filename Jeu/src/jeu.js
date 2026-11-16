@@ -21,7 +21,7 @@
   // Réglages de création de FERRO 0.2 (FRender.create) pour une ville vue de haut, en plein jour : anticrénelage ×4 de la
   // scène, atlas d'ombre doublé (un seul soleil couvre le sol visible), bords de l'écran peu assombris (les unités doivent
   // y rester lisibles), halo réservé au feu et aux reflets francs (un toit clair ne voile pas l'image).
-  const REGLAGES_MOTEUR = { msaa: 4, shadowMapScale: 2, vignette: 0.84, bloomThreshold: [0.86, 0.98] };
+  const REGLAGES_MOTEUR = { sea:false, reflections:false, msaa: 4, shadowMapScale: 2, vignette: 0.84, bloomThreshold: [0.86, 0.98] };
   // Écrans sans partie vivante : la ville d'accueil tourne lentement derrière eux.
   const FOND = { chargement: 1, titre: 1, reglages: 1, preparation: 1, echec: 1 };
   const LIMITES_ACCUEIL = { x0: -1000, z0: -1000, x1: 1000, z1: 1000 };

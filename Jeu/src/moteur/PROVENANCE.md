@@ -166,3 +166,8 @@ pools, le tri par comptage, le raster extérieur et les changements de stratégi
 d'envoi GPU du même commit METAL ne sont pas repris. Les passes de la foule, du
 voile, des lots et du MSAA restent intactes. Les comptes de blocs et de lignes
 plus haut décrivent le passage historique à FERRO 0.2.
+
+
+## FERRO commun 0.3.0 — 16 novembre 2026
+
+Migration vers le renderer de référence EMPRISE/src/ferro/renderer.js, identique dans les quatre jeux et contrôlé par FERRO.lock.json. Les apports BITUME et PDR sont conservés dans le moteur commun ; le jeu fournit ses réglages et son style. Aucun plafond de taille (décision explicite de David). Voir FERRO-REFERENCE.md.

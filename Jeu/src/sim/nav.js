@@ -387,3 +387,6 @@
 
   PDR.nav = Object.freeze({ creer, cap, DX, DZ, RADIANS, BUT, AUCUN, CELLULE, FIN, ORTHO, DIAG });
 })(globalThis.PDR = globalThis.PDR || {});
+
+// Stable FERRO API; legacy namespace remains an alias of the same implementation.
+globalThis.FNavigation=globalThis.PDR.nav;

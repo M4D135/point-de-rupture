@@ -1,0 +1,168 @@
+{
+  "format": "ferro-lock",
+  "version": "0.3.0",
+  "reference": "EMPRISE/src/ferro",
+  "game": "point-de-rupture",
+  "modules": [
+    {
+      "id": "math",
+      "path": "src/ferro/fmath.js",
+      "sha256": "bb001302bd2d57239c86183615c921563cf21f0490d67eef42586d1fc3457c9f"
+    },
+    {
+      "id": "render",
+      "path": "src/moteur/renderer.js",
+      "sha256": "5abc2a4026b8a93519f45246cdb141550f50f34f0eb70884442bdf16cdec5c75"
+    },
+    {
+      "id": "webgpu-shaders",
+      "path": "src/ferro/webgpu-shaders.js",
+      "sha256": "0be7951f56ce7549cbde57d7c4926cb44f8769a41fb10d9258c7b635611e2a0a"
+    },
+    {
+      "id": "webgpu",
+      "path": "src/ferro/webgpu-renderer.js",
+      "sha256": "0c654b0f3eefec30dfe77bc4e9f37eac33be1c3314b2713d40c3d9d3178792ff"
+    },
+    {
+      "id": "backends",
+      "path": "src/ferro/backends.js",
+      "sha256": "947f6b562e773acaf0d3ad59e1daea5a248185bd5c10b0d918a9e372e5f8dfb6"
+    },
+    {
+      "id": "geometry",
+      "path": "src/ferro/geometry.js",
+      "sha256": "8d0a044069ccb0eb2dec76c5f203ff1b4335a70f34b6d0aa971861cd2262eda7"
+    },
+    {
+      "id": "materials",
+      "path": "src/ferro/materials.js",
+      "sha256": "fd1789bd21ec43d4cd028d3ebffdb490e5bfe53d8b73fa0f7bdbd44ce7d2a954"
+    },
+    {
+      "id": "vehicle-dynamics",
+      "path": "src/ferro/vehicle-dynamics.js",
+      "sha256": "cd67cf8a8d15250e72a69cf883eeb2793a3f67bc272924b3fd7662ce5f553d8c"
+    },
+    {
+      "id": "physics-geometry",
+      "path": "src/ferro/physics-geometry.js",
+      "sha256": "c22965240de6a8f743aad87ff8514aaf7932a1c7f2a3635812b912e5fd9e9653"
+    },
+    {
+      "id": "physics",
+      "path": "src/ferro/physics.js",
+      "sha256": "9a6e3dbd9115b13f6f5daf9d2843f6ffa219f0b2d4c53d2106ac9dec769f175a"
+    },
+    {
+      "id": "destruction",
+      "path": "src/ferro/destruction.js",
+      "sha256": "c18d53831b23e55d798d02e698fd7eb670a28dd998de51a5bcd5195fe733eeea"
+    },
+    {
+      "id": "navigation",
+      "path": "src/sim/nav.js",
+      "sha256": "addfdb9bb3a30cc7a8fe747ca919c72a99d8bc8f79a44162757d6ac8113d0cb6"
+    },
+    {
+      "id": "input",
+      "path": "src/ferro/input.js",
+      "sha256": "2a7bfcf27c4dede79708882a604fa3264d32615fe3cf513deae807c07e109e68"
+    },
+    {
+      "id": "motion",
+      "path": "src/ferro/motion.js",
+      "sha256": "6f5078fafa6e61850ff58fde484463db05c3b1fff5e5a1bc2818191b13618ec4"
+    },
+    {
+      "id": "effects",
+      "path": "src/ferro/effects.js",
+      "sha256": "e873e7def347fb205594351fc9f0fd8e08fdb42ced36254ec68f071790bb3b42"
+    },
+    {
+      "id": "audio",
+      "path": "src/ferro/audio.js",
+      "sha256": "af0a6173d3c1db12e16c9a570d8aad86788f1dfde06508077cbee402d046f2a0"
+    },
+    {
+      "id": "recipes",
+      "path": "src/ferro/recipes.js",
+      "sha256": "761acc958d522bd2873529672fbb7fad22208bf0190ca395622136ac3582953f"
+    },
+    {
+      "id": "crowd",
+      "path": "src/ferro/crowd.js",
+      "sha256": "ee00aa7b358a71a1e8c93ab2779d0edc3d80828f4c4ad32d41900177221ceac9"
+    },
+    {
+      "id": "crowd-webgpu",
+      "path": "src/ferro/crowd-webgpu.js",
+      "sha256": "bc2719bdbef13f74789bde0caad5d24fea70f44ac52148085a27d448ada9e9f8"
+    },
+    {
+      "id": "imuse",
+      "path": "src/ferro/imuse.js",
+      "sha256": "8aa71cb0cdc9a5d0d1a42dab965563bd810d26151745ceb1ad603ab1c0851e16"
+    },
+    {
+      "id": "music",
+      "path": "src/ferro/music.js",
+      "sha256": "e59d6d2ed84bb70bf108f54d8d1f8510a02533f36e1d0741ac1d144c8830ea20"
+    },
+    {
+      "id": "surface",
+      "path": "src/ferro/surface.js",
+      "sha256": "46915edee28daa0408ea1c18abd664babef76e2e6bce52c2990a431f90cee77e"
+    },
+    {
+      "id": "gpu-profile",
+      "path": "src/ferro/gpu-profile.js",
+      "sha256": "513e7cb0523a50f62edb427f2ed563ec98d9bc771a70f357fce8409157faa9c4"
+    },
+    {
+      "id": "skies",
+      "path": "src/ferro/skies.js",
+      "sha256": "bd4b38002c8c800a5f7551a73712c721909ed22ae145d15fbf7f853ff30eddea"
+    },
+    {
+      "id": "reflections",
+      "path": "src/ferro/reflections.js",
+      "sha256": "51467e58cfaabfe6d9f5c7a5ccdf73afd35e33159bddae4778dd5a0bdd43ffbf"
+    },
+    {
+      "id": "passages",
+      "path": "src/ferro/passages.js",
+      "sha256": "16fbe21b2dbd0bc0abf16a2e2c6346940f8703fc9513a9906ab1a38303dacdaa"
+    },
+    {
+      "id": "brain",
+      "path": "src/ferro/brain.js",
+      "sha256": "598175891738fbdef6788d2d5e0eee89e279a472837a49e4966ca19e0de7bcf9"
+    },
+    {
+      "id": "loop",
+      "path": "src/ferro/loop.js",
+      "sha256": "f6777ad3141ed9b9dae6b860aded5aa625433c87f3068077a5204324a7c42e2f"
+    },
+    {
+      "id": "schedule",
+      "path": "src/ferro/schedule.js",
+      "sha256": "48a8b7cf0bba9a54ef6cff896110a654195b05606392c2d74ef3a3691edf9d12"
+    },
+    {
+      "id": "jobs",
+      "path": "src/ferro/jobs.js",
+      "sha256": "c027761f5d29d62ef542e444c95a17c551fececc1cbeb492668c2d35d7b13aa7"
+    },
+    {
+      "id": "demo",
+      "path": "src/ferro/demo.js",
+      "sha256": "1169679cfa96463222f6343a6f4f3feeadfc7b90cd65d8f1b7ece6e9e0600575"
+    },
+    {
+      "id": "host",
+      "path": "src/ferro/engine.js",
+      "sha256": "10a4fc260276efb2905fe52427f5547b8238408ab9529386b6e15567b9cd7dcf"
+    }
+  ]
+}
