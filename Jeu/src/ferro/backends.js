@@ -1,6 +1,10 @@
 /* FERRO — native backend selection. A canvas can own only one context type. */
 (function(root){'use strict';
  const preference=value=>['auto','webgpu','webgl2'].includes(value)?value:'auto';
+ function isSafariOnApple(userAgent){
+  if(typeof userAgent!=='string'||/(?:Chrome|Chromium|CriOS|Firefox|FxiOS|Edg|OPR\/|OPiOS|Opera|Android|SamsungBrowser)/i.test(userAgent))return false;
+  return /\b(?:Macintosh|Mac OS X|iPhone|iPad|iPod)\b/.test(userAgent)&&/AppleWebKit\//.test(userAgent)&&/Version\/\d/.test(userAgent)&&/Safari\/\d/.test(userAgent);
+ }
  function replaceCanvas(canvas){const fresh=canvas.cloneNode(false);canvas.replaceWith(fresh);return fresh;}
  const reason=error=>String(error?.message||error||'Erreur WebGPU inconnue.').slice(0,500);
  // Cleanup must not prevent fallback or create an unhandled rejection when a
@@ -8,8 +12,11 @@
  function release(renderer){try{renderer?.dispose?.();}catch{}}
  async function create(canvas,options={},providers={}){
   const requiredGL=!!(options.sceneReflections||options.advancedSky||options.resolution==='native'),requested=preference(options.backend),gpu=providers.webgpu||root.FRenderWebGPU?.create,gl=providers.webgl2||root.FRender?.create;
+  // Host opt-in after browser-specific pacing measurements. Explicit backend
+  // choices and other hosts retain their existing selection policy.
+  const preferSafariGL=requested==='auto'&&options.preferWebGL2OnSafari===true&&isSafariOnApple(providers.userAgent??root.navigator?.userAgent);
   const supported=providers.supported??!!root.navigator?.gpu,replace=providers.replaceCanvas||replaceCanvas;
-  let fallbackReason=requiredGL?'Profil de rendu avancé disponible en WebGL2.':null,phase='initializing',failure=null,timedOut=false,timer=null,activationResult;
+  let fallbackReason=requiredGL?'Profil de rendu avancé disponible en WebGL2.':preferSafariGL?'WebGL2 privilégié pour la fluidité dans Safari.':null,phase='initializing',failure=null,timedOut=false,timer=null,activationResult;
   function deliver(){
    if(phase!=='active'||!failure)return activationResult;
    phase='failed';
@@ -27,7 +34,7 @@
    if(phase==='pending'){phase='active';return deliver();}
    return activationResult;
   }
-  if(requested!=='webgl2'&&!requiredGL){
+  if(requested!=='webgl2'&&!requiredGL&&!preferSafariGL){
    if(supported&&gpu){
     let candidate=null;
     try{
@@ -51,5 +58,5 @@
   renderer.stats.requestedBackend=requested;renderer.stats.fallbackReason=fallbackReason;
   return {renderer,canvas,requested,backend:'webgl2',fallbackReason,activate(){}};
  }
- root.FRenderBackends={create,replaceCanvas,preference,capabilities:{webgl2:{proceduralPBR:true,crowds:true,screenReflections:true,localProbes:true,advancedSky:true,nativeSurface:true},webgpu:{proceduralPBR:true,crowds:true,screenReflections:true,localProbes:false,advancedSky:false,nativeSurface:false}}};
+ root.FRenderBackends={create,replaceCanvas,preference,isSafariOnApple,capabilities:{webgl2:{proceduralPBR:true,crowds:true,screenReflections:true,localProbes:true,advancedSky:true,nativeSurface:true},webgpu:{proceduralPBR:true,crowds:true,screenReflections:true,localProbes:false,advancedSky:false,nativeSurface:false}}};
 })(globalThis);

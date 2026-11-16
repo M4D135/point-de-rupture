@@ -1,0 +1,276 @@
+banc : 6 scénarios de verdict validés (horloge fictive, aucune mesure de performance)
+✔ verifications/banc-critere.test.mjs (226.400875ms)
+ok  maillages : un par type et par niveau de détail, rangés bout à bout, indices et sommets valides
+ok  maillages : faces tournées vers le dehors, aucun triangle dégénéré
+    triangles (détail/simple) par type : 388/168 348/120 296/120 352/192 356/144 336/156 368/144 356/144 288/144 276/132 336/156 364/240 452/224
+ok  silhouettes : chaque type a ses pièces, le niveau simple est plus léger, l’anneau de sélection est partout
+ok  liste des proches : devant la caméra, assez grandes, ni libres ni cachées par le brouillard, rangées par seau
+ok  plafond : les plus grandes tailles projetées sont gardées, et pas une de plus que le plafond
+ok  tampons réutilisés : même résultat, mêmes tableaux d’une liste à l’autre
+ok  codes d’unité : decoder relit regles.coder, après le passage en Float32
+ok  sur un contexte simulé : lignes servies seulement, points en un seul appel, figurines par seau, recréation
+8 vérifications de la foule réussies
+✔ verifications/foule.test.mjs (83.538292ms)
+hote : travailleur, repli sur le fil, arrêt — OK
+✔ verifications/hote.test.mjs (47.204042ms)
+ok  voisins (0.0 s)
+ok  prise après 15 s de chauffe (0.0 s)
+ok  propagation au voisin (0.0 s)
+ok  cocktail et tirage (0.0 s)
+ok  plafond de 48 (0.0 s)
+ok  déterminisme (0.0 s)
+ok  pres (0.0 s)
+ok  proche (0.0 s)
+ok  extinction et évènement 39 (0.0 s)
+ok  exporter (0.0 s)
+ok  compter (0.0 s)
+ok  calciné (0.0 s)
+ok  empreinte qui change (0.0 s)
+ok  immeuble tourné : distFacade (0.0 s)
+ok  sens du lacet (0.0 s)
+ok  reprise après extinction (0.0 s)
+ok  coût : 4 000 immeubles en damier (0.0 s)
+ok immeubles (17 vérifications)
+✔ verifications/immeubles.test.mjs (46.871958ms)
+ok  réglages : défauts complets, sans conflit de touches
+ok  réglages : normalisation (types, bornes, alliance, touches invalides ou en conflit)
+ok  réglages : ceux de la version 1 reçoivent Z Q S D, sans perdre les choix du joueur
+ok  réglages : assigner, conflits croisés, touches réservées, seconde touche
+ok  réglages : noms des touches, lettres selon la disposition (AZERTY)
+ok  réglages : stockage lu, écrit, refusé ou illisible
+ok  outils : nombres, horloge, typographie française
+ok  ordre contextuel : unité hostile, alliée, Bastion sans et avec colère
+ok  ordre contextuel : barricades, avant-postes, QG, gisements, cassables, sol
+ok  ordres de visée : attaque, regrouper, barricade, lever, casser, avant-poste, récolter, salve, jet, ralliement
+ok  production : types produits, raisons de refus, lots bornés par la file et les moyens
+    cadre plein écran sur 100000 unités : 49008 choisies, meilleure 0.90 ms, médiane 1.02 ms (9 essais)
+ok  choix au cadre : une passe exacte sur 100 000 unités (et sa durée)
+    choix au point (100 000 unités, tri au sol) : 0.193 ms par clic en moyenne sur 20
+ok  choix au point : la plus proche à moins de 12 px, jamais une adverse ni une hors jeu
+ok  groupes : Ctrl + 1 forme, 1 rappelle, Maj + 1 ajoute ; les unités hors jeu sont élaguées
+ok  clavier et visées : attaque, arrêt, barricade en deux clics, touches de la caméra consommées
+ok  clavier : Z Q S D et les flèches font défiler la vue ; Maj + Q ou D la tourne
+ok  contexte : douze boutons pour des unités, huit pour un QG, rien pour un QG adverse
+ok  démo : un camp −1 ne s’active jamais
+ok  minicarte : géométrie (côté entier ou côté de case), aller-retour pixel ↔ monde
+    densité 128 × 128 : 0.206 ms par remplissage (moyenne de 50)
+ok  minicarte : densité par camp (teinte dominante, contact, opacité logarithmique, brouillard)
+ok  sélection : compte la peur forte, puis oublie le drapeau absent et les hors-jeu
+ok  ATH : hostilité entrante réelle, riposte, alliance, élimination et ancien état
+22 vérifications passées
+✔ verifications/interface.test.mjs (177.591875ms)
+ok  « titre » : module M.K. bien formé, PCM bipolaire, tempo 100
+ok  « convergence » : module M.K. bien formé, PCM bipolaire, tempo 126
+ok  « bastion » : module M.K. bien formé, PCM bipolaire, tempo 88
+ok  « prefecture » : module M.K. bien formé, PCM bipolaire, tempo 124
+ok  quatre morceaux distincts, mêmes octets à chaque chargement
+ok  module() rend une copie : la modifier ne change pas la suivante
+ok  instruments et coups de batterie en flottants finis, bornés
+ok  lecteur : voix bornées à 28, rien dans le passé, tempo du morceau
+ok  intensité : bascule vers la section tendue, puis retour au calme, en fin de motif
+ok  pause, volume nul, changement de morceau et recalage après un retard
+ok  rythme : une rangée après l’autre, à l’heure audio, au tempo du morceau
+ok  preparer() crée les tampons d’un morceau sans rien jouer
+ok  préchauffage : par tranches, sans AudioContext, progression jusqu’à 1
+MUSIQUE  REUSSI : 13 vérifications, 4 morceaux
+✔ verifications/musique.test.mjs (709.6965ms)
+ok  FNV-1a 64 : valeurs publiées
+ok  racine entière exacte, petites et grandes distances
+ok  pas tronqué exact jusqu’aux bornes
+ok  soumettre : verdicts et ordre canonique
+ok  texte d’une relecture : l’empreinte relevée sur le modèle Python
+ok  condensé des parties 1 à 100, 10 000 itérations (2.8 s)
+NOYAU JS  REUSSI : 6 vérifications, condensé 9565f56e1f910d8d, 337010 commandes, 100 empreintes finales distinctes
+✔ verifications/noyau.test.mjs (2850.093458ms)
+ok  pression : peur puis repli avant 25 % de cohésion ; Tenir garde la position (0.1 s)
+ok  calme : délai sans dégâts, baisse progressive, borne zéro (0.0 s)
+ok  base et Fanfare : apaisement plus rapide, même à cohésion pleine (0.0 s)
+ok  véhicule : pression du feu sans peur, repli de cohésion conservé (0.0 s)
+ok  gaz et feu : peur causale, masques alliés préservés, Tenir sort du danger (0.0 s)
+ok  emplacement réutilisé : peur et délai remis à zéro (0.0 s)
+ok  export : moyenne et seuil, hors-jeu/libres/véhicules exclus, format inchangé (0.0 s)
+ok  empreintes : peur et délai couverts, cliché périodique identique (0.0 s)
+ok  replay : commandes sans nouveau champ, résultat identique avec les règles courantes (0.3 s)
+PEUR : 9 vérifications passées
+✔ verifications/peur.test.mjs (573.932209ms)
+ok  marseille : script classique chargé dans un contexte nu (ni window, ni document, ni atob, ni Buffer)
+ok  marseille : s'ajoute à un PDR existant sans rien y remplacer
+ok  marseille : centre, étendue, carrés de jeu, mentions ODbL
+ok  marseille : chaque carré de jeu suit le damier à 10 % près (mêmes îlots)
+ok  marseille : rues d'une classe connue, au décimètre dans l'étendue, sans point doublé
+ok  marseille : polygones fermés, orientés (extérieur A > 0, trou A < 0), non dégénérés, dans l'étendue
+    5510 anneaux ; 0 se touchent ou se recoupent (0 contacts) ; 0 trous débordent de leur extérieur
+ok  marseille : anneaux simples (aucune arête n'en touche une autre non voisine) ; aucun trou ne déborde
+ok  marseille : bâtiments : 0 ≤ base < hauteur au décimètre, connue, contour, couleur
+ok  marseille : eau, espaces et repères d'une sorte connue ; repères nommés dans l'étendue
+ok  marseille : mobilier : points sans nom d'une sorte connue, au décimètre dans l'étendue, sans doublon
+    zone -1250..1250 × -1250..1460 m ; repères major, fort-saint-jean, saint-laurent, fort-saint-nicolas, saint-victor, garde, villa-mediterranee, mucem, porte-aix, reformes ; 201 bâtiments, 3898 boîtes, 12 eaux, 31 espaces, 314 voies, 1 sommet(s)
+ok  marseille : lointain : zone autour du carré, repères et bâtiments hors du carré, boîtes, eau, espaces, voies
+    rues 1177 (chemin 666, rue 253, desserte 105, secondaire 38, rail 13, tertiaire 34, voie-bus 8, jetee 56, voie-express 4), 662 nommées
+    bâtiments 5274 (25922 points), hauteur connue 1080, contours 5
+    eau 5 (bassin 4, port 1) ; espaces 166 (parc 7, pietonne 75, jardin 7, terrain 5, place 9, pelouse 32, jeux 3, bois 1, arret 16, quai 2, jetee 8, pont 1)
+    repères 119 (parc 7, place 27, musee 5, police 4, bibliotheque 4, curiosite 4, quartier 7, jardin 2, theatre 8, metro 7, site 2, tram 6, culte 13, monument 8, mairie 2, eau 1, port 1, embarcadere 4, marche 2, ville 1, justice 4)
+    mobilier 1008 (toilettes 7, terrasse 451, boite-lettres 16, conteneur 46, velos 69, potelet 163, oeuvre 36, panneau 36, fontaine-a-boire 11, velos-partage 25, corbeille 65, arret-bus 45, abri 28, motos 4, kiosque 6)
+ok  marseille : comptes par genre et par sorte, ceux qu'annoncent le module et son en-tête
+    contenu sha-256 02e22642454f693c…, empreinte des flux 6274474d ; module 245035 octets, chargé et décodé en 3.9 ms (meilleur de 5)
+ok  marseille : toujours les mêmes données (deux chargements, même contenu)
+ok  marseille : une donnée altérée est refusée au chargement
+14 vérifications passées (1 plan : marseille.js)
+✔ verifications/plans.test.mjs (423.016333ms)
+ok  le Bastion ne frappe la Préfecture qu'en colère ; la Préfecture frappe tout le monde
+ok  des alliés ne se frappent jamais, quelle que soit la colère ; personne ne se frappe soi-même
+ok  seule la Convergence casse et barricade
+ok  lever : le Bastion et la Préfecture lèvent les barricades, la Convergence les siennes seulement
+ok  seule la Préfecture lève les avant-postes ; un QG ne se lève pas
+ok  codage des unités : aller-retour exact en Float32 sur tout le domaine
+ok  tables : 13 types, factions et listes cohérentes, chiffres finis
+ok  îlots selon les effectifs : 9 jusqu'à 30 000, 13 jusqu'à 120 000, 15 au-delà
+ok  protocole : forme des commandes, évènements, tampons
+ok  0.3 : victoire au choix, remise en forme et valeurs par défaut
+ok  0.3 : part des manifestants (peu, moyen par défaut, beaucoup), cent pour cent à chaque fois
+ok  0.3 : durées de vol, feu des objets et de leurs sortes, capacités de lancer et de charge
+ok  0.3 : protocole version 2, sortes de cassables, numéros laissés aux pompiers (types 13 et 14, ordre 18, évènements 38 et 39)
+REGLES  REUSSI : 13 vérifications
+✔ verifications/regles.test.mjs (48.607541ms)
+ok  moteur : retouches marquées « PDR (nom) », bibliothèque d’éclairage et points d’accroche exposés, réglages du jeu
+ok  retouches du jeu : foule appelée dans chaque passe, état GL rétabli, lots envoyés selon leur version, voile posé puis retiré
+ok  retouche du jeu : fx.msaa === false dessine sans anticrénelage, sans recréer une seule cible
+ok  migration FERRO : géométrie et réglages conservés dans les scènes historiques du jeu
+    pièces au plus : avant-poste 0 32, avant-poste 1 142, avant-poste 2 55, barricade 130
+ok  décor : structures de chaque sorte, à chaque étape, au format de pack du moteur
+ok  décor : chaque cassable de la ville, intact et cassé, au format de pack ; tas, lieux et QG aussi
+    instances des lots : cassables 7971, tas 949, structures 77, structures hors alliance 54, marques 568, traces 5
+ok  décor : états reçus, lots versionnés, brouillard, effets de chaque évènement, valeurs finies
+    cassables de Marseille (9 îlots) : 1488 ; instances par état : 6700, 15462, 15462, 15462
+ok  décor, feu : les sortes de Marseille (deux-roues, conteneur, terrasse, kiosque) dans leurs quatre états, au format de pack
+    image la plus chargée : 166 particules, 7 lampes
+ok  décor, feu : foyers de chaque sorte, colonnes, nuages, vols, souffle, vapeur, traces, lampes, brouillard
+    plans : ville, combat, combat, combat, combat, ville, combat, combat, ville, combat ; plus grand pas de caméra 9.09 m par image
+ok  réalisateur : ville entière d’abord, puis le point le plus vivant, plans de 8 à 12 s, sans saut
+    sans la ville : 6 visées sur 400 mettent l’œil dans un immeuble ; avec : aucune (recul au plus 28.9 m ; plus grand pas en glissant 2.02 m)
+ok  caméra : au plus près, l’œil reste au-dessus des toits (la visée, elle, ne bouge pas)
+11 vérifications du rendu réussies
+✔ verifications/rendu.test.mjs (740.435334ms)
+{
+  "root": "/Users/david/Documents/Codex/2026-11-15/no/work/ferro-reference-pdr",
+  "results": [
+    {
+      "offset": 200,
+      "point": [
+        -125.5,
+        -132
+      ],
+      "before_mm": 0,
+      "after_mm": 405.8792924010783,
+      "separated": true
+    },
+    {
+      "offset": 350,
+      "point": [
+        29.7,
+        18
+      ],
+      "before_mm": 0,
+      "after_mm": 405.8792924010783,
+      "separated": true
+    },
+    {
+      "offset": 500,
+      "point": [
+        174.5,
+        168
+      ],
+      "before_mm": 0,
+      "after_mm": 405.8792924010783,
+      "separated": true
+    }
+  ]
+}
+✔ verifications/separation-cases.test.mjs (175.917166ms)
+{"checks":12,"identical":true}
+✔ verifications/separation-reference.test.mjs (550.22975ms)
+ok  empreinte FNV-1a 64 : valeurs de référence (les mêmes que noyau.js) (0.0 s)
+ok  le pas ne lit ni Math.sin, ni Math.cos, ni horloge, ni hasard non semé (0.0 s)
+ok  déterminisme : même graine et mêmes ordres, mêmes empreintes ; autre graine, autres empreintes (3.0 s)
+ok  relecture : rejouer l'enregistrement donne les mêmes empreintes, avec l'IA ou sans elle (4.0 s)
+ok  le Bastion ne frappe pas la Préfecture avant d'avoir été frappé ; il riposte ensuite, en colère (0.1 s)
+ok  des alliés ne se frappent jamais ; après la rupture, ils se battent (0.1 s)
+ok  seule la Convergence casse et barricade ; elle y gagne des Matériaux (0.1 s)
+ok  barricade : posée et finie, elle ferme la rue ; levée, elle la rouvre (et rend 50 % au Bastion) (0.1 s)
+ok  avant-postes : bâtis par les Équipes ; seule la Préfecture les lève (0.1 s)
+ok  récolte : une Équipe porte 10 unités du gisement au dépôt (0.1 s)
+ok  production : un lot sort au terme, la file tient 5 ordres, le plafond arrête, l'annulation rembourse (0.1 s)
+ok  lieu : pris en 15 s sans ennemi, gelé par un ennemi, puis repris par un autre camp (0.1 s)
+ok  repli automatique par cohésion ou peur, sauf en posture Tenir (0.1 s)
+ok  élimination et victoire : QG occupés, sans avant-poste ni effectifs, la Convergence l'emporte (0.1 s)
+ok  alliance : un camp sans base tient tant que son allié tient la sienne (0.9 s)
+ok  brouillard : les lieux tenus par l'allié restent visibles, pas ceux d'un camp isolé (0.1 s)
+ok  0.3, cocktail sur ordre : Furets seulement, 4 Matériaux pièce, vol en cloche, souffle, foyer au sol (0.0 s)
+ok  0.3, feu au sol : il presse qui s'y trouve, même les siens, qui en sortent, même à terre ; qui y tombe disparaît (0.0 s)
+ok  0.3, Canon à eau : il éteint de lui-même le foyer à sa portée, et sur ordre celui qu'on lui désigne (0.0 s)
+ok  0.3, gaz : Convergence et Bastion suffoquent et en sortent au pas ; la Préfecture et ses alliés portent le masque (0.1 s)
+ok  0.3, mise à terre : trois secondes au sol sans rien faire, puis six sans retomber ; un véhicule ne tombe pas (0.0 s)
+ok  0.3, charge : les Béliers foncent entre 4 et 12 m ; le choc repousse et jette au sol (0.0 s)
+ok  0.3, pierres : à 10 m, Cortège et Piquets qui tiennent se lancent des pierres ; le coup porte 0,6 s plus tard (0.0 s)
+ok  0.3, déroute : un camp sans base tient 30 s, puis il est éliminé ; la partie continue à deux (0.2 s)
+ok  0.3, modes de victoire : la cible de points finit la partie ; la limite de temps donne le meilleur score (1.0 s)
+ok  travailleur : pret, un état par itération, tampons rendus, vitesse, rattrapage borné, démo sans ordres humains (0.3 s)
+ok  travailleur : le joueur commande son camp seulement ; une exception devient « erreur » (0.0 s)
+    HORS_JEU 17900, CASSE 47, BARRICADE_POSEE 15, BARRICADE_FINIE 6, BARRICADE_LEVEE 10, STRUCTURE_FINIE 17, STRUCTURE_DETRUITE 8, LIEU_PRIS 17, LIEU_NEUTRALISE 10, SALVE_ANNONCE 7020, SALVE 6971, JET 4131, PRODUCTION 477, GISEMENT_EPUISE 2, ALLIANCE_FORMEE 1, ALLIANCE_ROMPUE 1, ALLIANCE_PROPOSEE 1, COLERE 498, ATTAQUE_SUBIE 1445, REFUS 2, SOIN 22994, MOLOTOV 156, FEU_ALLUME 241, FEU_ETEINT 235, LACRYMO 150, GAZ 149, A_TERRE 16992, CHARGE 6710, PIERRE 55401, POSTE_OCCUPE 1, IMMEUBLE_FEU 15, IMMEUBLE_ETEINT 9
+    12000 itérations en 40.1 s ; vivantes 4013 / 1496 / 2048 ; scores 1534 / 920 / 1513 ; lieux 2,0,1,0,0,0,1
+ok  partie de 10 minutes à trois IA, 20 000 unités : aucune exception ni valeur invalide, tout bouge (40.1 s)
+SIM  REUSSI : 28 vérifications
+✔ verifications/sim.test.mjs (52765.871625ms)
+ok  rien ne s’ouvre ni ne joue avant un geste
+ok  chaque son ponctuel joue sans exception, avec et sans StereoPanner
+ok  plafond de voix : 48 au plus, la musique a ses 28 voix à elle
+ok  les ambiances suivent la foule en vue, ses camps, ses combats
+ok  évènements placés selon la caméra, bornés par sorte et par état
+ok  annonces : ce qui concerne le joueur, et seulement lui
+ok  sourdine, volumes indépendants, interface et accusés d’ordre
+ok  le morceau suit l’écran ; la fin laisse jouer le jingle puis rend le thème
+ok  essai du mixage : deux secondes bornées, ordre, frappe et rue
+ok  libération complète, puis tout est sans effet ; son indisponible sans erreur
+ok  aucune source de son chargée d’ailleurs : ni URL, ni data:audio, ni fetch
+    son.etat, 200 000 unités, tranche de 50 000 : meilleure 0.468 ms, médiane 0.481 ms (5 × 100 appels)
+ok  son.etat avec 200 000 unités : une tranche par état, quelques dixièmes de milliseconde
+SON  REUSSI : 12 vérifications
+✔ verifications/son.test.mjs (5459.002125ms)
+ok  même plan, même ville, à l'octet près (9, 13 et 15 îlots) ; trois carrés de jeu emboîtés (1104 ms)
+ok  à l'octet près dans un contexte neuf (comme le travailleur), sans window, document ni hasard (654 ms)
+ok  protocole : villeDe choisit Marseille, le damier sinon ; mention ODbL (389 ms)
+ok  pièces conformes au format du moteur FERRO (décor et cassables) (26 ms)
+    9 îlots : 200 trajets, 21 points de segment sur 17829 frôlent un bâtiment
+    15 îlots : 200 trajets, 17 points de segment sur 28833 frôlent un bâtiment
+ok  trajets : étapes praticables, segments presque toujours dans la rue (156 ms)
+ok  départs des trois factions sur les rues, dans le carré de jeu (25 ms)
+ok  QG : trois bâtiments distincts, un par camp, sortie praticable, bâtiment plein (0 ms)
+ok  lieux, gisements, cassables : nombres du damier, nommés, dans le carré, accessibles (2 ms)
+ok  d'un seul tenant pour la navigation de 4 m : QG, lieux et gisements se rejoignent (25 ms)
+    20020 en jeu, 40 hors des rues, 19962 ont bougé ; scores 6 / 15 / 15
+ok  une partie de 30 s à trois IA, 20 000 unités, sur Marseille : tout reste dans les rues (2396 ms)
+    construction : 9 îlots 188 ms (28406 pièces, 1488 cassables) ; 13 îlots 247 ms (37795 pièces, 3517 cassables) ; 15 îlots 262 ms (41563 pièces, 4778 cassables)
+VILLE RÉELLE  REUSSI : 10 vérifications
+✔ verifications/ville-reelle.test.mjs (5528.703625ms)
+ok  même graine, même ville ; autre graine, autre ville (9, 13 et 15 îlots) (554 ms)
+ok  à l'octet près dans un contexte neuf (comme le travailleur), sans window ni document (193 ms)
+ok  pièces conformes au format du moteur FERRO (décor et cassables) (14 ms)
+ok  trajets : chaque étape et chaque segment restent praticables (68 ms)
+ok  départs des trois factions sur les rues (1 ms)
+ok  QG : trois bâtiments distincts, un par camp, sortie praticable, parvis ouvert (0 ms)
+ok  lieux : 7, 9 et 11 lieux nommés, distincts, ouverts autour du centre (0 ms)
+ok  gisements : au moins 2 Moyens et 2 Matériaux près de chaque QG, et d'autres au milieu (0 ms)
+ok  cassables : six sortes, pièces hors des objets, chacun atteignable à pied (44 ms)
+  9 îlots : 12406 pièces, 7 lieux, 16 gisements, 1236 cassables {"vitrine":187,"banc":56,"barriere":24,"voiture":683,"poubelle":246,"abribus":40}, créée en 13.6 ms, empreinte 0550d23a86b8bbd8
+  13 îlots : 23269 pièces, 9 lieux, 20 gisements, 2662 cassables {"vitrine":434,"banc":76,"barriere":24,"poubelle":543,"abribus":62,"voiture":1523}, créée en 15.5 ms, empreinte c541fc7aff79bd75
+  15 îlots : 29781 pièces, 11 lieux, 24 gisements, 3588 cassables {"vitrine":597,"banc":96,"barriere":24,"voiture":2127,"poubelle":671,"abribus":73}, créée en 15.7 ms, empreinte 3598303414fc0c0b
+VILLE  REUSSI : 9 vérifications
+✔ verifications/ville.test.mjs (1075.683ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 55983.400625

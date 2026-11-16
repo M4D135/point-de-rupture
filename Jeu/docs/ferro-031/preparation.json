@@ -1,0 +1,40 @@
+{
+  "game": "point-de-rupture",
+  "repository": "/Users/david/Documents/Codex/2026-11-15/no/work/ferro-reference-pdr",
+  "root": "/Users/david/Documents/Codex/2026-11-15/no/work/ferro-reference-pdr/Jeu",
+  "baseCommit": "4755a8d17838b9da324d15f8304385a241336705",
+  "engineCommit": "54007b174a327e97513cb0b4dc7b0f941ffc19e2",
+  "version": "0.3.1",
+  "changedModuleIds": [
+    "render",
+    "webgpu",
+    "backends",
+    "host"
+  ],
+  "moduleCount": 32,
+  "buildScript": "construire.py",
+  "html": "dist/point-de-rupture.html",
+  "testGlob": "verifications/*.test.mjs",
+  "date": "2026-11-16T07:56:35.629331+00:00",
+  "state": "prepared-local",
+  "nodeVersion": "v24.18.0",
+  "testCommand": [
+    "node",
+    "--test",
+    "--test-concurrency=2",
+    "verifications/*.test.mjs"
+  ],
+  "node": {
+    "tests": 17,
+    "pass": 17,
+    "fail": 0,
+    "todo": 0
+  },
+  "moduleHashesMatchReference": true,
+  "adaptersChanged": false,
+  "gpuTestsRun": false,
+  "pushed": false,
+  "deployed": false,
+  "buildBytes": 1676035,
+  "buildSha256": "6b9649dddddd5efa84dc5597b91c07413079c7aca5eee49b902b3ad79511471f"
+}

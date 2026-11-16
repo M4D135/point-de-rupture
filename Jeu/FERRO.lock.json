@@ -1,7 +1,7 @@
 {
   "format": "ferro-lock",
-  "version": "0.3.0",
-  "reference": "EMPRISE/src/ferro",
+  "version": "0.3.1",
+  "reference": "M4D135/FERRO:src/ferro",
   "game": "point-de-rupture",
   "modules": [
     {
@@ -12,7 +12,7 @@
     {
       "id": "render",
       "path": "src/moteur/renderer.js",
-      "sha256": "5abc2a4026b8a93519f45246cdb141550f50f34f0eb70884442bdf16cdec5c75"
+      "sha256": "ed310b7bf4265f9609a0657dfa54db6b5f1d57dedfd2357778c02f8c9d642af5"
     },
     {
       "id": "webgpu-shaders",
@@ -22,12 +22,12 @@
     {
       "id": "webgpu",
       "path": "src/ferro/webgpu-renderer.js",
-      "sha256": "0c654b0f3eefec30dfe77bc4e9f37eac33be1c3314b2713d40c3d9d3178792ff"
+      "sha256": "50e916bd9f6362e5c94b6203b5c55df266bac98217ebb5c768ab9d219116c0bd"
     },
     {
       "id": "backends",
       "path": "src/ferro/backends.js",
-      "sha256": "947f6b562e773acaf0d3ad59e1daea5a248185bd5c10b0d918a9e372e5f8dfb6"
+      "sha256": "769e607b8349aa47bae32a8ef9f4747267119de49e7b057c874294049da9ccea"
     },
     {
       "id": "geometry",
@@ -162,7 +162,7 @@
     {
       "id": "host",
       "path": "src/ferro/engine.js",
-      "sha256": "10a4fc260276efb2905fe52427f5547b8238408ab9529386b6e15567b9cd7dcf"
+      "sha256": "2c84ba77346f86e2d1d80ce609b583331de1666449ad67076300afba7c0de2ad"
     }
   ]
 }

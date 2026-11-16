@@ -1263,7 +1263,7 @@
   function spatialIndex(meshes,environment,previous,options){
     if(previous?.reconcile)return previous.reconcile(meshes,environment,options);
     const levels=[new Map(),new Map(),new Map()],large=[0,1,2].map(level=>({entries:[],epoch:0,count:0,next:null,level,key:null})),maxRadius=[0,0,0],byMesh=new WeakMap();let epoch=0;
-    const index={entries:[],query,byMesh,reconcile};let sourceMeshes=null;
+    const index={entries:[],query,byMesh,reconcile};let sourceMeshes=null,revisionedSource=false;
     function append(bucket,e){
       if(bucket.epoch!==epoch){bucket.epoch=epoch;bucket.count=0;bucket.next=null;}
       if(bucket.next)bucket.next.push(e);
@@ -1282,13 +1282,16 @@
       // Existing identities in insertions may be moves, revisions or duplicate
       // occurrences. Preserve their general reconciliation semantics instead.
       const unique=new Set();for(const q of splices)for(const mesh of q.items){if(byMesh.has(mesh)||unique.has(mesh))return false;unique.add(mesh);}
+      // A valid delta also permits opting in after a strict initial load.
+      // Release its old snapshots without reading any retained mesh fields.
+      if(!revisionedSource){for(const e of index.entries)e.sourceState=null;revisionedSource=true;}
       if(!splices.length){sourceMeshes=list;index.delta={fromEpoch:epoch,epoch,added:[],removed:[],changed:[],full:false,fast:true};return true;}
       const priorEpoch=epoch++,removed=[],added=[],entrySplices=[],dirty=new Set(),insertions=new Map();
       for(const q of splices){
         for(let i=q.start;i<q.start+q.deleteCount;i++){const e=index.entries[i];removed.push(e);dirty.add(e.indexBucket);byMesh.delete(e.mesh);}
         const items=[];for(const mesh of q.items){
           const e=metadata(mesh),p=e.p,s=mesh.s||[1,1,1],r=mesh.r||[0,0,0],c=mesh.color||[0,0,0];
-          e.sourceState=meshState(mesh,env);e.row=new Float32Array([p[0],p[1],p[2],mesh.mat||0,s[0],s[1],s[2],mesh.emissive||0,r[0],r[1],r[2],surfaceFlags(mesh,env),c[0],c[1],c[2],mesh.color?1:0]);
+          e.sourceState=null;e.row=new Float32Array([p[0],p[1],p[2],mesh.mat||0,s[0],s[1],s[2],mesh.emissive||0,r[0],r[1],r[2],surfaceFlags(mesh,env),c[0],c[1],c[2],mesh.color?1:0]);
           let bucket;if(e.radius>32)bucket=large[e.detail];else{const key=Math.floor(p[0]/8)+','+Math.floor(p[2]/8),map=levels[e.detail];bucket=map.get(key);if(!bucket){bucket={entries:[],epoch:0,count:0,next:null,level:e.detail,key};map.set(key,bucket);}maxRadius[e.detail]=Math.max(maxRadius[e.detail],e.radius);}
           e.indexBucket=bucket;e.indexPX=p[0];e.indexPZ=p[2];e.indexRadius=e.radius;e.indexDetail=e.detail;dirty.add(bucket);let group=insertions.get(bucket);if(!group){group=[];insertions.set(bucket,group);}group.push(e);byMesh.set(mesh,e);items.push(e);added.push(e);
         }entrySplices.push({start:q.start,deleteCount:q.deleteCount,items});
@@ -1302,6 +1305,9 @@
       // Opt-in producer contract: retained identity + renderRevision guarantees
       // every render/spatial property (including p/s/r/color array contents)
       // is unchanged. A revised mesh always receives complete new metadata.
+      // These producers need no per-mesh value snapshot. Returning to strict
+      // mode rebuilds metadata once because the missing snapshot cannot prove
+      // equality; subsequent strict updates retain their original checks.
       const revisionedMeshes=options?.revisionedMeshes===true;
       const priorEpoch=epoch++,priorDuplicates=index.duplicates,priorEntries=index.entries,entries=[],added=[],removed=[],changed=[],removalCandidates=[],dirtyBuckets=new Set(),bucketInsertions=new Map();let lastOrdinal=-1,cursor=0,reordered=false,duplicates=false;
       const considerRemoval=e=>{if(e.removalEpoch!==epoch){e.removalEpoch=epoch;removalCandidates.push(e);}};
@@ -1314,12 +1320,13 @@
         if(duplicate)duplicates=true;
         if(retained){
           if(!duplicate){if(e.ordinal<=lastOrdinal)reordered=true;lastOrdinal=e.ordinal;}
+          if(revisionedMeshes)e.sourceState=null;
           e.retainedEpoch=epoch;if(!revisionedMeshes&&e.chunkCategory&&!sameChunkCategory(e.chunkCategory,e))changed.push(e);
         }
         else{
           if(!priorDuplicates&&prior?.indexEpoch===priorEpoch)considerRemoval(prior);
           const p=e.p,s=mesh.s||[1,1,1],r=mesh.r||[0,0,0],c=mesh.color||[0,0,0];
-          e.sourceState=meshState(mesh,env);e.row=new Float32Array([p[0],p[1],p[2],mesh.mat||0,s[0],s[1],s[2],mesh.emissive||0,r[0],r[1],r[2],surfaceFlags(mesh,env),c[0],c[1],c[2],mesh.color?1:0]);
+          e.sourceState=revisionedMeshes?null:meshState(mesh,env);e.row=new Float32Array([p[0],p[1],p[2],mesh.mat||0,s[0],s[1],s[2],mesh.emissive||0,r[0],r[1],r[2],surfaceFlags(mesh,env),c[0],c[1],c[2],mesh.color?1:0]);
           byMesh.set(mesh,e);
           if(priorEpoch)added.push(e);
         }
@@ -1346,7 +1353,7 @@
         bucket.entries=next;bucket.epoch=epoch;bucket.count=next.length;bucket.next=null;
         if(!next.length&&bucket.key!==null)levels[bucket.level].delete(bucket.key);
       }
-      sourceMeshes=list;index.entries=entries;index.duplicates=duplicates;index.delta={fromEpoch:priorEpoch,epoch,added,removed,changed,full,fast:false};return index;
+      sourceMeshes=list;revisionedSource=revisionedMeshes;index.entries=entries;index.duplicates=duplicates;index.delta={fromEpoch:priorEpoch,epoch,added,removed,changed,full,fast:false};return index;
     }
     function query(eye,ranges,out,frustum){
       const result=out||[];result.length=0;
@@ -1529,8 +1536,8 @@
       });
       return {p,radius:Math.hypot(...s)*.5,faces,vertices,sway:mat===11,s};
     }
-    function setWorld(meshes,points,atmosphere){
-      environment=environmentInfo(atmosphere);world=spatialIndex(meshes||[],environment);lights=points||[];
+    function setWorld(meshes,points,atmosphere,setOptions){
+      environment=environmentInfo(atmosphere);world=spatialIndex(meshes||[],environment,undefined,setOptions);lights=points||[];
       explicitGround=(meshes||[]).some(mesh=>mesh.ground===true);
       shadowGeometry=new WeakMap();staticCasterPlan=null;for(const e of world.entries)shadowGeometry.set(e.mesh,null);
       worldRevision=0;stats.worldRevision=0;stats.staticTotal=world.entries.length;stats.biome=environment?environment.biome:null;
@@ -2225,8 +2232,8 @@
       for(const [key,c] of chunks)if(next.get(key)!==c)gl.deleteBuffer(c.buffer);chunks=next;stats.chunks=chunks.size;stats.chunkBuildBytes=uploads;stats.chunkUpdateIncremental=chunkState.incremental;stats.chunkEntriesVisited=chunkState.entriesVisited;
     }
     function drawChunks(accept,shadow=false){let objects=0,count=0;for(const c of chunks.values())if(accept(c)){renderBatch(c.batch,c.buffer,false,shadow);objects+=c.entries.length;count++;}if(shadow){stats.shadowChunks=count;stats.shadowStatic=objects;}else{stats.visibleChunks=count;stats.staticVisible=objects;stats.staticCulled=world.length-objects;}return count;}
-    function setWorld(meshes,points,atmosphere) {
-      const partition=partitionState=partitionWorld(meshes);environment=environmentInfo(atmosphere);world=partition.world;worldIndex=spatialIndex(world,environment);backgroundIndex=spatialIndex(partition.background,environment);lights=points||[];worldBatch=pack([]);shadowLight=null;actorLightPlan=null;stats.staticTotal=world.length+backgroundIndex.entries.length;stats.biome=environment?environment.biome:null;
+    function setWorld(meshes,points,atmosphere,setOptions) {
+      const partition=partitionState=partitionWorld(meshes);environment=environmentInfo(atmosphere);world=partition.world;worldIndex=spatialIndex(world,environment,undefined,setOptions);backgroundIndex=spatialIndex(partition.background,environment,undefined,setOptions);lights=points||[];worldBatch=pack([]);shadowLight=null;actorLightPlan=null;stats.staticTotal=world.length+backgroundIndex.entries.length;stats.biome=environment?environment.biome:null;
       worldRevision=0;stats.worldRevision=0;indexRevision++;viewCache=torchCache=sunCache=null;for(const c of chunks.values())gl.deleteBuffer(c.buffer);chunks.clear();
       lampCasters=[];for(const cache of staticCaches){cache.entries=[];cache.batch=pack([]);}
       governor.reset();autoScale=1;
