@@ -112,5 +112,84 @@ function attach(w,d){
   }
   w.sweepCapsule=sweepCapsule;w.character=character;return {setStatics,filter,govern};
 }
-G.FPhysicsGeometry={merge,attach};
+// Continuous, translation-only box motion. Kinematic targets need an explicit
+// sweep: a rigid-body solver does not stop them automatically at static walls.
+function clampBox(from,to,half,boxes,options={},out={}){
+  const valid=v=>v&&v.length===3&&Array.from(v).every(Number.isFinite);
+  const skin=options.skin??.001,axis=options.axis;
+  if(!valid(from)||!valid(to)||!valid(half)||half.some(h=>h<=0)||!Number.isFinite(skin)||skin<0||axis!==undefined&&![0,1,2].includes(axis))throw TypeError('FERRO: invalid kinematic box');
+  const p=Array.from(from),target=Array.from(to),names=['X','Y','Z'],epsilon=1e-9;
+  out.hit=false;out.fraction=1;out.nx=out.ny=out.nz=0;out.resolved=false;out.blocked=false;
+  const finish=()=>{out.x=p[0];out.y=p[1];out.z=p[2];return out;};
+  function narrow(fraction){
+    if(!G.FPhysX?.isReady())return fraction;
+    const delta=target.map((v,k)=>v-p[k]),hit={};
+    // The rail/slab calculation also guards double-precision boundaries. PhysX
+    // supplies the narrow-phase impact distance for broad-phase candidates.
+    for(const b of boxes){
+      if(!names.every((n,k)=>Math.max(p[k],target[k])+half[k]>b['min'+n]&&Math.min(p[k],target[k])-half[k]<b['max'+n]))continue;
+      G.FPhysX.sweepBox(p,half,delta,b,hit);
+      if(hit.hit&&delta[0]*hit.nx+delta[1]*hit.ny+delta[2]*hit.nz<0)fraction=Math.min(fraction,Math.max(0,hit.fraction));
+    }
+    return fraction;
+  }
+  if(axis!==undefined){
+    for(let k=0;k<3;k++)if(k!==axis&&Math.abs(from[k]-to[k])>epsilon)throw TypeError('FERRO: target must stay on its rail');
+    // Union the forbidden rail intervals before resolving an old overlapping
+    // pose. This avoids oscillating between adjacent pieces of the same wall.
+    const intervals=[];
+    for(const b of boxes){
+      let intersects=true;
+      for(let k=0;k<3;k++)if(k!==axis&&(p[k]+half[k]<=b['min'+names[k]]+epsilon||p[k]-half[k]>=b['max'+names[k]]-epsilon)){intersects=false;break;}
+      if(intersects)intervals.push([b['min'+names[axis]]-half[axis],b['max'+names[axis]]+half[axis]]);
+    }
+    intervals.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const merged=[];
+    for(const q of intervals){const last=merged[merged.length-1];if(last&&q[0]<=last[1]+2*skin)last[1]=Math.max(last[1],q[1]);else merged.push(q.slice());}
+    const start=p[axis];
+    for(const q of merged)if(p[axis]>q[0]+epsilon&&p[axis]<q[1]-epsilon){
+      const left=q[0]-skin,right=q[1]+skin,min=options.min??-Infinity,max=options.max??Infinity;
+      if(left<min&&right>max){out.hit=out.blocked=true;out.fraction=0;return finish();}
+      p[axis]=left>=min&&(right>max||p[axis]-left<=right-p[axis])?left:right;out.hit=out.resolved=true;break;
+    }
+    const delta=target[axis]-p[axis];let fraction=1,normal=0;
+    for(const q of merged){
+      const entry=delta>epsilon?(q[0]-p[axis])/delta:delta<-epsilon?(q[1]-p[axis])/delta:Infinity;
+      if(entry>=-epsilon&&entry<=fraction&&entry<=1){fraction=Math.max(0,entry);normal=delta>0?-1:1;}
+    }
+    if(normal){fraction=narrow(fraction);const distance=Math.abs(delta),retreat=Math.min(skin,distance*fraction);p[axis]+=delta*fraction+normal*retreat;out.hit=true;out.fraction=fraction;out[['nx','ny','nz'][axis]]=normal;}
+    else p[axis]=target[axis];
+    if(out.resolved&&p[axis]!==start)out.fraction=0;
+    return finish();
+  }
+  const overlaps=(b)=>names.every((n,k)=>p[k]+half[k]>b['min'+n]+epsilon&&p[k]-half[k]<b['max'+n]-epsilon);
+  // A small set of exact face projections repairs an initial overlap. Test
+  // each candidate against every obstacle, rather than correcting one axis
+  // merely because its intervals happen to overlap.
+  if(boxes.some(overlaps)){
+    let best=null,distance=Infinity;
+    for(const b of boxes)if(overlaps(b))for(let k=0;k<3;k++)for(const sign of [-1,1]){
+      const value=sign<0?b['min'+names[k]]-half[k]-skin:b['max'+names[k]]+half[k]+skin,previous=p[k];p[k]=value;
+      const clear=!boxes.some(overlaps);p[k]=previous;
+      if(clear&&Math.abs(value-previous)<distance){best=[k,value];distance=Math.abs(value-previous);}
+    }
+    if(!best){out.hit=out.blocked=true;out.fraction=0;return finish();}
+    p[best[0]]=best[1];out.hit=out.resolved=true;
+  }
+  const delta=target.map((v,k)=>v-p[k]);let fraction=1,normalAxis=-1,normalSign=0;
+  for(const b of boxes){
+    let entry=-Infinity,exit=Infinity,hitAxis=-1,sign=0;
+    for(let k=0;k<3;k++){
+      const low=b['min'+names[k]]-half[k],high=b['max'+names[k]]+half[k],d=delta[k];
+      if(Math.abs(d)<=epsilon){if(p[k]<=low+epsilon||p[k]>=high-epsilon){exit=-Infinity;break;}continue;}
+      const a=(low-p[k])/d,c=(high-p[k])/d,near=Math.min(a,c),far=Math.max(a,c);
+      if(near>entry){entry=near;hitAxis=k;sign=d>0?-1:1;}exit=Math.min(exit,far);
+    }
+    if(entry>=-epsilon&&entry<=exit&&entry<=fraction&&entry<=1&&hitAxis>=0){fraction=Math.max(0,entry);normalAxis=hitAxis;normalSign=sign;}
+  }
+  if(normalAxis>=0)fraction=narrow(fraction);
+  for(let k=0;k<3;k++)p[k]+=delta[k]*fraction;
+  if(normalAxis>=0){p[normalAxis]+=normalSign*Math.min(skin,Math.abs(delta[normalAxis])*fraction);out.hit=true;out.fraction=fraction;out[['nx','ny','nz'][normalAxis]]=normalSign;}
+  return finish();
+}
+G.FPhysicsGeometry={merge,attach,clampBox};
 })(typeof window!=='undefined'?window:globalThis);

@@ -1,0 +1,22 @@
+{
+  "library": "physx-js-webidl",
+  "version": "2.9.1",
+  "sdk": "5.12.0",
+  "upstream": "https://github.com/fabmax/physx-js-webidl",
+  "tag": "v2.9.1",
+  "commit": "3b16794502e75c624b889a48c220a40ab0af6071",
+  "releaseAssetsSha256": {
+    "physx-js-webidl.mjs": "ac2baef9bbd359163c69a343238345e74968cab291419ee173103932c5374a55",
+    "physx-js-webidl.wasm": "f3f658feb6ebd2bccb32c155509f0178abd946538912b07cfa165f9ca4472108",
+    "physx-js-webidl.d.ts": "1a409c8d86a0e6c353c2f8df585bd28b7092494bbe51932fcaa153e333ca5cde"
+  },
+  "files": {
+    "LICENSE": "0879a16adc700c9956ca0b60fbcac1fcb52310219feee827c03d7a0ab9886fbd",
+    "physx-js-webidl.mjs": "ac2baef9bbd359163c69a343238345e74968cab291419ee173103932c5374a55",
+    "physx-js-webidl.d.ts": "1a409c8d86a0e6c353c2f8df585bd28b7092494bbe51932fcaa153e333ca5cde",
+    "README.md": "fe66920e62874c5058685cc89fc1501adb2e67fa00217b092df1c7f933536103",
+    "package.json": "ea4679e238f576483e3e999f350e0d77580a9356d93d6923429076c1b0a84dab",
+    "NOTICE.md": "2a7d60ff994150a8fc287fcc574322dff19f0a506493f9a36d6d179053f7ce7e",
+    "physx-js-webidl.wasm": "f3f658feb6ebd2bccb32c155509f0178abd946538912b07cfa165f9ca4472108"
+  }
+}

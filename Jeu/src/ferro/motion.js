@@ -73,13 +73,13 @@
     }
     function update(dt,loc={},signals={},enabled=true){
       dt=clamp(finite(dt),0,.12);
-      const speed=Math.max(0,finite(loc.speed)),move=speed>.04?clamp(finite(loc.moveBlend),0,1):0;
+      const speed=Math.max(0,finite(loc.speed)),move=!signals.flying&&speed>.04?clamp(finite(loc.moveBlend),0,1):0;
       const run=clamp(finite(loc.sprintBlend),0,1),dash=clamp(finite(loc.dashBlend),0,1),phase=finite(loc.stridePhase);
       const strafe=clamp(finite(loc.strafe)/5,-1,1),forward=clamp(finite(loc.forward)/5,-1,1);
       const yawRate=clamp(finite(signals.lookYaw),-8,8),pitchRate=clamp(finite(signals.lookPitch),-6,6),time=finite(signals.time);
       const kick=damp('kick',0,kickOmega,dt),equip=damp('equip',0,21,dt),impact=damp('impact',0,23,dt),blast=damp('blast',0,17,dt),melee=damp('melee',0,19,dt);
       const intensity=enabled?1:.22,runPose=run*(signals.firing?.18:1);
-      const breathing=Math.sin(time*1.45)*.002*(1-move);
+      const breathing=signals.flying?0:Math.sin(time*1.45)*.002*(1-move);
       const x=damp('x',Math.sin(phase)*.014*move-strafe*.014-yawRate*.003,25,dt);
       const y=damp('y',Math.cos(phase*2)*.009*move-runPose*.024-dash*.028+breathing,25,dt);
       const z=damp('z',runPose*.012+dash*.032-forward*.004,23,dt);
@@ -102,7 +102,8 @@
         view.height=view.roll=view.fov=0;
         for(const key of ['height','cameraRoll','fov']){const q=channel(key);q.x=q.v=0;}
       }
-      if(options.cameraSteps){const y=Number.isFinite(signals.groundY)?signals.groundY:null,delta=stepY===null||y===null?0:y-stepY;stepOffset*=Math.exp(-14*dt);if(signals.grounded&&Math.abs(delta)<=.45)stepOffset-=delta;else if(!signals.grounded||Math.abs(delta)>.45)stepOffset=0;stepY=y;view.step=enabled?stepOffset:0;view.height+=view.step+damp('landing',0,18,dt)*(enabled?1:.3);}
+      if(options.cameraSteps&&signals.flying){stepY=null;stepOffset=0;view.step=0;const q=channel('landing');q.x=q.v=0;}
+      if(options.cameraSteps&&!signals.flying){const y=Number.isFinite(signals.groundY)?signals.groundY:null,delta=stepY===null||y===null?0:y-stepY;stepOffset*=Math.exp(-14*dt);if(signals.grounded&&Math.abs(delta)<=.45)stepOffset-=delta;else if(!signals.grounded||Math.abs(delta)>.45)stepOffset=0;stepY=y;view.step=enabled?stepOffset:0;view.height+=view.step+damp('landing',0,18,dt)*(enabled?1:.3);}
       const recoilScale=enabled?1:.3;view.pitch=damp('cameraKick',0,kickOmega,dt)*recoilScale;view.recoilFov=damp('kickFov',0,14,dt)*recoilScale;view.recoilRoll=damp('kickRoll',0,kickOmega,dt)*recoilScale;view.fov+=view.recoilFov;view.roll+=view.recoilRoll;
       return view;
     }

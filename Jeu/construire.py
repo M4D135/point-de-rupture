@@ -39,6 +39,8 @@ MODULES = [
     ('sim/ia.js', 'simulation'),
     ('sim/travailleur.js', 'simulation'),
     ('ferro/engine.js', 'page'),
+    ('ferro/physx-runtime.js', 'page'),
+    ('ferro/physx.js', 'page'),
     ('crowd-style.js', 'page'),
     ('ferro/crowd.js', 'page'),
     ('foule.js', 'page'),
@@ -83,6 +85,7 @@ def main():
         raise SystemExit('index.html doit contenir __VERSION_JEU__ et, une fois, __EDITION_JEU__')
     gabarit = gabarit.replace('__VERSION_JEU__', VERSION.removeprefix('essai-')).replace('__EDITION_JEU__', EDITION)
 
+    sources['jeu.js']='FERRO.initPhysics().then(function(){\n'+sources['jeu.js']+"\n}).catch(function(error){console.error('FERRO physics initialization failed',error);const notice=document.createElement('p');notice.setAttribute('role','alert');notice.textContent='Impossible de démarrer le jeu. Rechargez la page.';document.body.appendChild(notice);});"
     scripts = '\n'.join(f'{OUVERTURE[role]}\n// ---- {nom} ----\n{sources[nom]}</script>' for nom, role in MODULES)
     fragment = gabarit.replace('/*STYLE*/', style.rstrip('\n')).replace('<!--MODULES-->', scripts)
     autonome, remplacements = POLICES.subn('', fragment)

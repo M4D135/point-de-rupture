@@ -1,6 +1,6 @@
 {
   "format": "ferro-lock",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "reference": "M4D135/FERRO:src/ferro",
   "game": "point-de-rupture",
   "modules": [
@@ -47,7 +47,17 @@
     {
       "id": "physics-geometry",
       "path": "src/ferro/physics-geometry.js",
-      "sha256": "c22965240de6a8f743aad87ff8514aaf7932a1c7f2a3635812b912e5fd9e9653"
+      "sha256": "fc73172463262947ced24017cc03ef73a00c113e2a850fab3460bd3c30fcd242"
+    },
+    {
+      "id": "physxRuntime",
+      "path": "src/ferro/physx-runtime.js",
+      "sha256": "0234e97848df3e50d296d6e099d9340abf7f857beaa275276eb9c8c2974c7010"
+    },
+    {
+      "id": "physx",
+      "path": "src/ferro/physx.js",
+      "sha256": "7c424d7ff34a14952868d5d2bf2c5fa51a1d6bd65e47a2f687c34c4981cc5b5c"
     },
     {
       "id": "physics",
@@ -72,7 +82,7 @@
     {
       "id": "motion",
       "path": "src/ferro/motion.js",
-      "sha256": "6f5078fafa6e61850ff58fde484463db05c3b1fff5e5a1bc2818191b13618ec4"
+      "sha256": "3ea6ff872208b6c133a3f732d51d0706fc36a2d042725c7e6c59fba42ab4df4b"
     },
     {
       "id": "effects",
@@ -162,7 +172,7 @@
     {
       "id": "host",
       "path": "src/ferro/engine.js",
-      "sha256": "60cd8cafa388da240aa37ee438888fe1886074801bf16596f3a434f31d59c5d0"
+      "sha256": "8b16877330d775edc88267e335742bc8f5244a3e13324caecb8d26157b7dd8b8"
     }
   ]
 }

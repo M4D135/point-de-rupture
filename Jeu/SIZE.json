@@ -1,8 +1,8 @@
 {
   "version": "essai-0.3e",
-  "raw": 1676440,
-  "gzip": 565301,
-  "sha256": "bc789bad456aac49233ddf45ebf5e8d1efcc2540ef5ceb037defc9ed7dfd87a9",
+  "raw": 13753117,
+  "gzip": 3274187,
+  "sha256": "f5dc86c6c97cd996184d1ad268ab929c5d3ceae4eb774fd6558e9e4cfac8a77d",
   "sources": {
     "moteur/renderer.js": 209041,
     "sim/regles.js": 25098,
@@ -15,7 +15,9 @@
     "sim/monde.js": 162803,
     "sim/ia.js": 40239,
     "sim/travailleur.js": 9269,
-    "ferro/engine.js": 1871,
+    "ferro/engine.js": 2024,
+    "ferro/physx-runtime.js": 12063280,
+    "ferro/physx.js": 12834,
     "crowd-style.js": 34182,
     "ferro/crowd.js": 59966,
     "foule.js": 393,
@@ -30,7 +32,7 @@
     "interface/minicarte.js": 18699,
     "interface/commandes.js": 57088,
     "hote.js": 6138,
-    "jeu.js": 14925,
+    "jeu.js": 15233,
     "index.html": 24218,
     "style.css": 59124
   }
