@@ -62,7 +62,7 @@ OUVERTURE = {
     'partage': '<script data-travailleur>',
     'simulation': '<script type="text/plain" data-travailleur>',
 }
-VERSION = 'essai-0.3e'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3e »)
+VERSION = 'essai-0.3f'        # chaque page mise en ligne a la sienne ; l'écran titre l'affiche (« V0.3e »)
 EDITION = '03 / MARSEILLE'    # le nom de l'étape, à gauche de la version sur l'écran titre
 # La page servie en ligne ne charge rien d'ailleurs : sans les polices de Google, le style se rabat sur celles du système.
 POLICES = re.compile(r'^<link rel="stylesheet" href="https://fonts\.googleapis\.com/[^"]*">\n', re.M)
